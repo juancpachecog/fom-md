@@ -126,5 +126,3 @@
 .leaflet-popup.ruta-popup span{display:block;color:#b7c7d9}
 .leaflet-popup.ruta-popup a.leaflet-popup-close-button{color:#b7c7d9}
 .ruta-item.activo{border-color:#349bfa;background:#173957;box-shadow:0 0 0 1px #349bfa55}
-/* Con Mapbox, el logo sube por encima de la etiqueta «Actualización cada 15 s». */
-.control-map .pnl-mapa.con-mapbox .leaflet-bottom.leaflet-left{bottom:64px}

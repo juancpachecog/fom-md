@@ -1,16 +1,23 @@
 import { useMemo, useState } from 'react'
 import MapaLibre from './MapaLibre'
+import MapaMapbox, { HAY_MAPBOX } from './MapaMapbox'
 import FichaUnidad from './FichaUnidad'
 import { vehicleMarkerUrl } from './vehicleMarker'
 import MapaGoogle, { hayClaveMaps } from './MapaGoogle'
 
 // ============================================================
 // MAPA DE FLOTA
-// Por defecto usa OpenStreetMap con Leaflet: mapa real de calles, gratis y
-// sin clave. Si algún día se configura VITE_GOOGLE_MAPS_API_KEY, pasa a
-// Google Maps (el mismo proveedor que react-native-maps usa en la app).
+// Con `VITE_MAPBOX_TOKEN` el mapa es Mapbox GL (estilo Standard, 3D, satélite,
+// tráfico: ver MapaMapbox.jsx). Sin token, OpenStreetMap con Leaflet: mapa real
+// de calles, gratis y sin clave. Si Mapbox falla (token vencido, URL no
+// permitida, navegador sin WebGL 2) se vuelve a Leaflet en esa misma sesión.
+// Si algún día se configura VITE_GOOGLE_MAPS_API_KEY, pasa a Google Maps.
 // El plano esquemático de más abajo queda solo como último recurso.
 // ============================================================
+
+// Una vez que Mapbox falla, todos los mapas de la sesión usan Leaflet: no tiene
+// sentido volver a intentarlo (y cobrar una carga) en cada pantalla.
+let mapboxFallo = false
 
 // Encuadre geográfico de la zona de operación
 const LNG_MIN = -71.85
@@ -74,7 +81,11 @@ function colorEstado(v) {
  * y no se enteran de cuál está detrás.
  */
 export default function Mapa(props) {
+  const [, rehacer] = useState(0)
   if (hayClaveMaps) return <MapaGoogle {...props} />
+  if (HAY_MAPBOX && !mapboxFallo) {
+    return <MapaMapbox {...props} alFallar={() => { mapboxFallo = true; rehacer((n) => n + 1) }} />
+  }
   return <MapaLibre {...props} />
 }
 

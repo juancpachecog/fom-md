@@ -59,10 +59,6 @@
 .fleet-map-legend .gris i { background:#a1afbf; }
 .pnl-mapa.fleet-map { background:#0b1927; }
 .fom-dark .pnl-mapa.fleet-map.oscuro .leaflet-tile-pane,.fom-site .pnl-mapa.fleet-map.oscuro .leaflet-tile-pane,.pnl-mapa.fleet-map.oscuro .leaflet-tile-pane { filter:invert(1) grayscale(1) sepia(.55) hue-rotate(166deg) saturate(2) brightness(.85) contrast(.92); }
-/* Con Mapbox debajo el estilo ya es oscuro de verdad (luz de noche): el filtro que oscurecía las teselas de OpenStreetMap sobra. */
-.pnl-mapa.fleet-map.oscuro.con-mapbox .leaflet-tile-pane { filter:none; }
-.leaflet-mapbox-layer { position:absolute; }
-.leaflet-mapbox-layer .mapboxgl-canvas { position:absolute; left:0; top:0; }
 .fleet-map .leaflet-control-zoom a { background:#0b1927; color:#f3f7fc; border-color:#263b4d; }
 .fleet-map .leaflet-control-attribution { background:#0b1927e8; color:#b7c7d9; }
 .fleet-map .leaflet-control-attribution a { color:#85c9ff; }
@@ -73,4 +69,3 @@
   .fleet-card .fleet-plate { font-size:28px; }
 }
 @media(prefers-reduced-motion:reduce) { .fleet-marker { transition:none!important; } }
-.pnl-mapa.con-mapbox .leaflet-bottom.leaflet-left .mapboxgl-ctrl-logo { display: block; margin: 0 0 6px 6px; opacity: 0.85; }

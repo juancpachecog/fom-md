@@ -5,7 +5,7 @@ import { useSesion } from '../useSesion'
 import { miAsignacion } from '../datos/asignacion-conductor'
 export { miAsignacion } from '../datos/asignacion-conductor'
 import { Cabecera, Cargando, Datos, ErrorCarga, Tag, Tarjeta, Vacio } from '../comp/ui'
-import MapaLibre from '../comp/MapaLibre'
+import Mapa from '../comp/Mapa'
 import * as f from '../datos/formato'
 import { etiqueta } from '../datos/catalogos'
 import { Icono } from '../Iconos'
@@ -186,7 +186,7 @@ export default function MiUnidad() {
           {/* --- Posición y cifras de la unidad -------------------------- */}
           <section className="mu-mapa" aria-label="Posición de la unidad">
             {enMapa.length > 0 ? (
-              <MapaLibre
+              <Mapa
                 vehiculos={enMapa}
                 recorrido={unidad.recorrido ?? null}
                 alto="clamp(400px, calc(100vh - 450px), 820px)"

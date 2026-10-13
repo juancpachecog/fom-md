@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { Cabecera, Cargando, ErrorCarga, Tarjeta, Vacio, Kpi } from '../comp/ui'
-import MapaLibre from '../comp/MapaLibre'
+import Mapa from '../comp/Mapa'
 import FichaUnidad from '../comp/FichaUnidad'
 import * as f from '../datos/formato'
 import { etiqueta } from '../datos/catalogos'
@@ -197,7 +197,7 @@ function Tablero({ resumen: r, vehiculos, odts, alertas, inspecciones, seleccion
       <div className="pnl-resumen-central">
         <div className="pnl-resumen-mapa">
           <Tarjeta titulo="Vehículos en tiempo real" accion={<Link to="/panel/mapa" className="pnl-link">Ver centro de control →</Link>} sinCuerpo>
-            <MapaLibre vehiculos={unidades} seleccionado={seleccion?.id} alSeleccionar={alSeleccionar} alto="clamp(360px, 48vh, 570px)" leyenda={false} ficha={false} />
+            <Mapa vehiculos={unidades} seleccionado={seleccion?.id} alSeleccionar={alSeleccionar} alto="clamp(360px, 48vh, 570px)" leyenda={false} ficha={false} />
           </Tarjeta>
         </div>
         <div className="pnl-resumen-unidad">
