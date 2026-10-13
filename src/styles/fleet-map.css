@@ -73,3 +73,4 @@
   .fleet-card .fleet-plate { font-size:28px; }
 }
 @media(prefers-reduced-motion:reduce) { .fleet-marker { transition:none!important; } }
+.pnl-mapa.con-mapbox .leaflet-bottom.leaflet-left .mapboxgl-ctrl-logo { display: block; margin: 0 0 6px 6px; opacity: 0.85; }

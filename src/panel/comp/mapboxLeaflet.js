@@ -39,6 +39,18 @@ export function crearCapaMapbox(mapboxgl) {
       map.getPane(this.getPaneName()).appendChild(this._container)
       this._initGL()
       this._offset = this._map.containerPointToLayerPoint([0, 0])
+      // El logo de Mapbox tiene que verse (lo exige su licencia). El propio de GL queda
+      // tapado dentro del lienzo, así que se pone como control de Leaflet, abajo a la izquierda.
+      this._logo = L.control({ position: 'bottomleft' })
+      this._logo.onAdd = () => {
+        const a = L.DomUtil.create('a', 'mapboxgl-ctrl-logo')
+        a.href = 'https://www.mapbox.com/'
+        a.target = '_blank'
+        a.rel = 'noopener nofollow'
+        a.setAttribute('aria-label', 'Mapbox')
+        return a
+      }
+      this._logo.addTo(map)
       if (map.options.zoomAnimation) L.DomEvent.on(map._proxy, L.DomUtil.TRANSITION_END, this._transitionEnd, this)
     },
 
@@ -46,6 +58,8 @@ export function crearCapaMapbox(mapboxgl) {
       if (this._map._proxy && this._map.options.zoomAnimation) {
         L.DomEvent.off(this._map._proxy, L.DomUtil.TRANSITION_END, this._transitionEnd, this)
       }
+      this._logo?.remove()
+      this._logo = null
       map.getPane(this.getPaneName()).removeChild(this._container)
       this._glMap?.remove()
       this._glMap = null
