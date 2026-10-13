@@ -7,7 +7,7 @@ import { pintarCola, pintarRuta } from './rutaLeaflet'
 import '../../styles/fleet-map.css'
 
 // ============================================================
-// MAPA REAL Y GRATUITO (Leaflet + OpenStreetMap)
+// MAPA REAL (Leaflet encima; debajo Mapbox si hay token, si no OpenStreetMap)
 // Servicio público sin garantía de disponibilidad. Respetar la política de
 // teselas: identificación del sitio, caché del navegador y atribución visible.
 //
@@ -47,6 +47,22 @@ const TESELAS = {
  * Sin esa variable todo sigue como antes.
  */
 const ESTILO_VECTORIAL = import.meta.env?.VITE_MAPA_ESTILO || ''
+
+/**
+ * MAPBOX (decisión de Marco, 13 oct 2026): con `VITE_MAPBOX_TOKEN` (un token
+ * público `pk.` restringido por URL en la cuenta de Mapbox) el mapa de debajo
+ * pasa a ser Mapbox GL JS v3 con el estilo Standard: calles en vector, 3D,
+ * luz del día, satélite si se cambia el estilo. Marcadores, recorridos y
+ * fichas siguen en Leaflet encima, sin cambios. Se cobra por «carga de
+ * mapa» (50.000 gratis al mes). Sin token, todo sigue como antes. Si el
+ * token falla (vencido, URL no permitida), se vuelve a OpenStreetMap y se
+ * avisa, en vez de dejar el mapa en blanco.
+ */
+const MAPBOX_TOKEN = String(import.meta.env?.VITE_MAPBOX_TOKEN || '').trim()
+const MAPBOX_ESTILO = import.meta.env?.VITE_MAPBOX_ESTILO || 'mapbox://styles/mapbox/standard'
+// dawn | day | dusk | night: la luz del estilo Standard. El panel es oscuro: noche.
+const MAPBOX_LUZ = import.meta.env?.VITE_MAPBOX_LUZ || 'night'
+const HAY_MAPBOX = /^pk\./u.test(MAPBOX_TOKEN)
 const ATRIBUCION_VECTORIAL = import.meta.env?.VITE_MAPA_ATRIBUCION || '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 
 /**
@@ -150,6 +166,9 @@ export default function MapaLibre({
   const colaEncuadrada = useRef(null)
   const encuadrado = useRef(false)
   const [fallaTeselas, setFallaTeselas] = useState(false)
+  // Mapbox cargó mal (token inválido, URL no permitida, sin WebGL 2): se cae a OpenStreetMap.
+  const [mapboxFallo, setMapboxFallo] = useState(false)
+  const conMapbox = HAY_MAPBOX && !mapboxFallo
 
   const esquema = 'oscuro'
 
@@ -199,6 +218,39 @@ export default function MapaLibre({
     if (capa.current) capa.current.remove()
     let fallos = 0
     let cargoAlguna = false
+    if (conMapbox) {
+      let cancelado = false
+      Promise.all([import('mapbox-gl'), import('mapbox-gl/dist/mapbox-gl.css'), import('./mapboxLeaflet')])
+        .then(([mapboxgl, , { crearCapaMapbox }]) => {
+          if (cancelado || !mapa.current) return
+          const gl = mapboxgl.default ?? mapboxgl
+          if (!gl.supported?.({ failIfMajorPerformanceCaveat: false })) throw new Error('Este navegador no puede dibujar el mapa de Mapbox (WebGL 2).')
+          const esStandard = /\/standard(?:-satellite)?$/u.test(MAPBOX_ESTILO)
+          capa.current = crearCapaMapbox(gl)({
+            accessToken: MAPBOX_TOKEN,
+            style: MAPBOX_ESTILO,
+            config: esStandard ? { basemap: { lightPreset: MAPBOX_LUZ, showPointOfInterestLabels: true, showPlaceLabels: true, showRoadLabels: true, showTransitLabels: false } } : undefined,
+            attribution: '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            alCargar: () => setFallaTeselas(false),
+            alError: (error) => {
+              // Un 401 o 403 es el token; un fallo de estilo o de WebGL es el entorno. En todos los
+              // casos la respuesta es la misma: mapa de respaldo y aviso, nunca un rectángulo vacío.
+              console.warn('[mapa] Mapbox no cargó; se usa OpenStreetMap:', error?.message || error)
+              setMapboxFallo(true)
+            },
+          })
+          capa.current.addTo(mapa.current)
+        })
+        .catch((error) => {
+          console.warn('[mapa] Mapbox no cargó; se usa OpenStreetMap:', error?.message || error)
+          setMapboxFallo(true)
+        })
+      return () => {
+        cancelado = true
+        capa.current?.remove()
+        capa.current = null
+      }
+    }
     if (ESTILO_VECTORIAL) {
       // Carga perezosa: el motor vectorial pesa y solo se baja si hay un estilo configurado.
       let cancelado = false
@@ -242,7 +294,7 @@ export default function MapaLibre({
       if (!cargoAlguna) setFallaTeselas(true)
     }, 8000)
     return () => clearTimeout(vigilante)
-  }, [esquema])
+  }, [esquema, conMapbox])
 
   // Marcadores de las unidades
   useEffect(() => {
@@ -409,7 +461,7 @@ export default function MapaLibre({
   const estados = [...new Map(vehiculos.map(v => { const e = estadoUnidad(v); return [e.clave, e] })).values()]
 
   return (
-    <div className={`pnl-mapa fleet-map${esquema === 'oscuro' ? ' oscuro' : ''}`} style={{ height: alto }}>
+    <div className={`pnl-mapa fleet-map${esquema === 'oscuro' ? ' oscuro' : ''}${conMapbox ? ' con-mapbox' : ''}`} style={{ height: alto }}>
       <div ref={contenedor} className="pnl-mapa-lienzo" />
 
       {fallaTeselas && (

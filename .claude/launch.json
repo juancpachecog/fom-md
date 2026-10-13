@@ -97,6 +97,18 @@
         "rapido"
       ],
       "port": 4173
+    },
+    {
+      "name": "fom-prueba-mapbox",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--mode",
+        "prueba-mapbox",
+        "--port",
+        "5177"
+      ],
+      "port": 5177
     }
   ]
 }
