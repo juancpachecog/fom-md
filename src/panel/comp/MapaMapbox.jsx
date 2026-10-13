@@ -3,6 +3,9 @@ import FichaUnidad, { estadoUnidad } from './FichaUnidad'
 import { vehicleMarkerSvg, MARKER_SIZE, MARKER_ANCHOR, validPosition } from './vehicleMarker'
 import { pintarCola, pintarRuta } from './rutaMapbox'
 import CapasMapa from './CapasMapa'
+import HerramientasRuta from './HerramientasRuta'
+import { limitesDe, pintarAlcance, pintarLlegada } from './herramientasMapbox'
+import { alcanceDesde, emparejarPuntos, emparejarViajes, rutaConTrafico } from '../datos/mapboxApi'
 import { configDe, estiloDe, guardarPrefs, leerPrefs, luzEfectiva, nieblaDe } from './mapaPrefs'
 import '../../styles/fleet-map.css'
 import '../../styles/mapa-mapbox.css'
@@ -35,6 +38,8 @@ function leerTokens() {
   const cs = getComputedStyle(raiz)
   return { primario: cs.getPropertyValue('--e-primario').trim() || '#208AEF' }
 }
+
+const HERR_VACIO = Object.freeze({ eligiendo: false, llegada: null, cargandoLlegada: false, errorLlegada: null, alcance: null, cargandoAlcance: false, errorAlcance: null })
 
 const sinMovimiento = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -176,6 +181,85 @@ export default function MapaMapbox({
   const prefsRef = useRef(prefs)
   prefsRef.current = prefs
   const [luzActual, setLuzActual] = useState(() => luzEfectiva(prefs))
+  const seleccionadoRef = useRef(seleccionado)
+  seleccionadoRef.current = seleccionado
+
+  // Llegada y alcance de la unidad elegida (Directions e Isochrone de Mapbox)
+  const [herr, setHerr] = useState(HERR_VACIO)
+  const modoDestino = useRef(false)
+  const llegadaCapa = useRef(null)
+  const alcanceCapa = useRef(null)
+  const elegirDestinoRef = useRef(null)
+
+  const limpiarHerramientas = () => {
+    modoDestino.current = false
+    llegadaCapa.current?.quitar?.()
+    llegadaCapa.current = null
+    alcanceCapa.current?.quitar?.()
+    alcanceCapa.current = null
+    setHerr(HERR_VACIO)
+  }
+
+  const encuadre = (m) => {
+    const ancho = m.getContainer().getBoundingClientRect().width
+    return { top: 110, left: ancho > 600 && (ficha || espacioFicha) ? 420 : 40, right: ancho > 600 ? 340 : 40, bottom: 90 }
+  }
+
+  const elegirDestino = async (destino) => {
+    const m = mapa.current
+    const mapboxgl = gl.current
+    const u = vehiculosRef.current.find((x) => x.id === seleccionadoRef.current)
+    if (!m || !mapboxgl || !validPosition(u)) return
+    modoDestino.current = false
+    llegadaCapa.current?.quitar?.()
+    llegadaCapa.current = null
+    setHerr((h) => ({ ...h, eligiendo: false, cargandoLlegada: true, errorLlegada: null, llegada: null }))
+    try {
+      const r = await rutaConTrafico({ lat: u.lat, lng: u.lng }, destino)
+      if (!mapa.current || seleccionadoRef.current !== u.id || !estiloListo.current) return
+      llegadaCapa.current = pintarLlegada(mapboxgl, m, { tramos: r.tramos, destino })
+      const limites = limitesDe(mapboxgl, r.trazo)
+      if (limites) m.fitBounds(limites, { padding: encuadre(m), maxZoom: 15, duration: sinMovimiento() ? 0 : 800 })
+      setHerr((h) => ({ ...h, cargandoLlegada: false, llegada: r }))
+    } catch (e) {
+      setHerr((h) => ({ ...h, cargandoLlegada: false, errorLlegada: `No se pudo calcular la llegada. ${e?.message || ''}`.trim() }))
+    }
+  }
+  elegirDestinoRef.current = elegirDestino
+
+  const empezarDestino = () => {
+    modoDestino.current = true
+    setHerr((h) => ({ ...h, eligiendo: true, errorLlegada: null }))
+  }
+  const quitarLlegada = () => {
+    modoDestino.current = false
+    llegadaCapa.current?.quitar?.()
+    llegadaCapa.current = null
+    setHerr((h) => ({ ...h, eligiendo: false, llegada: null, errorLlegada: null }))
+  }
+  const alternarAlcance = async () => {
+    const m = mapa.current
+    const mapboxgl = gl.current
+    if (alcanceCapa.current) {
+      alcanceCapa.current.quitar()
+      alcanceCapa.current = null
+      setHerr((h) => ({ ...h, alcance: null, errorAlcance: null }))
+      return
+    }
+    const u = vehiculosRef.current.find((x) => x.id === seleccionadoRef.current)
+    if (!m || !mapboxgl || !validPosition(u)) return
+    setHerr((h) => ({ ...h, cargandoAlcance: true, errorAlcance: null }))
+    try {
+      const zonas = await alcanceDesde({ lat: u.lat, lng: u.lng }, [10, 20, 30])
+      if (!mapa.current || seleccionadoRef.current !== u.id || !estiloListo.current) return
+      alcanceCapa.current = pintarAlcance(m, zonas)
+      const limites = limitesDe(mapboxgl, zonas.features.map((z) => z.geometry?.coordinates))
+      if (limites) m.fitBounds(limites, { padding: encuadre(m), duration: sinMovimiento() ? 0 : 800 })
+      setHerr((h) => ({ ...h, cargandoAlcance: false, alcance: zonas }))
+    } catch (e) {
+      setHerr((h) => ({ ...h, cargandoAlcance: false, errorAlcance: `No se pudo calcular el alcance. ${e?.message || ''}`.trim() }))
+    }
+  }
 
   // Crear el mapa una sola vez
   useEffect(() => {
@@ -254,6 +338,10 @@ export default function MapaMapbox({
         }
         m.on('zoomend', ajustarMarcadores)
         ajustarMarcadores()
+        // Eligiendo destino: un toque en el mapa es el destino.
+        m.on('click', (e) => {
+          if (modoDestino.current) elegirDestinoRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng })
+        })
       })
       .catch((error) => {
         console.warn('[mapa] Mapbox no cargó; se usa el mapa de respaldo:', error?.message || error)
@@ -275,6 +363,24 @@ export default function MapaMapbox({
       mapa.current = null
       encuadrado.current = false
     }
+  }, [])
+
+  // Escape cancela la elección de destino.
+  useEffect(() => {
+    const tecla = (e) => {
+      if (e.key === 'Escape' && modoDestino.current) {
+        modoDestino.current = false
+        setHerr((h) => ({ ...h, eligiendo: false }))
+      }
+    }
+    document.addEventListener('keydown', tecla)
+    return () => document.removeEventListener('keydown', tecla)
+  }, [])
+
+  // Al desmontar se quitan las capas de llegada y alcance.
+  useEffect(() => () => {
+    llegadaCapa.current?.quitar?.()
+    alcanceCapa.current?.quitar?.()
   }, [])
 
   // La luz automática cambia con la hora: se revisa cada cinco minutos.
@@ -304,6 +410,7 @@ export default function MapaMapbox({
       ruta.current = null
       colaCapa.current?.quitar?.()
       colaCapa.current = null
+      limpiarHerramientas()
       estiloListo.current = false
       m.setStyle(estiloDe(nuevas), { config: { basemap: configDe(nuevas) } })
     } else if (estiloListo.current) {
@@ -350,6 +457,10 @@ export default function MapaMapbox({
         const el = mk.getElement()
         el.onclick = (e) => {
           e.stopPropagation()
+          if (modoDestino.current && v.id !== seleccionadoRef.current) {
+            elegirDestinoRef.current?.({ lat: v.lat, lng: v.lng })
+            return
+          }
           alSeleccionar?.(seleccionado === v.id ? null : v.id)
         }
         el.onkeydown = (e) => {
@@ -389,6 +500,7 @@ export default function MapaMapbox({
   // Al ELEGIR una unidad se centra en ella (una sola vez, sin tocar el zoom).
   useEffect(() => {
     colaEncuadrada.current = null
+    limpiarHerramientas()
     const m = mapa.current
     if (!m || !seleccionado) return
     const v = vehiculosRef.current.find((x) => x.id === seleccionado)
@@ -407,13 +519,27 @@ export default function MapaMapbox({
     ruta.current = null
     if (!m || !mapboxgl || !listo || !estiloListo.current) return undefined
     if (!viajes?.length && !paradas?.length) return undefined
-    const r = pintarRuta(mapboxgl, m, { viajes: viajes ?? [], paradas: paradas ?? [], color: leerTokens().primario, alElegirViaje: (n) => alElegirViajeRef.current?.(n) })
-    ruta.current = r
-    resaltarRef.current = r.resaltar
-    r.resaltar(viajeActivoRef.current)
+    const color = leerTokens().primario
+    const pintar = (lista) => {
+      ruta.current?.quitar?.()
+      const r = pintarRuta(mapboxgl, m, { viajes: lista, paradas: paradas ?? [], color, alElegirViaje: (n) => alElegirViajeRef.current?.(n) })
+      ruta.current = r
+      resaltarRef.current = r.resaltar
+      r.resaltar(viajeActivoRef.current)
+    }
+    // Se pinta de una vez tal como vino del GPS y, cuando Mapbox lo pega a las calles, se repinta.
+    pintar(viajes ?? [])
+    const control = new AbortController()
+    emparejarViajes(viajes ?? [], { señal: control.signal })
+      .then((pegados) => {
+        if (control.signal.aborted || !mapa.current || !estiloListo.current) return
+        if (pegados.some((x) => x.pegado)) pintar(pegados)
+      })
+      .catch(() => { /* se queda el trazo crudo */ })
     return () => {
-      r.quitar()
-      if (ruta.current === r) ruta.current = null
+      control.abort()
+      ruta.current?.quitar?.()
+      ruta.current = null
     }
   }, [viajes, paradas, seleccionado, listo])
 
@@ -432,8 +558,16 @@ export default function MapaMapbox({
     if (!cola || cola.length < 2) return undefined
     const util = cola.filter(validPosition)
     if (util.length < 2) return undefined
-    const c = pintarCola(mapboxgl, m, util, leerTokens().primario)
-    colaCapa.current = c
+    const color = leerTokens().primario
+    colaCapa.current = pintarCola(mapboxgl, m, util, color)
+    const control = new AbortController()
+    emparejarPuntos(util, { señal: control.signal })
+      .then((pegado) => {
+        if (control.signal.aborted || !mapa.current || !estiloListo.current || !pegado?.trazo) return
+        colaCapa.current?.quitar?.()
+        colaCapa.current = pintarCola(mapboxgl, m, pegado.puntos, color, pegado.trazo)
+      })
+      .catch(() => { /* se queda la cola cruda */ })
     if (seleccionado && colaEncuadrada.current !== seleccionado) {
       const lienzo = m.getContainer().getBoundingClientRect()
       const limites = util.reduce((b, p) => b.extend([p.lng, p.lat]), new mapboxgl.LngLatBounds([util[0].lng, util[0].lat], [util[0].lng, util[0].lat]))
@@ -446,8 +580,9 @@ export default function MapaMapbox({
       colaEncuadrada.current = seleccionado
     }
     return () => {
-      c.quitar()
-      if (colaCapa.current === c) colaCapa.current = null
+      control.abort()
+      colaCapa.current?.quitar?.()
+      colaCapa.current = null
     }
   }, [cola, seleccionado, listo])
 
@@ -503,10 +638,14 @@ export default function MapaMapbox({
   const estados = [...new Map(vehiculos.map((u) => { const e = estadoUnidad(u); return [e.clave, e] })).values()]
 
   return (
-    <div className={`pnl-mapa fleet-map oscuro con-mapbox luz-${luzActual}${prefs.vista3d ? ' vista-3d' : ''}`} style={{ height: alto }}>
+    <div className={`pnl-mapa fleet-map oscuro con-mapbox luz-${luzActual}${prefs.vista3d ? ' vista-3d' : ''}${herr.eligiendo ? ' eligiendo-destino' : ''}`} style={{ height: alto }}>
       <div ref={contenedor} className="pnl-mapa-lienzo" />
 
       <CapasMapa prefs={prefs} alCambiar={cambiarPrefs} luzActual={luzActual} />
+
+      {v && validPosition(v) && (
+        <HerramientasRuta unidad={v} estado={herr} alElegirDestino={empezarDestino} alQuitarLlegada={quitarLlegada} alAlternarAlcance={alternarAlcance} />
+      )}
 
       {leyenda && estados.length > 0 && <div className="fleet-map-legend" aria-label="Estados de los vehículos">{estados.map((e) => <span className={e.color} key={e.clave}><i />{e.texto}</span>)}</div>}
 

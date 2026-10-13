@@ -75,7 +75,37 @@
 .mapa-capas-reset { min-height: 36px; border: 1px solid #263b4d; border-radius: 10px; background: transparent; color: #b7c7d9; font: 500 12px/1 inherit; cursor: pointer; }
 .mapa-capas-reset:hover { background: #173147; color: #fff; }
 
+/* Llegada y alcance de la unidad elegida */
+.mapa-herr { position: absolute; z-index: 455; right: 18px; top: 64px; width: min(300px, calc(100vw - 48px)); padding: 12px 14px; border: 1px solid #263b4d; border-radius: 14px; background: #0b1927f2; color: #f3f7fc; box-shadow: 0 10px 30px #0008; font-family: var(--e-fuente, 'Spline Sans', sans-serif); display: grid; gap: 10px; }
+.control-map .mapa-herr { top: 84px; }
+.mapa-herr-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.mapa-herr-cab b { font-size: 14px; }
+.mapa-herr-cab span { font-size: 11px; color: #9fb4c9; }
+.mapa-herr-botones { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mapa-herr-botones button { min-height: 36px; padding: 0 8px; border: 1px solid #263b4d; border-radius: 10px; background: #0e1c29; color: #c6d4e3; font: 500 12px/1.2 inherit; cursor: pointer; }
+.mapa-herr-botones button:hover { border-color: #349bfa88; }
+.mapa-herr-botones button.on { background: #198bfa22; border-color: #349bfa; color: #cfe8ff; }
+.mapa-herr-botones button:disabled { opacity: 0.6; cursor: wait; }
+.mapa-herr-botones button:focus-visible { outline: 3px solid #85c9ff; outline-offset: 2px; }
+.mapa-herr-nota { margin: 0; font-size: 12px; color: #b7c7d9; }
+.mapa-herr-nota.error { color: #ffb4b4; }
+.mapa-herr-eta { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid #263b4d; border-radius: 10px; background: #10202f; }
+.mapa-herr-eta strong { font-size: 18px; }
+.mapa-herr-eta span { font-size: 12px; color: #b7c7d9; }
+.mapa-herr-semaforo { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin-top: 4px; font-size: 11px; }
+.mapa-herr-semaforo i, .mapa-herr-alcance i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.mapa-herr-semaforo i.low, .mapa-herr-alcance i.a10 { background: #35e888; }
+.mapa-herr-semaforo i.moderate, .mapa-herr-alcance i.a20 { background: #ffbf43; }
+.mapa-herr-semaforo i.heavy { background: #ff7a45; }
+.mapa-herr-semaforo i.severe, .mapa-herr-alcance i.a30 { background: #f43f5e; }
+.mapa-herr-alcance { display: flex; gap: 12px; font-size: 12px; color: #c6d4e3; }
+.pnl-mapa.eligiendo-destino .mapboxgl-canvas-container.mapboxgl-interactive { cursor: crosshair; }
+.mapa-destino { width: 22px; height: 30px; position: relative; }
+.mapa-destino i { position: absolute; left: 50%; bottom: 0; width: 18px; height: 18px; margin-left: -9px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #f3f7fc; border: 3px solid #168fff; box-shadow: 0 3px 8px #0009; }
+
 @media (max-width: 800px) {
+  .mapa-herr { right: 12px; left: 12px; width: auto; top: auto; bottom: 62px; }
+  .control-map .mapa-herr { top: auto; bottom: 62px; }
   .control-map .mapa-capas { bottom: auto; top: 200px; right: 12px; }
   .control-map .mapa-capas-panel { top: calc(100% + 8px); bottom: auto; }
   .mapa-capas-boton span { display: none; }

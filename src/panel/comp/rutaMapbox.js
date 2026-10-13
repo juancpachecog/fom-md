@@ -28,6 +28,8 @@ function popup(gl, html, extra = {}) {
 }
 
 const linea = (puntos) => ({ type: 'LineString', coordinates: puntos.map((p) => [p.lng, p.lat]) })
+// Un viaje pegado a las calles (Map Matching) trae `trazo` ya en [lng, lat]; si no, se une punto a punto.
+const trazoDe = (viaje) => (viaje.trazo?.length > 1 ? { type: 'LineString', coordinates: viaje.trazo } : linea(viaje.puntos))
 
 /**
  * Pinta viajes y paradas y devuelve cómo quitarlos y cómo resaltar uno.
@@ -46,7 +48,7 @@ export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = '#349b
     type: 'FeatureCollection',
     features: viajes.map((viaje) => {
       limites.push(...viaje.puntos.map((p) => [p.lng, p.lat]))
-      return { type: 'Feature', properties: { numero: viaje.numero }, geometry: linea(viaje.puntos) }
+      return { type: 'Feature', properties: { numero: viaje.numero }, geometry: trazoDe(viaje) }
     }),
   }
   mapa.addSource(ID, { type: 'geojson', data: coleccion })
@@ -173,9 +175,9 @@ export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = '#349b
 }
 
 /** La cola reciente: una línea punteada y tenue, con un punto donde empieza. */
-export function pintarCola(gl, mapa, puntos, color = '#349bfa') {
+export function pintarCola(gl, mapa, puntos, color = '#349bfa', trazo = null) {
   const ID = `cola-${Date.now().toString(36)}`
-  mapa.addSource(ID, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: linea(puntos) } })
+  mapa.addSource(ID, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: trazo?.length > 1 ? { type: 'LineString', coordinates: trazo } : linea(puntos) } })
   mapa.addLayer({
     id: `${ID}-linea`,
     type: 'line',
