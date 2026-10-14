@@ -1,6 +1,7 @@
 import { Campo, Modal } from './ui'
 import { Icono } from '../Iconos'
 import Avatar from './Avatar'
+import FotosIdentidad from './FotosIdentidad'
 import CambiarFoto from './CambiarFoto'
 import { cloudinaryConfigurado, etiquetas, ids } from '../datos/cloudinary'
 import { iniciales } from '../datos/formato'
@@ -76,6 +77,14 @@ export default function EditarMisDatos({ abierto, perfil, borrador, setBorrador,
             </Campo>
           </div>
         </fieldset>
+
+        {perfil?.id && (
+          <fieldset className="emd-grupo">
+            <legend>Fotos de tus documentos</legend>
+            <p className="emd-nota">Cada foto se guarda al subirla, sin esperar a «Guardar cambios».{perfil?.conduce ? ' Como conduces, también van tu licencia y tu carta médica.' : ''}</p>
+            <FotosIdentidad userId={perfil.id} conduce={Boolean(perfil?.conduce)} />
+          </fieldset>
+        )}
 
         <fieldset className="emd-grupo">
           <legend>Acceso</legend>

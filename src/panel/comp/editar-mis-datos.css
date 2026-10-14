@@ -25,3 +25,4 @@
   .emd-acciones { flex-direction: column-reverse; }
   .emd-acciones .pnl-btn { width: 100%; justify-content: center; }
 }
+.emd-grupo > .emd-nota { margin-bottom: 12px; }

@@ -1,0 +1,9 @@
+/* Fotos de cédula, licencia y carta médica de una persona. */
+.fid { display: grid; gap: 18px; }
+.fid-doc { display: grid; gap: 10px; }
+.fid-doc h4 { margin: 0; font-size: 14px; font-weight: 600; color: var(--e-texto); }
+.fid .fd-huecos { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.fid .fd-hueco > b { font-size: 12px; font-weight: 500; color: var(--e-texto-2); }
+.fid .fd-marco { aspect-ratio: 16 / 10; }
+/* El aviso de «Cloudinary no conectado» se repetiría por cada documento: basta el primero. */
+.fid .fid-doc + .fid-doc .fd-aviso { display: none; }
