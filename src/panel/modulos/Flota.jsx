@@ -1,6 +1,6 @@
 import MiniFoto from '../comp/MiniFoto'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
@@ -134,6 +134,9 @@ export default function Flota() {
   const [areaId, setAreaId] = useState('')
   const [orden, setOrden] = useState({ k: 'unidad', dir: 'asc' })
   const [creando, setCreando] = useState(false)
+  // Desde «Vehículos generales» el administrador llega ya dentro de la empresa para dar de alta una unidad.
+  const ubicacion = useLocation()
+  useEffect(() => { if (esAdmin && ubicacion.state?.nuevaUnidad) setCreando(true) }, [esAdmin, ubicacion.state])
 
   const vehiculos = useDatos(() => repo.vehiculos.listar(), [])
   const areas = useDatos(() => repo.areas(), [])

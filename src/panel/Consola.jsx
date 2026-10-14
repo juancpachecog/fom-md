@@ -33,6 +33,7 @@ import Seguridad from './modulos/Seguridad'
 import Jornadas from './modulos/Jornadas'
 import Transferencias from './modulos/Transferencias'
 import Plataforma from './modulos/Plataforma'
+import AdminVehiculos from './modulos/AdminVehiculos'
 
 // Módulos de la consola, agrupados como en la arquitectura FOM-WEB.
 const MENU = [
@@ -74,6 +75,7 @@ const MENU_ADMIN = {
   items: [
     { a: '/panel/admin/empresas', icono: 'empresa', texto: 'Empresas' },
     { a: '/panel/admin/plataforma', icono: 'buscar', texto: 'Usuarios generales' },
+    { a: '/panel/admin/vehiculos', icono: 'camion', texto: 'Vehículos generales' },
     { a: '/panel/admin/transferencias', icono: 'comparar', texto: 'Transferencias' },
     { a: '/panel/admin/pagos', icono: 'costos', texto: 'Facturación' },
     { a: '/panel/admin/gps', icono: 'pin', texto: 'GPS' },
@@ -335,6 +337,7 @@ export default function Consola() {
             <>
               <Route path="admin/empresas" element={<AdminEmpresas />} />
               <Route path="admin/plataforma" element={<Plataforma />} />
+              <Route path="admin/vehiculos" element={<AdminVehiculos />} />
               <Route path="admin/transferencias" element={<Transferencias />} />
               <Route path="admin/pagos" element={<AdminPagos />} />
               <Route path="admin/gps" element={<AdminGps />} />
