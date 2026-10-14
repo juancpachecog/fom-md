@@ -7,6 +7,7 @@ import { iniciales, fecha } from '../datos/formato'
 import './perfil-alertas.css'
 import Apariencia from '../comp/Apariencia'
 import Avatar from '../comp/Avatar'
+import EditarMisDatos from '../comp/EditarMisDatos'
 import CambiarFoto from '../comp/CambiarFoto'
 import { cloudinaryConfigurado, etiquetas, ids } from '../datos/cloudinary'
 import ScoreManejo from '../comp/ScoreManejo'
@@ -111,13 +112,8 @@ function Perfil() {
         {perfil.aviso && <p className="pa-nota fp-disponibilidad">{perfil.aviso}</p>}
       </>}
     </div>
-    <Modal abierto={editando} titulo="Editar mis datos" alCerrar={cancelar} ancho={760}><div className="pa-modal"><p className="pa-nota">Actualiza tus datos personales. Tu rol y correo de acceso se mantienen.</p><form className="fp-form" onSubmit={guardar}>
-      {CAMPOS.map(([clave, etiqueta, tipo]) => <Campo key={clave} etiqueta={etiqueta} ayuda={clave === 'telefono' ? 'Incluye el código de país, por ejemplo +58.' : undefined}><input className="pnl-input" type={tipo} value={borrador[clave] || ''} disabled={guardando} required={clave === 'nombre'} autoComplete={{ nombre: 'name', telefono: 'tel', direccion: 'street-address', fechaNacimiento: 'bday' }[clave]} maxLength={clave === 'direccion' ? 300 : clave === 'nombre' ? 160 : undefined} onChange={e => setBorrador(b => ({ ...b, [clave]: e.target.value }))} /></Campo>)}
-      <Campo etiqueta="Correo de acceso" ayuda="El correo de acceso lo cambia un administrador."><input className="pnl-input" value={perfil?.email || ''} readOnly /></Campo>
-      {!perfil?.completoDisponible && <p className="pa-nota fp-form-pie">Si un dato no aparece en la web, escribe un valor solo cuando quieras actualizarlo.</p>}
-      {error && <p className="pnl-campo-error fp-form-pie" role="alert">{error}</p>}
-      <div className="fp-form-pie pa-modal-acciones"><button type="button" className="pnl-btn" disabled={guardando} onClick={cancelar}>Cancelar</button><button className="pnl-btn primario" disabled={guardando}>{guardando ? 'Guardando…' : 'Guardar cambios'}</button></div>
-    </form></div></Modal>
+    <EditarMisDatos abierto={editando} perfil={perfil} borrador={borrador} setBorrador={setBorrador}
+      guardando={guardando} error={error} alGuardar={guardar} alCancelar={cancelar} />
     <Modal abierto={Boolean(documento)} titulo="Información del documento" alCerrar={() => setDocumento(null)} ancho={580}><div className="pa-modal">{documento && <><h3 className="fp-modal-tipo"><Icono nombre="documento" tam={26} />{documento.tipo}</h3><Datos items={[{ etiqueta: 'Número', valor: documento.numero || 'Sin registrar' }, { etiqueta: 'Vencimiento', valor: documento.venceEn ? fecha(documento.venceEn) : 'Sin fecha registrada' }, { etiqueta: 'Estado', valor: ESTADOS[documento.estado]?.[0] || 'Sin estado disponible' }]} /><p className="pa-ayuda">{documento.declarado ? 'Dato declarado en tu perfil.' : 'Documento registrado en tu cuenta.'}</p><p className="pa-nota">Para ver o subir la foto y corregir el vencimiento, abre este documento en Mi perfil de la app.</p><div className="pa-modal-acciones"><button className="pnl-btn primario" onClick={() => setDocumento(null)}>Entendido</button></div></>}</div></Modal>
     <Modal abierto={seguridad} titulo="Seguridad de la cuenta" alCerrar={() => setSeguridad(false)} ancho={560}><div className="pa-modal"><div className="fp-seguridad-icono"><Icono nombre="escudo" tam={48} /></div><h3>Cambia tu contraseña en la app</h3><p className="pa-nota">Abre FOM en tu teléfono y sigue estos pasos:</p><ol className="fp-pasos"><li>Entra en <strong>Mi perfil</strong>.</li><li>Abre <strong>Seguridad</strong>.</li><li>Selecciona <strong>Cambiar contraseña</strong>.</li></ol><div className="pa-modal-acciones"><button className="pnl-btn primario" onClick={() => setSeguridad(false)}>Entendido</button></div></div></Modal>
   </div>

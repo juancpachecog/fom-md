@@ -1,0 +1,27 @@
+/* «Editar mis datos»: foto arriba y los datos en grupos. */
+.emd { display: grid; gap: 18px; }
+.emd-foto { display: flex; align-items: center; gap: 18px; padding: 16px; border: 1px solid var(--e-borde); border-radius: 18px; background: var(--e-sup-baja); }
+.emd-avatar { flex: none; width: 96px; height: 96px; overflow: hidden; display: grid; place-items: center; border-radius: 50%; font-size: 32px; font-style: normal; font-weight: 700; background: var(--e-info-sup, var(--e-sup)); color: var(--e-primario); }
+.emd-foto-texto { display: grid; gap: 4px; min-width: 0; justify-items: start; }
+.emd-foto-texto b { font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
+.emd-foto-texto > span { color: var(--e-texto-2); font-size: 13px; overflow-wrap: anywhere; }
+.emd-foto-texto .pnl-btn { margin-top: 8px; min-height: 38px; }
+.emd-foto-texto small { color: var(--e-texto-3, var(--e-texto-2)); font-size: 12px; line-height: 1.45; }
+.emd-grupo { margin: 0; padding: 0; border: 0; min-width: 0; }
+.emd-grupo legend { margin-bottom: 10px; padding: 0; color: var(--e-texto-2); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.emd-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+.emd-campos .pnl-campo { margin-bottom: 0; }
+.emd-ancho { grid-column: 1 / -1; }
+.emd-acceso { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px dashed var(--e-borde); border-radius: 14px; color: var(--e-texto-2); }
+.emd-acceso > div { display: grid; gap: 2px; min-width: 0; }
+.emd-acceso b { color: var(--e-texto); font-size: 14px; overflow-wrap: anywhere; }
+.emd-acceso span { font-size: 12px; }
+.emd-nota { margin: 0; color: var(--e-texto-2); font-size: 12px; line-height: 1.5; }
+.emd-acciones { display: flex; justify-content: flex-end; gap: 12px; padding-top: 16px; border-top: 1px solid var(--e-borde); }
+@media (max-width: 640px) {
+  .emd-foto { flex-direction: column; text-align: center; }
+  .emd-foto-texto { justify-items: center; }
+  .emd-campos { grid-template-columns: 1fr; }
+  .emd-acciones { flex-direction: column-reverse; }
+  .emd-acciones .pnl-btn { width: 100%; justify-content: center; }
+}
