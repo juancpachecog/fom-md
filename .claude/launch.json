@@ -109,6 +109,23 @@
         "5177"
       ],
       "port": 5177
+    },
+    {
+      "name": "fom-app-puente",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/puente-app-juan.mjs"
+      ],
+      "port": 8098
+    },
+    {
+      "name": "fom-app-juan",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd /d C:/Users/home/Downloads/fom-driver-juan && set CI=1&& set EXPO_PUBLIC_FOM_API_URL=http://localhost:8098&& npx expo start --web --port 8099"
+      ],
+      "port": 8099
     }
   ]
 }
