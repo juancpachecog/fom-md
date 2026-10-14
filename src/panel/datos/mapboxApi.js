@@ -43,6 +43,19 @@ function metros(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * rad) * Math.cos(b[1] * rad) * Math.sin(dLng / 2) ** 2
   return 2 * R * Math.asin(Math.sqrt(h))
 }
+// Distancia a partir de la cual el final por calle y el punto real del GPS se unen con un tramo.
+const UNION_M = 10
+// Hasta dónde puede estar un punto GPS de la calle para que Mapbox lo tome (su máximo es 50 m).
+const RADIO_M = 40
+
+/** Segundos Unix de cada punto, solo si todos tienen hora y van en orden; si no, null. */
+export function marcasDeTiempo(puntos) {
+  const t = puntos.map((p) => Math.floor(Date.parse(p.hora) / 1000))
+  if (t.some((x) => !Number.isFinite(x))) return null
+  for (let i = 1; i < t.length; i += 1) if (t[i] < t[i - 1]) return null
+  return t
+}
+
 const largoDe = (coords) => coords.reduce((t, c, i) => (i ? t + metros(coords[i - 1], c) : 0), 0)
 const claveDe = (puntos) => `${puntos.length}:${coord(puntos[0])}:${coord(puntos[Math.floor(puntos.length / 2)])}:${coord(puntos.at(-1))}`
 
@@ -89,6 +102,13 @@ export function aplicarEmparejado(puntos, respuesta) {
   const confianza = Math.max(...matchings.map((m) => Number(m.confidence) || 0))
   const trazo = unirTrazos(matchings.map((m) => m.geometry?.coordinates ?? []))
   if (trazo.length < 2) return null
+  // Mapbox dibuja solo lo que va por calle: si el carro arrancó o se estacionó dentro
+  // de un estacionamiento o un patio, la línea moría en la esquina. Se une el trazo
+  // con el punto real del GPS al principio y al final, que es donde están los pines.
+  const primero = [puntos[0].lng, puntos[0].lat]
+  const ultimo = [puntos.at(-1).lng, puntos.at(-1).lat]
+  if (metros(primero, trazo[0]) > UNION_M) trazo.unshift(primero)
+  if (metros(trazo.at(-1), ultimo) > UNION_M) trazo.push(ultimo)
   const crudo = largoDe(puntos.map((p) => [p.lng, p.lat]))
   if (largoDe(trazo) > crudo * 2.5 + 500) return null
   const trace = respuesta.tracepoints ?? []
@@ -105,13 +125,17 @@ export function aplicarEmparejado(puntos, respuesta) {
  */
 export function emparejarPuntos(puntos, { señal, perfil = 'driving' } = {}) {
   if (!TOKEN || !Array.isArray(puntos) || puntos.length < 2) return Promise.resolve(null)
-  return recordar(`mm:${perfil}:${claveDe(puntos)}`, async () => {
+  return recordar(`mm2:${perfil}:${claveDe(puntos)}`, async () => {
     const trozos = partirPuntos(puntos, 100, 1)
     const partes = []
     for (const trozo of trozos) {
       const coords = trozo.map(coord).join(';')
-      const radios = trozo.map(() => 25).join(';')
-      const url = `${BASE}/matching/v5/mapbox/${perfil}/${coords}?geometries=geojson&overview=full&tidy=true&radiuses=${radios}&access_token=${encodeURIComponent(TOKEN)}`
+      const radios = trozo.map(() => RADIO_M).join(';')
+      // Con la hora de cada punto Mapbox sabe cuánto tiempo pasó entre dos posiciones y
+      // elige el camino que se pudo hacer en ese tiempo: con puntos cada uno o cinco
+      // minutos es lo que más acierta. Sin `tidy`, que podía borrar el último punto.
+      const tiempos = marcasDeTiempo(trozo)
+      const url = `${BASE}/matching/v5/mapbox/${perfil}/${coords}?geometries=geojson&overview=full&radiuses=${radios}${tiempos ? `&timestamps=${tiempos.join(';')}` : ''}&access_token=${encodeURIComponent(TOKEN)}`
       const r = await pedirJson(url, señal)
       const parte = aplicarEmparejado(trozo, r)
       if (!parte) return null

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { aplicarEmparejado, partirPuntos, tramosDeRuta, unirTrazos } from '../src/panel/datos/mapboxApi.js'
+import { aplicarEmparejado, marcasDeTiempo, partirPuntos, tramosDeRuta, unirTrazos } from '../src/panel/datos/mapboxApi.js'
 
 const pt = (i) => ({ lat: 10 + i * 0.001, lng: -71.4, hora: `2026-10-13T08:${String(i % 60).padStart(2, '0')}:00Z` })
 
@@ -40,7 +40,32 @@ test('aplicarEmparejado: mueve cada punto a la calle y conserva su hora', () => 
   assert.deepEqual(r.puntos[0].crudo, { lat: puntos[0].lat, lng: puntos[0].lng })
   // El punto sin coincidencia se queda donde estaba.
   assert.equal(r.puntos[1].lat, puntos[1].lat)
+  // Los extremos del trazo llegan al punto real del GPS (donde están los pines).
+  assert.deepEqual(r.trazo[0], [puntos[0].lng, puntos[0].lat])
+  assert.deepEqual(r.trazo.at(-1), [puntos[2].lng, puntos[2].lat])
+})
+
+test('aplicarEmparejado: une el final por calle con el sitio donde se estacionó', () => {
+  // El carro termina 60 m al norte de la calle, dentro de un estacionamiento.
+  const puntos = [{ lat: 10, lng: -71.4, hora: 'a' }, { lat: 10.0026, lng: -71.4, hora: 'b' }]
+  const respuesta = {
+    code: 'Ok',
+    matchings: [{ confidence: 0.5, geometry: { coordinates: [[-71.4, 10], [-71.4, 10.002]] } }],
+    tracepoints: [{ location: [-71.4, 10] }, null],
+  }
+  const r = aplicarEmparejado(puntos, respuesta)
   assert.equal(r.trazo.length, 3)
+  assert.deepEqual(r.trazo.at(-1), [-71.4, 10.0026])
+  // El inicio ya estaba en la calle: no se repite.
+  assert.deepEqual(r.trazo[0], [-71.4, 10])
+})
+
+test('marcasDeTiempo: segundos de cada punto, o null si falta una hora o van al revés', () => {
+  const a = { hora: '2026-10-14T08:00:00Z' }
+  const b = { hora: '2026-10-14T08:01:00Z' }
+  assert.deepEqual(marcasDeTiempo([a, b]), [Date.parse(a.hora) / 1000, Date.parse(b.hora) / 1000])
+  assert.equal(marcasDeTiempo([b, a]), null)
+  assert.equal(marcasDeTiempo([a, { hora: null }]), null)
 })
 
 test('aplicarEmparejado: sin coincidencia devuelve null, y la confianza baja no estorba', () => {
