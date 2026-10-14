@@ -122,7 +122,7 @@ export default function CentroControl() {
       <div className="control-map-canvas">
         <Mapa vehiculos={lista} seleccionado={seleccionado} alSeleccionar={setSeleccionado}
           cola={seleccionado && !viendoRecorrido ? colaPuntos : null} viajes={analisis?.viajes} paradas={analisis?.paradas} foco={foco} viajeActivo={viajeActivo} alElegirViaje={(n) => setViajeActivo((a) => (a === n ? null : n))}
-          alto="100%" ficha={false} leyenda={false} espacioFicha />
+          alto="100%" ficha={false} leyenda={false} espacioFicha herramientas />
       </div>
       <div className="control-search">
         <div className="control-search-heading"><div><h1>Centro de control</h1><p>{bajada}</p></div>

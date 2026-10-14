@@ -23,7 +23,7 @@ export default function HerramientasRuta({ unidad, estado, alElegirDestino, alQu
           {llegada ? 'Quitar llegada' : eligiendo ? 'Elige el destino…' : 'Llegada a un punto'}
         </button>
         <button type="button" className={alcance ? 'on' : ''} aria-pressed={Boolean(alcance)} disabled={cargandoAlcance} onClick={alAlternarAlcance}>
-          {cargandoAlcance ? 'Calculando…' : alcance ? 'Quitar alcance' : 'Alcance 10 · 20 · 30 min'}
+          {cargandoAlcance ? 'Calculando…' : alcance ? 'Quitar alcance' : 'Alcance en minutos'}
         </button>
       </div>
       {eligiendo && <p className="mapa-herr-nota">Toca el destino en el mapa, o toca otra unidad. Esc para cancelar.</p>}

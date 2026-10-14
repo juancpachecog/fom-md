@@ -148,6 +148,9 @@ export default function MapaMapbox({
   alVerRecorrido,
   espacioFicha = false,
   alto = 'clamp(320px, 52vh, 560px)',
+  // «Llegada y alcance» solo donde se opera la flota (Centro de control); en
+  // el Resumen o Mi unidad el mapa es de consulta y no las muestra.
+  herramientas = false,
   alFallar,
 }) {
   const contenedor = useRef(null)
@@ -643,7 +646,7 @@ export default function MapaMapbox({
 
       <CapasMapa prefs={prefs} alCambiar={cambiarPrefs} luzActual={luzActual} />
 
-      {v && validPosition(v) && (
+      {herramientas && v && validPosition(v) && (
         <HerramientasRuta unidad={v} estado={herr} alElegirDestino={empezarDestino} alQuitarLlegada={quitarLlegada} alAlternarAlcance={alternarAlcance} />
       )}
 
