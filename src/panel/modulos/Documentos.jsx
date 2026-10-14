@@ -10,7 +10,9 @@ import * as f from '../datos/formato'
 import { color, diasPara, etiqueta } from '../datos/catalogos'
 import { Icono } from '../Iconos'
 import FotosDe from '../comp/FotosDe'
+import { GaleriaArchivos, SelectorArchivos } from '../comp/Archivos'
 import { etiquetas, ids } from '../datos/cloudinary'
+import { subirVarios } from '../datos/archivos'
 
 // ============================================================
 // DOCUMENTOS
@@ -142,7 +144,7 @@ export default function Documentos() {
         alCerrar={() => setRenovando(null)}
         alGuardar={recargar}
       />
-      <ModalNuevo abierto={creando} alCerrar={() => setCreando(false)} alGuardar={recargar} />
+      <ModalNuevoDocumento abierto={creando} alCerrar={() => setCreando(false)} alGuardar={recargar} />
     </>
   )
 }
@@ -320,7 +322,7 @@ function Contenido({ datos, ambito, setAmbito, estadoDoc, setEstadoDoc, q, setQ,
                         <div className="pnl-chips">
                           <button type="button" className="pnl-btn sutil" onClick={() => verFotos(d)}>
                             <Icono nombre="ver" tam={15} />
-                            Fotos
+                            Fotos y PDF
                           </button>
                           <button type="button" className="pnl-btn sutil" onClick={() => abrirRenovar(d)}>
                             <Icono nombre="editar" tam={15} />
@@ -351,8 +353,8 @@ function Contenido({ datos, ambito, setAmbito, estadoDoc, setEstadoDoc, q, setQ,
           </>
         )}
       </Modal>
-      <Modal titulo={fotosDe ? `Fotos: ${fotosDe.tipo}` : 'Fotos'} abierto={Boolean(fotosDe)} alCerrar={() => setFotosDe(null)} ancho={760}>
-        {fotosDe && <FotosDe huecos={[{ clave: 'frente', titulo: 'Frente', publicId: ids.documento(fotosDe.id, 'frente'), etiqueta: etiquetas.documento(fotosDe.id) }, { clave: 'reverso', titulo: 'Reverso', publicId: ids.documento(fotosDe.id, 'reverso'), etiqueta: etiquetas.documento(fotosDe.id) }]} />}
+      <Modal titulo={fotosDe ? `Fotos y PDF: ${fotosDe.tipo}` : 'Fotos y PDF'} abierto={Boolean(fotosDe)} alCerrar={() => setFotosDe(null)} ancho={760}>
+        {fotosDe && <ArchivosDeDocumento documento={fotosDe} />}
       </Modal>
     </>
   )
@@ -436,16 +438,40 @@ const TIPOS_SUGERIDOS = [
 ]
 const PATRON_TIPO = /^[a-z][a-z0-9_]{1,59}$/u
 
-function ModalNuevo({ abierto, alCerrar, alGuardar }) {
-  const [d, setD] = useState({ ambito: 'vehiculo', vehiculoId: '', personaId: '', tipo: '', numero: '', emitidoEn: '', venceEn: '', notas: '' })
+/** Las dos caras del documento (frente y reverso) y los demás archivos: fotos o el PDF. */
+export function ArchivosDeDocumento({ documento }) {
+  return (
+    <div className="pnl-filas">
+      <FotosDe huecos={[
+        { clave: 'frente', titulo: 'Frente', publicId: ids.documento(documento.id, 'frente'), etiqueta: etiquetas.documento(documento.id) },
+        { clave: 'reverso', titulo: 'Reverso', publicId: ids.documento(documento.id, 'reverso'), etiqueta: etiquetas.documento(documento.id) },
+      ]} />
+      <div className="arch-bloque">
+        <GaleriaArchivos coleccion="documents" padreId={documento.id} proposito="document_file" titulo="Otros archivos (PDF o fotos)" vacio="Sin archivos: sube aquí la póliza en PDF o más fotos." />
+      </div>
+    </div>
+  )
+}
+
+const VACIO_DOC = { ambito: 'vehiculo', vehiculoId: '', personaId: '', tipo: '', numero: '', emitidoEn: '', venceEn: '', notas: '' }
+
+/**
+ * Registrar un documento. Con `fijo` ({ ambito, vehiculoId | personaId, nombre }) ya se sabe de quién es
+ * (por ejemplo desde la ficha de una unidad) y no se pregunta.
+ */
+export function ModalNuevoDocumento({ abierto, alCerrar, alGuardar, fijo = null }) {
+  const inicial = fijo ? { ...VACIO_DOC, ambito: fijo.ambito, vehiculoId: fijo.vehiculoId ?? '', personaId: fijo.personaId ?? '' } : VACIO_DOC
+  const [d, setD] = useState(inicial)
   const [error, setError] = useState({})
   const [guardando, setGuardando] = useState(false)
+  const [archivos, setArchivos] = useState([])
   const vehiculos = useDatos(() => repo.vehiculos.listar({}), [])
   const gente = useDatos(() => repo.admin.usuarios.listar({}), [])
   const set = (k) => (e) => setD((x) => ({ ...x, [k]: e.target.value }))
 
   const cerrar = () => {
     setError({})
+    setArchivos([])
     alCerrar()
   }
 
@@ -461,7 +487,7 @@ function ModalNuevo({ abierto, alCerrar, alGuardar }) {
     if (Object.keys(err).length > 0) return
     setGuardando(true)
     try {
-      await repo.documentos.crear({
+      const creado = await repo.documentos.crear({
         ambito: d.ambito,
         vehiculoId: d.ambito === 'vehiculo' ? d.vehiculoId : undefined,
         personaId: d.ambito === 'persona' ? d.personaId : undefined,
@@ -471,8 +497,19 @@ function ModalNuevo({ abierto, alCerrar, alGuardar }) {
         venceEn: d.venceEn,
         notas: d.notas.trim(),
       })
+      // Los archivos van después: necesitan el número del documento para quedar unidos a él.
+      const docId = typeof creado === 'string' ? creado : creado?.id
+      if (archivos.length && docId) {
+        const r = await subirVarios({ coleccion: 'documents', padreId: docId, proposito: 'document_file', archivos })
+        if (r.errores.length) {
+          await alGuardar()
+          setError({ general: `El documento quedó registrado, pero ${r.errores.length} archivo(s) no se subieron: ${r.errores[0]} Puedes subirlos desde «Fotos y PDF».` })
+          setArchivos([])
+          return
+        }
+      }
       await alGuardar()
-      setD({ ambito: 'vehiculo', vehiculoId: '', personaId: '', tipo: '', numero: '', emitidoEn: '', venceEn: '', notas: '' })
+      setD(inicial)
       cerrar()
     } catch (e) {
       setError({ general: e?.message || 'No pudimos registrar el documento.' })
@@ -483,6 +520,11 @@ function ModalNuevo({ abierto, alCerrar, alGuardar }) {
 
   return (
     <Modal titulo="Registrar documento" abierto={abierto} alCerrar={cerrar} ancho={560}>
+      {fijo ? (
+        <Campo etiqueta="De quién es">
+          <p className="pnl-campo-fijo"><b>{fijo.nombre}</b></p>
+        </Campo>
+      ) : (
       <Campo etiqueta="De quién es" error={error.sujeto}>
         <div className="pnl-chips">
           <select className="pnl-input" value={d.ambito} onChange={set('ambito')} aria-label="Ámbito">
@@ -502,6 +544,7 @@ function ModalNuevo({ abierto, alCerrar, alGuardar }) {
           )}
         </div>
       </Campo>
+      )}
       <Campo etiqueta="Tipo de documento" error={error.tipo} ayuda="Código estable del tipo dentro de tu empresa. Elige uno sugerido o escribe el tuyo.">
         <input className="pnl-input" list="tipos-de-documento" value={d.tipo} onChange={set('tipo')} placeholder="seguro_rcv" />
         <datalist id="tipos-de-documento">
@@ -522,6 +565,15 @@ function ModalNuevo({ abierto, alCerrar, alGuardar }) {
       <Campo etiqueta="Notas (opcional)">
         <input className="pnl-input" value={d.notas} onChange={set('notas')} />
       </Campo>
+      <SelectorArchivos
+        archivos={archivos}
+        alCambiar={setArchivos}
+        coleccion="documents"
+        aceptaPdf
+        titulo="Fotos o PDF del documento (opcional)"
+        ayuda="La póliza en PDF, o fotos del frente y del reverso. Se suben al registrarlo."
+        deshabilitado={guardando}
+      />
       {error.general && <p className="pnl-campo-error" role="alert">{error.general}</p>}
       <div className="pnl-chips">
         <button type="button" className="pnl-btn primario" onClick={confirmar} disabled={guardando}>

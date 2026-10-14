@@ -9,6 +9,7 @@ import { Icono } from '../Iconos'
 import { miAsignacion } from './MiUnidad'
 import { NuevaOdt } from './Mantenimiento'
 import './mantenimiento.css'
+import { GaleriaArchivos } from '../comp/Archivos'
 
 // ============================================================
 // MANTENIMIENTO DEL CONDUCTOR
@@ -191,6 +192,7 @@ function Historia({ odt }) {
           <em>{f.desde(odt.creadaEn)}</em>
         </div>
         <div className="pnl-fila-txt"><b>{odt.descripcion}</b><span>{AYUDA[odt.estado] ?? ''}</span></div>
+        <GaleriaArchivos coleccion="work-orders" padreId={odt.id} proposito="work_order_opening" titulo="Fotos del reporte" vacio="Sin fotos. Puedes agregar fotos de la falla." />
         {odt.estado === 'cerrada' && odt.notaSolucion && (
           <div className="adm-sigue"><b>Qué se hizo</b><p>{odt.notaSolucion}</p></div>
         )}

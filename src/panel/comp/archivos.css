@@ -1,0 +1,22 @@
+/* Fotos y PDF que acompañan a una orden o un documento. */
+.arch { display: grid; gap: 10px; }
+.arch-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.arch-cab h4 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 600; color: var(--e-texto); }
+.arch-cab h4 span { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--e-sup-baja); color: var(--e-texto-2); font-size: 12px; font-weight: 500; text-align: center; }
+.arch-nota { margin: 0; color: var(--e-texto-2); font-size: 13px; line-height: 1.45; }
+.arch-error { margin: 0; color: var(--e-peligro, #f87171); font-size: 13px; line-height: 1.45; }
+.arch-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.arch-lista li { position: relative; }
+.arch-lista li > button, .arch-elegido { display: grid; place-items: center; width: 100%; aspect-ratio: 4 / 3; padding: 0; overflow: hidden; border: 1px solid var(--e-borde); border-radius: 12px; background: var(--e-sup-baja); color: var(--e-texto-2); cursor: zoom-in; transition: border-color .2s ease, transform .2s ease; }
+.arch-lista li > button:hover { border-color: var(--e-borde-fuerte, var(--e-borde)); transform: translateY(-1px); }
+.arch-lista li > button:focus-visible { outline: 2px solid var(--e-primario); outline-offset: 2px; }
+.arch-lista img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.arch-pdf { display: grid; justify-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
+.arch-elegido { cursor: default; }
+.arch-quitar { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: rgba(8, 14, 24, .82); color: #fff; cursor: pointer; }
+.arch-quitar:hover { background: rgba(8, 14, 24, .95); }
+.arch-quitar:focus-visible { outline: 2px solid var(--e-primario); outline-offset: 2px; }
+.arch-selector { padding: 12px 14px; border: 1.5px dashed var(--e-borde); border-radius: 14px; }
+.arch-bloque { display: grid; gap: 18px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--e-borde); }
+@media (prefers-reduced-motion: reduce) { .arch-lista li > button { transition: none; } }
+.pnl-campo-fijo { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--e-sup-baja); color: var(--e-texto); font-size: 14px; }

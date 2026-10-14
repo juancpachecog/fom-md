@@ -159,10 +159,15 @@ const TIEMPO_LIMITE = 45_000
 const MAX_MB = 10
 const TIPOS = /^image\/(jpeg|png|webp|gif|heic|heif)$/i
 
-/** Dice qué le pasa a un archivo que no se puede subir, o `null` si está bien. */
-export function problemaDelArchivo(archivo) {
+/** Dice qué le pasa a un archivo que no se puede subir, o `null` si está bien. Con `permitirPdf`, también acepta PDF. */
+export function problemaDelArchivo(archivo, { permitirPdf = false } = {}) {
   if (!archivo) return 'No hay archivo.'
-  if (!TIPOS.test(archivo.type || '')) return `«${archivo.name}» no es una imagen (JPG, PNG, WebP o HEIC).`
+  const esPdf = permitirPdf && /^application\/pdf$/i.test(archivo.type || '')
+  if (!esPdf && !TIPOS.test(archivo.type || '')) {
+    return permitirPdf
+      ? `«${archivo.name}» no es una imagen ni un PDF (JPG, PNG, WebP, HEIC o PDF).`
+      : `«${archivo.name}» no es una imagen (JPG, PNG, WebP o HEIC).`
+  }
   if (archivo.size > MAX_MB * 1024 * 1024) return `«${archivo.name}» pesa más de ${MAX_MB} MB.`
   return null
 }
@@ -171,10 +176,10 @@ export function problemaDelArchivo(archivo) {
  * Sube UNA imagen como la versión siguiente de su dirección base (`publicId`) y la deja como la vigente. Lanza un
  * Error con el motivo si no se pudo: la pantalla no debe decir «guardado» si la foto no llegó.
  */
-export async function subirImagen(archivo, { publicId: base, etiqueta, titulo } = {}) {
+export async function subirImagen(archivo, { publicId: base, etiqueta, titulo, permitirPdf = false } = {}) {
   if (!cloudinaryConfigurado()) throw new Error('Cloudinary no está configurado en esta web.')
   if (!base) throw new Error('Falta saber a qué pertenece la foto.')
-  const mal = problemaDelArchivo(archivo)
+  const mal = problemaDelArchivo(archivo, { permitirPdf })
   if (mal) throw new Error(mal)
 
   let n = (await ultimaVersion(base)) + 1

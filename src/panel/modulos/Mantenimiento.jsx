@@ -22,6 +22,8 @@ import {
 import * as f from '../datos/formato'
 import { color, etiqueta } from '../datos/catalogos'
 import { presentarHistorial } from '../datos/historial-odt'
+import { GaleriaArchivos, SelectorArchivos } from '../comp/Archivos'
+import { subirVarios } from '../datos/archivos'
 import { Icono } from '../Iconos'
 
 // ============================================================
@@ -492,6 +494,10 @@ function Detalle({ odt, perfil, vehiculo, recargar, alCerrar }) {
         </> : <><p>{AYUDA_ODT[odt.estado] || 'Revisa el reporte y elige la siguiente acción disponible.'}</p><p className="mnt-detail-responsable"><b>Responsable:</b> {responsable?.nombre || 'Aún sin asignar'}</p></>}
       </section>
       <details className="mnt-record"><summary>Datos del reporte <span>Unidad, responsable, fechas y ubicación</span></summary><Datos items={items}/><p className="mnt-order-reference">Identificador completo: <code>{odt.id}</code></p></details>
+      <div className="arch-bloque">
+        <GaleriaArchivos coleccion="work-orders" padreId={odt.id} proposito="work_order_opening" titulo="Fotos del reporte" vacio="Nadie ha subido fotos de la falla todavía." />
+        <GaleriaArchivos coleccion="work-orders" padreId={odt.id} proposito="work_order_closure" titulo="Fotos del trabajo terminado" vacio="Todavía no hay fotos del trabajo hecho." />
+      </div>
 
       {ejecucion.estado === 'error' && <ErrorCarga texto={ejecucion.error?.message} onReintentar={ejecucion.recargar}/>}
       {(() => {
@@ -578,6 +584,9 @@ export function NuevaOdt({ vehiculos, creadorId, recargar, alCerrar, alCrear, si
   const [errores, setErrores] = useState({})
   const [guardando, setGuardando] = useState(false)
   const [fallo, setFallo] = useState('')
+  const [fotos, setFotos] = useState([])
+  // La orden ya se creó pero alguna foto no subió: el botón pasa a «Listo».
+  const [creada, setCreada] = useState(false)
 
   if (vehiculos.length === 0) {
     return (
@@ -614,7 +623,19 @@ export function NuevaOdt({ vehiculos, creadorId, recargar, alCerrar, alCrear, si
         creadorId,
         comoConductor,
       })
-      .then(() => {
+      .then(async (r) => {
+        // Las fotos se suben DESPUÉS de crear la orden: necesitan su número para quedar unidas a ella.
+        // El servidor devuelve { id }; el modo demo, el id solo.
+        const odtId = typeof r === 'string' ? r : r?.id
+        if (fotos.length && odtId) {
+          const s = await subirVarios({ coleccion: 'work-orders', padreId: odtId, proposito: 'work_order_opening', archivos: fotos })
+          if (s.errores.length) {
+            setFallo(`La orden quedó creada, pero ${s.errores.length} de ${fotos.length} fotos no se subieron: ${s.errores[0]} Puedes agregarlas desde el detalle de la orden.`)
+            setCreada(true)
+            setGuardando(false)
+            return recargar()
+          }
+        }
         alCrear(elegido?.placa || elegido?.alias || "la unidad")
         alCerrar()
         return recargar()
@@ -662,6 +683,15 @@ export function NuevaOdt({ vehiculos, creadorId, recargar, alCerrar, alCrear, si
         />
       </Campo>
 
+      <SelectorArchivos
+        archivos={fotos}
+        alCambiar={setFotos}
+        coleccion="work-orders"
+        titulo="Fotos de la falla (opcional)"
+        ayuda="Hasta 10 fotos de lo que se dañó. Se suben al crear la orden."
+        deshabilitado={guardando || creada}
+      />
+
       {fallo && (
         <div className="pnl-fila critica">
           <Icono nombre="alerta" tam={16} />
@@ -672,9 +702,13 @@ export function NuevaOdt({ vehiculos, creadorId, recargar, alCerrar, alCrear, si
       )}
 
       <div className="pnl-kanban-cab">
-        <button type="button" className="pnl-btn primario" onClick={crear} disabled={guardando}>
-          {guardando ? 'Creando…' : 'Crear orden'}
-        </button>
+        {creada ? (
+          <button type="button" className="pnl-btn primario" onClick={alCerrar}>Listo</button>
+        ) : (
+          <button type="button" className="pnl-btn primario" onClick={crear} disabled={guardando}>
+            {guardando ? (fotos.length ? 'Creando y subiendo fotos…' : 'Creando…') : 'Crear orden'}
+          </button>
+        )}
         {vehiculos.length > 1 && (<button type="button" className="pnl-btn sutil" onClick={() => setPaso(1)} disabled={guardando}>
           ← Cambiar unidad
         </button>)}

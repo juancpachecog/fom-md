@@ -13,6 +13,9 @@ import Mapa from '../comp/Mapa'
 import { BarrasH } from '../comp/Grafico'
 import { Icono } from '../Iconos'
 import FichaUnidad from '../comp/FichaUnidad'
+import { SelectorArchivos } from '../comp/Archivos'
+import { subirVarios } from '../datos/archivos'
+import { ArchivosDeDocumento, ModalNuevoDocumento } from './Documentos'
 import FichaDatosUnidad from './FichaDatosUnidad'
 import UsuariosUnidad from './UsuariosUnidad'
 import * as f from '../datos/formato'
@@ -188,6 +191,10 @@ export default function ExpedienteVehiculo() {
   const [errorForma, setErrorForma] = useState('')
   const [archivando, setArchivando] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  const [fotosOdt, setFotosOdt] = useState([])
+  // Documentos de la unidad: registrar uno nuevo y ver o subir sus archivos.
+  const [registrandoDoc, setRegistrandoDoc] = useState(false)
+  const [archivosDe, setArchivosDe] = useState(null)
 
   const reloj = useRef(null)
   useEffect(() => () => clearTimeout(reloj.current), [])
@@ -271,16 +278,24 @@ export default function ExpedienteVehiculo() {
     }
     setEnviando(true)
     try {
-      await repo.odts.crear({
+      const creada = await repo.odts.crear({
         vehiculoId: id,
         descripcion: forma.descripcion.trim(),
         tipoFalla: forma.tipoFalla,
         ubicacion: forma.ubicacion.trim(),
         creadorId: sesion?.perfil?.id ?? null,
       })
+      // Las fotos van después: necesitan el número de la orden para quedar unidas a ella.
+      let nota = ''
+      const odtId = typeof creada === 'string' ? creada : creada?.id
+      if (fotosOdt.length && odtId) {
+        const r = await subirVarios({ coleccion: 'work-orders', padreId: odtId, proposito: 'work_order_opening', archivos: fotosOdt })
+        if (r.errores.length) nota = ` · ${r.errores.length} foto(s) no se subieron; agrégalas desde la orden`
+      }
+      setFotosOdt([])
       setModalOdt(false)
       await recargar()
-      avisarGuardado('ODT creada')
+      avisarGuardado(`ODT creada${nota}`)
     } finally {
       setEnviando(false)
     }
@@ -530,7 +545,14 @@ export default function ExpedienteVehiculo() {
             {pestana === 'documentos' && (
               <Tarjeta
                 titulo="Documentos de la unidad"
-                accion={guardado ? <Tag color="verde">{guardado}</Tag> : null}
+                accion={
+                  <div className="pnl-chips">
+                    {guardado ? <Tag color="verde">{guardado}</Tag> : null}
+                    <button type="button" className="pnl-btn primario" onClick={() => setRegistrandoDoc(true)}>
+                      <Icono nombre="mas" tam={16} />Registrar documento
+                    </button>
+                  </div>
+                }
                 sinCuerpo
               >
                 {!v.documentos.length ? (
@@ -548,6 +570,7 @@ export default function ExpedienteVehiculo() {
                           <th>Vence</th>
                           <th>Estado</th>
                           <th>Cambiar vencimiento</th>
+                          <th>Archivos</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -574,6 +597,11 @@ export default function ExpedienteVehiculo() {
                                 aria-label={`Cambiar el vencimiento de ${d.tipo}`}
                                 onChange={(e) => cambiarVencimiento(d.id, e.target.value)}
                               />
+                            </td>
+                            <td>
+                              <button type="button" className="pnl-btn sutil" onClick={() => setArchivosDe(d)}>
+                                <Icono nombre="documento" tam={15} />Fotos y PDF
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -653,6 +681,15 @@ export default function ExpedienteVehiculo() {
             />
           </Campo>
 
+          <SelectorArchivos
+            archivos={fotosOdt}
+            alCambiar={setFotosOdt}
+            coleccion="work-orders"
+            titulo="Fotos de la falla (opcional)"
+            ayuda="Hasta 10 fotos de lo que se dañó. Se suben al crear la orden."
+            deshabilitado={enviando}
+          />
+
           <div className="pnl-cab-acciones">
             <button type="button" className="pnl-btn sutil" onClick={() => setModalOdt(false)}>
               Cancelar
@@ -662,6 +699,17 @@ export default function ExpedienteVehiculo() {
             </button>
           </div>
         </form>
+      </Modal>
+      {v && (
+        <ModalNuevoDocumento
+          abierto={registrandoDoc}
+          alCerrar={() => setRegistrandoDoc(false)}
+          alGuardar={async () => { await recargar(); avisarGuardado('Documento registrado') }}
+          fijo={{ ambito: 'vehiculo', vehiculoId: v.id, nombre: [v.alias, v.placa].filter(Boolean).join(' · ') }}
+        />
+      )}
+      <Modal titulo={archivosDe ? `Fotos y PDF: ${archivosDe.tipo}` : 'Fotos y PDF'} abierto={Boolean(archivosDe)} alCerrar={() => setArchivosDe(null)} ancho={760}>
+        {archivosDe && <ArchivosDeDocumento documento={archivosDe} />}
       </Modal>
       {v && archivando && (
         <ModalArchivar unidad={v} alCerrar={() => setArchivando(false)} alHecho={() => { setArchivando(false); recargar() }} />
