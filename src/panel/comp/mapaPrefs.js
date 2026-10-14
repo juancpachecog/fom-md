@@ -15,8 +15,9 @@ export const PREFS_POR_DEFECTO = Object.freeze({
   luz: 'night',
   // calles | satelite
   vista: 'calles',
-  // default | faded | monochrome (solo en calles)
-  tema: 'default',
+  // fom | default | faded | monochrome (solo en calles). «fom» es el estilo
+  // de Mapbox con los colores de noche del panel; «default» es el original.
+  tema: 'fom',
   // Edificios, árboles y monumentos en 3D (se notan al inclinar la cámara).
   edificios3d: true,
   // Relieve del terreno (montañas con volumen).
@@ -36,7 +37,10 @@ export function leerPrefs() {
     const crudo = localStorage.getItem(CLAVE)
     if (!crudo) return { ...PREFS_POR_DEFECTO }
     const guardado = JSON.parse(crudo)
-    return { ...PREFS_POR_DEFECTO, ...(guardado && typeof guardado === 'object' ? guardado : {}) }
+    if (!guardado || typeof guardado !== 'object') return { ...PREFS_POR_DEFECTO }
+    // Antes de la versión 2, «default» era el tema con los colores de FOM.
+    if (!guardado.v && guardado.tema === 'default') guardado.tema = 'fom'
+    return { ...PREFS_POR_DEFECTO, ...guardado }
   } catch {
     return { ...PREFS_POR_DEFECTO }
   }
@@ -44,7 +48,7 @@ export function leerPrefs() {
 
 export function guardarPrefs(prefs) {
   try {
-    localStorage.setItem(CLAVE, JSON.stringify(prefs))
+    localStorage.setItem(CLAVE, JSON.stringify({ ...prefs, v: 2 }))
   } catch {
     /* navegador sin almacenamiento: queda en memoria */
   }
@@ -100,7 +104,18 @@ const COLORES_NOCHE = Object.freeze({
   colorPointOfInterestLabels: '#9fb6cf',
 })
 
-/** La configuración del estilo Standard (`config.basemap`) que sale de las preferencias. */
+export const CLAVES_COLOR = Object.freeze(Object.keys(COLORES_NOCHE))
+
+/**
+ * Los colores propios que tocan: los de noche de FOM solo con tema «FOM», de
+ * noche y en calles. En cualquier otro caso, ninguno (se ve el original de Mapbox).
+ * No es un filtro sobre la imagen: son propiedades del estilo Standard.
+ */
+export function coloresDe(prefs, fecha = new Date()) {
+  return prefs.vista !== 'satelite' && prefs.tema === 'fom' && luzEfectiva(prefs, fecha) === 'night' ? COLORES_NOCHE : {}
+}
+
+/** La configuración del estilo Standard (`config.basemap`) que sale de las preferencias (sin los colores). */
 export function configDe(prefs, fecha = new Date()) {
   const luz = luzEfectiva(prefs, fecha)
   const base = {
@@ -114,11 +129,10 @@ export function configDe(prefs, fecha = new Date()) {
   if (prefs.vista === 'satelite') return { ...base, showRoadsAndTransit: true }
   return {
     ...base,
-    theme: prefs.tema,
+    theme: prefs.tema === 'fom' ? 'default' : prefs.tema,
     show3dObjects: prefs.edificios3d,
     showLandmarkIcons: true,
     densityPointOfInterestLabels: 2,
-    ...(luz === 'night' && prefs.tema === 'default' ? COLORES_NOCHE : {}),
   }
 }
 

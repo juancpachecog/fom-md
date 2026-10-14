@@ -111,6 +111,35 @@
   .pnl.fom-dark[data-diseno="glass"] :is(.mnt-nav, .insp-nav, .rp-nav) button { color: var(--e-texto-2); }
   .pnl.fom-dark[data-diseno="glass"] :is(.mnt-nav, .insp-nav, .rp-nav) :is(button[aria-selected="true"], button[aria-current]) { color: #e4f2ff; }
   .pnl.fom-dark[data-diseno="glass"] :is(.pnl-tabla tbody tr:hover, .pnl-tabla tbody tr.seleccionada) { background: #36404d; }
+  /* Centro de control: todas las tarjetas sobre el mapa con la misma superficie que la cabecera,
+     en cualquier diseño. Antes la cabecera seguía el tema y las demás traían un azul marino fijo. */
+  .pnl.fom-dark[data-diseno] :is(.control-panel, .control-live, .fleet-map-legend, .fleet-card.flotante, .mapa-herr, .mapa-capas-panel, .mapa-capas-boton) {
+    background: var(--e-sup);
+    border-color: var(--e-borde);
+    box-shadow: var(--apariencia-sombra);
+    backdrop-filter: var(--apariencia-blur);
+    color: var(--e-texto);
+  }
+  .pnl.fom-dark[data-diseno] .fleet-card { --fleet-ink: var(--e-texto); --fleet-muted: var(--e-texto-2); --fleet-line: var(--e-borde); }
+  .pnl.fom-dark[data-diseno] :is(.fleet-metrics > div, .ruta-item, .ruta-rangos button, .control-panel-heading button, .mapa-herr-botones button, .mapa-capas-chips button, .mapa-capas-reset, .mapa-herr-eta, .control-filters .pnl-chip) {
+    background: var(--e-sup-baja);
+    border-color: var(--e-borde);
+    color: var(--e-texto);
+  }
+  .pnl.fom-dark[data-diseno] :is(.mapa-herr-botones button.on, .mapa-capas-chips button.on, .ruta-rangos button.on, .ruta-item.activo, .control-filters .pnl-chip.activo) {
+    background: color-mix(in srgb, var(--e-primario) 24%, transparent);
+    border-color: var(--e-primario);
+    color: #e4f2ff;
+  }
+  .pnl.fom-dark[data-diseno] .control-filters select.pnl-input { background-color: var(--e-sup); border-color: var(--e-borde); color: var(--e-texto); }
+  .pnl.fom-dark[data-diseno] .control-filters select.pnl-input option { background: var(--e-sup); color: var(--e-texto); }
+  .pnl.fom-dark[data-diseno] :is(.mapa-herr-cab span, .mapa-herr-nota, .mapa-herr-eta span, .mapa-capas-grupo > span, .mapa-capas-switch small, .mapa-herr-alcance, .control-live) { color: var(--e-texto-2); }
+  .pnl.fom-dark[data-diseno] :is(.mapa-capas-boton:hover, .mapa-capas.abierto .mapa-capas-boton) { background: var(--e-sup-baja); }
+  .pnl.fom-dark[data-diseno] .fleet-vehicle-image { background: transparent; }
+  .pnl.fom-dark[data-diseno] .mapboxgl-ctrl-group { background: var(--e-sup); border-color: var(--e-borde); }
+  .pnl.fom-dark[data-diseno] .mapboxgl-ctrl-group button + button { border-top-color: var(--e-borde); }
+  .pnl.fom-dark[data-diseno] .mapboxgl-ctrl-attrib { background: var(--e-sup); color: var(--e-texto-2); }
+  .pnl.fom-dark[data-diseno] :is(.mapboxgl-popup.ruta-popup .mapboxgl-popup-content, .ruta-sonda .ruta-hora) { background: var(--e-sup); color: var(--e-texto); }
   .pnl.fom-dark[data-diseno="glass"] :is(.control-search, .control-panel, .control-live, .fleet-map-legend, .fleet-card.flotante) {
     background: var(--e-sup);
     border-color: var(--e-borde);
@@ -127,6 +156,26 @@
   .pnl.fom-dark[data-diseno="glass"] .control-filters select.pnl-input { background-color: #292c32; border-color: var(--e-borde); color: var(--e-texto); }
   .pnl.fom-dark[data-diseno="glass"] .control-filters select.pnl-input option { background: #292c32; color: var(--e-texto); }
   .pnl.fom-dark[data-diseno="glass"] .leaflet-bar a { background: #292c32; border-color: #555b64; }
+  /* Mapa de Mapbox: sus tarjetas y controles con el mismo material que las demás tarjetas. */
+  .pnl.fom-dark[data-diseno="glass"] :is(.mapa-herr, .mapa-capas-panel, .mapa-capas-boton) {
+    background: var(--e-sup);
+    border-color: var(--e-borde);
+    box-shadow: var(--apariencia-sombra);
+    backdrop-filter: var(--apariencia-blur);
+    color: var(--e-texto);
+  }
+  .pnl.fom-dark[data-diseno] :is(.mapa-herr, .mapa-capas-panel) { border-radius: 20px; }
+  .pnl.fom-dark[data-diseno] .mapa-capas-boton { border-radius: 999px; }
+  .pnl.fom-dark[data-diseno="glass"] :is(.mapa-herr-cab span, .mapa-herr-nota, .mapa-herr-eta span, .mapa-capas-grupo > span, .mapa-capas-switch small, .mapa-herr-alcance) { color: var(--e-texto-2); }
+  .pnl.fom-dark[data-diseno="glass"] :is(.mapa-herr-botones button, .mapa-capas-chips button, .mapa-capas-reset, .mapa-herr-eta) { background: var(--e-sup-baja); border-color: var(--e-borde); color: var(--e-texto); }
+  .pnl.fom-dark[data-diseno="glass"] :is(.mapa-herr-botones button.on, .mapa-capas-chips button.on) { background: #184573; border-color: #184573; color: #c6e5ff; }
+  .pnl.fom-dark[data-diseno="glass"] .mapa-capas-boton:hover, .pnl.fom-dark[data-diseno="glass"] .mapa-capas.abierto .mapa-capas-boton { background: var(--e-sup-baja); }
+  .pnl.fom-dark[data-diseno="glass"] .mapa-capas-switch i { background: var(--e-borde-fuerte, #555b64); }
+  .pnl.fom-dark[data-diseno="glass"] .mapa-capas-switch input:checked + i { background: var(--e-primario); }
+  .pnl.fom-dark[data-diseno="glass"] .mapboxgl-ctrl-group { background: #292c32; border-color: #555b64; }
+  .pnl.fom-dark[data-diseno="glass"] .mapboxgl-ctrl-group button + button { border-top-color: #555b64; }
+  .pnl.fom-dark[data-diseno="glass"] .mapboxgl-ctrl-attrib { background: #292c32e8; color: var(--e-texto-2); }
+  .pnl.fom-dark[data-diseno="glass"] :is(.mapboxgl-popup.ruta-popup .mapboxgl-popup-content, .ruta-sonda .ruta-hora) { background: #292c32; border-color: var(--e-borde-fuerte, #555b64); color: var(--e-texto); }
   .pnl.fom-dark[data-diseno] ::selection { background: var(--e-primario); color: var(--e-sobre-primario); }
   .pnl.fom-dark[data-diseno] { scrollbar-color: var(--e-borde-fuerte) var(--e-sup-baja); }
   .pnl.fom-dark[data-diseno] :is(button, a, input, select, textarea, summary):focus-visible { outline: 2px solid #75b9fa; outline-offset: 3px; }

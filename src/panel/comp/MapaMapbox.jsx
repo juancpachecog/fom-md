@@ -6,7 +6,7 @@ import CapasMapa from './CapasMapa'
 import HerramientasRuta from './HerramientasRuta'
 import { limitesDe, pintarAlcance, pintarLlegada } from './herramientasMapbox'
 import { alcanceDesde, emparejarPuntos, emparejarViajes, rutaConTrafico } from '../datos/mapboxApi'
-import { configDe, estiloDe, guardarPrefs, leerPrefs, luzEfectiva, nieblaDe } from './mapaPrefs'
+import { CLAVES_COLOR, coloresDe, configDe, estiloDe, guardarPrefs, leerPrefs, luzEfectiva, nieblaDe } from './mapaPrefs'
 import '../../styles/fleet-map.css'
 import '../../styles/mapa-mapbox.css'
 
@@ -78,12 +78,32 @@ function elementoUnidad(v, seleccionado) {
   return el
 }
 
-/** Aplica al mapa lo que diga el panel de capas: luz, 3D, relieve, tráfico, niebla y lluvia. */
+// Los colores originales del estilo, leídos al cargarlo, para poder volver a ellos.
+const coloresOriginales = new WeakMap()
+
+/** Aplica al mapa lo que diga el panel de capas: luz, colores, 3D, relieve, tráfico, niebla y lluvia. */
 function aplicarPrefs(mapa, prefs) {
   const luz = luzEfectiva(prefs)
   const config = configDe(prefs)
   for (const [clave, valor] of Object.entries(config)) {
     try { mapa.setConfigProperty('basemap', clave, valor) } catch { /* propiedad que este estilo no tiene */ }
+  }
+  // Colores de noche de FOM, o los originales de Mapbox si no tocan.
+  if (prefs.vista !== 'satelite') {
+    if (!coloresOriginales.has(mapa)) {
+      const o = {}
+      for (const clave of CLAVES_COLOR) {
+        try { o[clave] = mapa.getConfigProperty('basemap', clave) } catch { /* sin esa propiedad */ }
+      }
+      coloresOriginales.set(mapa, o)
+    }
+    const propios = coloresDe(prefs)
+    const originales = coloresOriginales.get(mapa)
+    for (const clave of CLAVES_COLOR) {
+      const valor = propios[clave] ?? originales[clave]
+      if (valor == null) continue
+      try { mapa.setConfigProperty('basemap', clave, valor) } catch { /* sin esa propiedad */ }
+    }
   }
   try { mapa.setFog(nieblaDe(luz)) } catch { /* sin niebla */ }
 
@@ -307,12 +327,20 @@ export default function MapaMapbox({
         m.addControl(new mapboxgl.NavigationControl({ showCompass: true, showZoom: true, visualizePitch: true }), 'bottom-right')
 
         // Si en 25 s no cargó nada, el token o la red fallaron: se avisa para volver a Leaflet.
-        vigilante = window.setTimeout(() => {
-          if (!m.loaded()) {
+        // El estilo llegó = el token sirve; con eso basta. Si la pestaña está en segundo
+        // plano el navegador no dibuja y Mapbox no avanza: se espera a que vuelva al frente
+        // en vez de darlo por caído.
+        let respondio = false
+        const vigilar = () => {
+          vigilante = window.setTimeout(() => {
+            if (respondio || cancelado) return
+            if (document.hidden) { vigilar(); return }
             console.warn('[mapa] Mapbox no respondió a tiempo; se usa el mapa de respaldo.')
             alFallarRef.current?.()
-          }
-        }, 25000)
+          }, 25000)
+        }
+        vigilar()
+        m.once('style.load', () => { respondio = true; window.clearTimeout(vigilante) })
         m.on('error', (e) => {
           const error = e?.error
           const estado = error?.status ?? error?.statusCode
@@ -323,10 +351,11 @@ export default function MapaMapbox({
             alFallarRef.current?.()
           }
         })
-        m.on('load', () => window.clearTimeout(vigilante))
+        m.on('load', () => { respondio = true; window.clearTimeout(vigilante) })
         // Cada vez que entra un estilo (al crear el mapa y al cambiar entre calles y satélite)
         // se vuelven a aplicar las preferencias y se avisa para repintar recorrido y cola.
         m.on('style.load', () => {
+          coloresOriginales.delete(m)
           estiloListo.current = true
           aplicarPrefs(m, prefsRef.current)
           setListo((n) => n + 1)

@@ -21,7 +21,8 @@ const VISTAS = [
   { v: 'satelite', t: 'Satélite' },
 ]
 const TEMAS = [
-  { v: 'default', t: 'Normal' },
+  { v: 'fom', t: 'FOM' },
+  { v: 'default', t: 'Original' },
   { v: 'faded', t: 'Suave' },
   { v: 'monochrome', t: 'Mono' },
 ]
