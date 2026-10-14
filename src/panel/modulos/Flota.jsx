@@ -229,12 +229,8 @@ export default function Flota() {
             Agregar vehículos a un área
           </button>
         )}
-        {esAdmin && (
-          <button type="button" className="pnl-btn primario" onClick={() => setCreando(true)}>
-            <Icono nombre="mas" tam={16} />
-            Nueva unidad
-          </button>
-        )}
+        {/* «Nueva unidad» no va aquí: crear unidades es del Administrador FOM y se hace en
+            Administración › Vehículos generales, que entra a la empresa y abre este mismo alta. */}
       </Cabecera>
 
       {esGestorDeFlota && (
