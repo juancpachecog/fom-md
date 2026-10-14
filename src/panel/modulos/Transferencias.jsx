@@ -29,12 +29,14 @@ function paso(t) {
 }
 
 /**
- * El servidor responde 403 con una frase genérica. Aquí se dice qué pasa de verdad: el permiso para mover
- * personas y vehículos entre empresas lo da el servidor, no esta pantalla, y se arregla allá.
+ * El servidor responde 403 («Transfer not authorized») cuando la base niega la operación. Con el
+ * administrador FOM pasa en producción porque ahí todavía corre una regla vieja: solo deja mover
+ * personas o vehículos de una empresa donde el administrador tenga membresía propia. El arreglo
+ * (fom-core #632, Issue #631) ya está en el código de Juan pero no se ha publicado.
  */
 const explicar = (mensaje) =>
   /permiso/i.test(String(mensaje ?? ''))
-    ? 'Tu cuenta todavía no puede ver ni abrir transferencias entre empresas. No es un error de la pantalla: el servidor aún no te reconoce como administrador de la plataforma. Pide que registren tu usuario como administrador de plataforma y vuelve a entrar.'
+    ? 'El servidor de producción no dejó hacer este paso. No es tu cuenta ni la pantalla: producción todavía tiene una regla vieja que solo deja mover personas y vehículos de una empresa donde el administrador FOM sea miembro. El arreglo ya está hecho en el servidor (fom-core #632) y falta que Juan lo publique.'
     : mensaje
 
 export default function Transferencias() {
