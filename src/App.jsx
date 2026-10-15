@@ -1,4 +1,5 @@
 import { lazy, Suspense, useLayoutEffect } from 'react'
+import CargaFom from './components/CargaFom'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import MarketingHeader from './components/marketing/MarketingChrome'
 import './styles/marketing.css'
@@ -57,7 +58,7 @@ export default function App() {
     <a className="skip-link" href="#contenido">Saltar al contenido</a>
     {!esConsola && <MarketingHeader />}
     <ScrollTop />
-    <Suspense fallback={<div className="route-loading" role="status" style={{ padding: '120px 5%' }}>Cargando…</div>}>
+    <Suspense fallback={<CargaFom />}>
       <Routes>
         <Route path="/" element={<Inicio />} />
         {['plataforma','funciones','seguridad','areas','contacto','preguntas-frecuentes','app','beneficios','quienes-somos','que-ofrecemos'].map(path => {
