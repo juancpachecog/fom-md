@@ -135,6 +135,14 @@
         "cd /d C:/Users/home/Downloads/fom-driver-juan && set CI=1&& npx expo start --tunnel --port 8081"
       ],
       "port": 8081
+    },
+    {
+      "name": "fom-app-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/app-demo.mjs"
+      ],
+      "port": 8097
     }
   ]
 }
