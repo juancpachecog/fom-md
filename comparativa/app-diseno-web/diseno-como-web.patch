@@ -1,0 +1,2434 @@
+From de62044848b392b8caa43332444bea9c335718c8 Mon Sep 17 00:00:00 2001
+From: marcodpa <marcodpa@users.noreply.github.com>
+Date: Thu, 15 Oct 2026 09:05:25 -0400
+Subject: [PATCH] =?UTF-8?q?Dise=C3=B1o=20de=20la=20app=20igual=20al=20pane?=
+ =?UTF-8?q?l=20web:=20encabezado=20redondo=20en=20todas=20las=20pesta?=
+ =?UTF-8?q?=C3=B1as?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Letra Spline Sans (la del panel), cargada en la raíz; el peso elige la cara.
+- Siempre en oscuro; gris tenue #8C97A7; radios del panel (10/16/24/28).
+- Tarjetas sin raya, etiquetas en frase normal, botón principal en píldora.
+- EncabezadoFom: cápsula con empresa y sección, campana con número de
+  alertas y avatar; título grande con bajada y acción. Flota sobre el mapa
+  en el Inicio del conductor (los controles del mapa bajan para no taparse).
+- Todas las pestañas de admin, supervisor, compañía, conductor, gerencial y
+  personal lo usan; ScreenHeader con botón redondo y título en cápsula.
+- Nombres de la web: Vehículos, Usuarios, Mantenimiento, Alertas.
+- Cifras Abiertas / En revisión / Resueltas arriba de Mantenimiento.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ package-lock.json                          |   7 +
+ package.json                               |   1 +
+ src/app/(driver)/_layout.tsx               |   2 +-
+ src/app/(driver)/index.tsx                 | 141 +++--------
+ src/app/(driver)/inspeccion.tsx            |   9 +-
+ src/app/(driver)/mantenimiento.tsx         |  77 +++---
+ src/app/(driver)/mas.tsx                   |   3 +
+ src/app/_layout.tsx                        |   8 +-
+ src/app/admin/_layout.tsx                  |   2 +-
+ src/app/admin/empresas.tsx                 |  21 +-
+ src/app/admin/flota.tsx                    |  40 ++-
+ src/app/admin/index.tsx                    |  21 +-
+ src/app/admin/mas.tsx                      |   4 +
+ src/app/admin/usuarios.tsx                 |  32 +--
+ src/app/compania/_layout.tsx               |   8 +-
+ src/app/compania/flota.tsx                 |   8 +-
+ src/app/compania/index.tsx                 |   9 +-
+ src/app/compania/mantenimiento.tsx         |  27 ++-
+ src/app/compania/mas.tsx                   |   8 +-
+ src/app/compania/personal.tsx              |   8 +-
+ src/app/gerencial/index.tsx                |  13 +-
+ src/app/notificaciones.tsx                 |   2 +-
+ src/app/panel/_layout.tsx                  |  15 +-
+ src/app/panel/flota.tsx                    |  37 +--
+ src/app/panel/index.tsx                    |   1 +
+ src/app/panel/mantenimiento.tsx            |  41 +++-
+ src/app/panel/mas.tsx                      |   6 +-
+ src/app/panel/personal.tsx                 |   5 +-
+ src/app/personal/index.tsx                 |  26 +-
+ src/components/admin-header.tsx            |  98 +-------
+ src/components/boton-nuevo.tsx             |   5 +-
+ src/components/card.tsx                    |   9 +-
+ src/components/chip.tsx                    |   6 +-
+ src/components/encabezado-fom.tsx          | 269 +++++++++++++++++++++
+ src/components/kpi-fila.tsx                |  42 ++++
+ src/components/map-vehiculo-clasico.tsx    |  14 +-
+ src/components/map-vehiculo-mapbox.tsx     |   6 +-
+ src/components/map-vehiculo-mapbox.web.tsx |   8 +-
+ src/components/map-vehiculo.web.tsx        |   3 +
+ src/components/option-picker.tsx           |   2 +-
+ src/components/screen-header.tsx           |  46 ++--
+ src/components/search-bar.tsx              |   4 +-
+ src/components/text-field.tsx              |   3 +-
+ src/components/themed-text.tsx             |  16 +-
+ src/theme/ThemeProvider.tsx                |   4 +-
+ src/theme/fuentes.ts                       |  33 +++
+ src/theme/index.ts                         |   1 +
+ src/theme/tokens.ts                        |  14 +-
+ 48 files changed, 673 insertions(+), 492 deletions(-)
+ create mode 100644 src/components/encabezado-fom.tsx
+ create mode 100644 src/components/kpi-fila.tsx
+ create mode 100644 src/theme/fuentes.ts
+
+diff --git a/package-lock.json b/package-lock.json
+index 3be4553..a6caee5 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -8,6 +8,7 @@
+       "name": "control_flotas",
+       "version": "1.0.0",
+       "dependencies": {
++        "@expo-google-fonts/spline-sans": "^0.4.2",
+         "@expo/metro-runtime": "~57.0.15",
+         "@react-native-async-storage/async-storage": "2.2.0",
+         "@rnmapbox/maps": "^10.3.8",
+@@ -1283,6 +1284,12 @@
+       "integrity": "sha512-D5gd/uFa7KfMJX9S11hvej4GpQnBl27oKiUgyIq3cLTPtyDOWBwRgmeePIdV6+PGcedlDkaCND2BnRgAkxzNaA==",
+       "license": "MIT AND Apache-2.0"
+     },
++    "node_modules/@expo-google-fonts/spline-sans": {
++      "version": "0.4.2",
++      "resolved": "https://registry.npmjs.org/@expo-google-fonts/spline-sans/-/spline-sans-0.4.2.tgz",
++      "integrity": "sha512-/28sbzpAdGIzSMlchblyJ5w0zEBGlOPPgFokgBF/f92CdSsIB1qpeKDDUkJfKCUPTvNujJr2YiJ+b6bbVyCaIA==",
++      "license": "MIT AND OFL-1.1"
++    },
+     "node_modules/@expo/code-signing-certificates": {
+       "version": "0.0.6",
+       "resolved": "https://registry.npmjs.org/@expo/code-signing-certificates/-/code-signing-certificates-0.0.6.tgz",
+diff --git a/package.json b/package.json
+index 2103a22..2b1ea8a 100644
+--- a/package.json
++++ b/package.json
+@@ -3,6 +3,7 @@
+   "main": "expo-router/entry",
+   "version": "1.0.0",
+   "dependencies": {
++    "@expo-google-fonts/spline-sans": "^0.4.2",
+     "@expo/metro-runtime": "~57.0.15",
+     "@react-native-async-storage/async-storage": "2.2.0",
+     "@rnmapbox/maps": "^10.3.8",
+diff --git a/src/app/(driver)/_layout.tsx b/src/app/(driver)/_layout.tsx
+index b03f29c..d3ef50e 100644
+--- a/src/app/(driver)/_layout.tsx
++++ b/src/app/(driver)/_layout.tsx
+@@ -107,7 +107,7 @@ export default function DriverTabsLayout() {
+         <Tabs.Screen
+           name="mantenimiento"
+           options={{
+-            title: 'Mantenim.',
++            title: 'Mantenimiento',
+             tabBarIcon: ({ color, size }) => <TabIcon name="ot" color={color} size={size} />,
+           }}
+         />
+diff --git a/src/app/(driver)/index.tsx b/src/app/(driver)/index.tsx
+index f2c0120..c5c0fbe 100644
+--- a/src/app/(driver)/index.tsx
++++ b/src/app/(driver)/index.tsx
+@@ -1,15 +1,15 @@
+ import { Redirect, useFocusEffect, useRouter } from 'expo-router';
+ import { useCallback, useEffect, useRef, useState } from 'react';
+ import { Animated, Easing, StyleSheet, View } from 'react-native';
+-import { SafeAreaView } from 'react-native-safe-area-context';
++import { useSafeAreaInsets } from 'react-native-safe-area-context';
+ import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+ 
+ import { esAdmin, useAuth } from '@/auth';
+ import { AnimatedNumber } from '@/components/animated-number';
+-import { Avatar } from '@/components/avatar';
+ import { AvisoEmergencia } from '@/components/aviso-emergencia';
+ import { BottomSheet } from '@/components/bottom-sheet';
+ import { Card } from '@/components/card';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { MapaVehiculo } from '@/components/map-vehiculo';
+ import { PantallaTransicion } from '@/components/pantalla-transicion';
+ import { PressableScale } from '@/components/pressable-scale';
+@@ -46,9 +46,6 @@ import { etiquetaCortaDeUnidad, identidadDeUnidad } from '@/lib/vehiculos';
+ import { saludoPorHora } from '@/utils/date';
+ import { miles } from '@/utils/numero';
+ 
+-function primerNombre(nombre: string): string {
+-  return nombre.split(' ')[0];
+-}
+ function horaCorta(iso: string): string {
+   const d = new Date(iso);
+   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+@@ -81,6 +78,12 @@ export default function InicioScreen() {
+   const { setBrand } = useThemeController();
+   const { user, status } = useAuth();
+   const router = useRouter();
++  const insets = useSafeAreaInsets();
++  /*
++   * Lo que tapa el encabezado flotante por arriba (barra de estado + su aire +
++   * la cápsula de 52): los controles del mapa y la píldora del PIN van debajo.
++   */
++  const margenMapa = insets.top + spacing.md + 52;
+ 
+   const { driving, vehicle: vehiculoSesion, via } = useDriving();
+   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+@@ -203,26 +206,12 @@ export default function InicioScreen() {
+   if (!driving) {
+     return (
+       <ThemedView style={styles.root}>
+-        {/* Franja superior fija (idéntica a la vista con vehículo). */}
+-        <SafeAreaView
+-        edges={['top']}
+-        style={[styles.headerBar, { borderBottomColor: colors.border }]}>
+-          <View style={[styles.header, { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }]}>
+-            <View style={styles.flex1}>
+-              <ThemedText variant="overline" color="textMuted">
+-                {saludoPorHora()}
+-              </ThemedText>
+-              <ThemedText variant="subtitle">{primerNombre(user.name)}</ThemedText>
+-            </View>
+-            <AccionesEncabezado sinLeer={sinLeer} nombre={user.name} />
+-          </View>
+-        </SafeAreaView>
+-
+-        {/* Mapa protagonista a pantalla completa: SOLO tu ubicación (no hay
+-            unidad que mostrar). El SOS flota dentro, en su posición de siempre. */}
++        {/* Mapa protagonista a pantalla completa, desde arriba del todo: SOLO
++            tu ubicación (no hay unidad que mostrar). El SOS flota dentro, en
++            su posición de siempre. */}
+         <View style={styles.mapArea}>
+-          {/* Controles arriba: abajo mandan el SOS y la lengüeta. */}
+-          <MapaVehiculo soloUsuario hideOverlays controlesArriba style={styles.mapFill} />
++          {/* Controles arriba (bajo el encabezado): abajo mandan el SOS y la lengüeta. */}
++          <MapaVehiculo soloUsuario hideOverlays controlesArriba margenArriba={margenMapa} style={styles.mapFill} />
+ 
+           <Animated.View style={[styles.sosFab, { transform: [{ scale: sosEscala }] }]}>
+             <PressableScale
+@@ -250,6 +239,10 @@ export default function InicioScreen() {
+           </Animated.View>
+         </View>
+ 
++        {/* El encabezado de siempre, flotando sobre el mapa (va después para
++            quedar encima). */}
++        <EncabezadoFom flotante seccion={saludoPorHora()} nombre={user.name} sinLeer={sinLeer} />
++
+         {/* Lengüeta: el aviso en lugar de la telemetría del vehículo. */}
+         <BottomSheet
+           header={
+@@ -284,25 +277,9 @@ export default function InicioScreen() {
+   // ─────────────────── CON CHIP: franja + mapa + lengüeta ─────────────────────
+   return (
+     <ThemedView style={styles.root}>
+-      {/* Franja superior fija (identidad + acciones). El mapa NO tapa la barra
+-          de estado del teléfono: queda debajo de esta franja. */}
+-      <SafeAreaView
+-        edges={['top']}
+-        style={[styles.headerBar, { borderBottomColor: colors.border }]}>
+-        <View style={[styles.header, { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }]}>
+-          <View style={styles.flex1}>
+-            <ThemedText variant="overline" color="textMuted">
+-              {saludoPorHora()}
+-            </ThemedText>
+-            <ThemedText variant="subtitle">{primerNombre(user.name)}</ThemedText>
+-          </View>
+-          {/* Acciones: avisos y tu perfil. */}
+-          <AccionesEncabezado sinLeer={sinLeer} nombre={user.name} />
+-        </View>
+-      </SafeAreaView>
+-
+-      {/* Mapa (protagonista) entre la franja y la lengüeta. Con la posición del
+-          vehículo del GPS muestra DOS puntos: la unidad + tu ubicación (§8-8). */}
++      {/* Mapa (protagonista) a pantalla completa, con el encabezado flotando
++          encima. Con la posición del vehículo del GPS muestra DOS puntos: la
++          unidad + tu ubicación (§8-8). */}
+       <View style={styles.mapArea}>
+         {/* UN marcador, con la misma pieza que los mapas de flota: así el
+             conductor y su supervisor ven el mismo color para la misma unidad
+@@ -328,14 +305,15 @@ export default function InicioScreen() {
+           }
+           encuadreClave={vehicle.id}
+           hideOverlays
+-          // Los controles van ARRIBA: abajo mandan el SOS y la lengüeta.
++          // Los controles van ARRIBA, bajo el encabezado: abajo mandan el SOS y la lengüeta.
+           controlesArriba
++          margenArriba={margenMapa}
+           style={styles.mapFill}
+         />
+ 
+         {/* Uso temporal por PIN (§4.3): se ve de un vistazo a qué título conduces. */}
+         {via === 'secundario' ? (
+-          <View style={[styles.viaPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
++          <View style={[styles.viaPill, { top: margenMapa + 12, backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+             <ThemedText variant="overline" color="info">
+               {`USANDO ${etiquetaCortaDeUnidad(vehicle)} · PIN`}
+             </ThemedText>
+@@ -374,6 +352,10 @@ export default function InicioScreen() {
+         </Animated.View>
+       </View>
+ 
++      {/* El encabezado de siempre, flotando sobre el mapa (va después para
++          quedar encima). */}
++      <EncabezadoFom flotante seccion={saludoPorHora()} nombre={user.name} sinLeer={sinLeer} />
++
+       {/* Lengüeta con TODA la vista de conducción. Se abre ARRASTRÁNDOLA. */}
+       <BottomSheet
+         header={
+@@ -575,53 +557,6 @@ export default function InicioScreen() {
+   );
+ }
+ 
+-/** Fila etiqueta–valor. */
+-/**
+- * Acciones del encabezado del Inicio: los AVISOS (campana con punto si hay algo
+- * sin leer) y TU PERFIL (avatar). Son las mismas con y sin unidad asignada, así
+- * que viven en una sola pieza. Quien además administra entra a su panel desde
+- * la pestaña Perfil: la franja de arriba es del conductor.
+- */
+-function AccionesEncabezado({
+-  sinLeer,
+-  nombre,
+-  foto,
+-}: {
+-  sinLeer: number;
+-  nombre: string;
+-  foto?: string;
+-}) {
+-  const { colors, radii, spacing } = useTheme();
+-  const router = useRouter();
+-  return (
+-    <View style={[styles.inline, styles.actions, { gap: spacing.sm }]}>
+-      <PressableScale
+-        onPress={() => router.navigate('/mis-notificaciones')}
+-        accessibilityRole="button"
+-        accessibilityLabel={sinLeer > 0 ? `Notificaciones, ${sinLeer} sin leer` : 'Notificaciones'}
+-        style={[
+-          styles.accionCuadro,
+-          { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md },
+-        ]}>
+-        <TabIcon name="alertas" color={colors.textSecondary} size={18} />
+-        {sinLeer > 0 ? (
+-          <View style={[styles.puntoAviso, { backgroundColor: colors.danger, borderColor: colors.surface }]} />
+-        ) : null}
+-      </PressableScale>
+-
+-      {/* TU cara, no un muñeco genérico: la foto real del perfil y, mientras no
+-          la tengas, tus iniciales (el `Avatar` de siempre). */}
+-      <PressableScale
+-        onPress={() => router.navigate('/mas')}
+-        accessibilityRole="button"
+-        accessibilityLabel="Tu perfil"
+-        style={[styles.avatar, { borderColor: colors.border }]}>
+-        <Avatar uri={foto} nombre={nombre} size={34} />
+-      </PressableScale>
+-    </View>
+-  );
+-}
+-
+ /**
+  * Celda de la ficha: etiqueta pequeña y dato grande sobre una superficie
+  * hundida. En `fila` los pone uno a cada lado (para el odómetro, que es largo).
+@@ -675,8 +610,6 @@ function Tile({
+ 
+ const styles = StyleSheet.create({
+   root: { flex: 1 },
+-  headerBar: { borderBottomWidth: StyleSheet.hairlineWidth },
+-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+   mapArea: { flex: 1, overflow: 'hidden' },
+   mapFill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, height: '100%', borderRadius: 0, borderWidth: 0 },
+   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+@@ -686,24 +619,6 @@ const styles = StyleSheet.create({
+   // SOS: a la derecha y SIEMPRE por encima de la lengüeta cerrada (54 de peek
+   // + aire), para que no haya que abrirla ni moverla para pedir ayuda.
+   sosFab: { position: 'absolute', right: 14, bottom: 92 },
+-  // Acciones del encabezado: campana (cuadrado suave) y avatar (círculo).
+-  accionCuadro: {
+-    width: 38,
+-    height: 38,
+-    alignItems: 'center',
+-    justifyContent: 'center',
+-    borderWidth: StyleSheet.hairlineWidth,
+-  },
+-  puntoAviso: { position: 'absolute', top: 7, right: 7, width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
+-  avatar: {
+-    width: 38,
+-    height: 38,
+-    borderRadius: 19,
+-    alignItems: 'center',
+-    justifyContent: 'center',
+-    borderWidth: 2,
+-    overflow: 'hidden',
+-  },
+   // Píldora "usando unidad por PIN" (§4.3), centrada sobre el mapa.
+   viaPill: {
+     position: 'absolute',
+@@ -744,6 +659,4 @@ const styles = StyleSheet.create({
+   center: { textAlign: 'center' },
+   flex1: { flex: 1, minWidth: 0 },
+   inline: { flexDirection: 'row', alignItems: 'center' },
+-  // Grupo de acciones: mantiene su tamaño, no se comprime contra el título.
+-  actions: { flexShrink: 0 },
+ });
+diff --git a/src/app/(driver)/inspeccion.tsx b/src/app/(driver)/inspeccion.tsx
+index ffa2bcd..49bf25d 100644
+--- a/src/app/(driver)/inspeccion.tsx
++++ b/src/app/(driver)/inspeccion.tsx
+@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
+ import { useAuth } from '@/auth';
+ import { Button } from '@/components/button';
+ import { Card } from '@/components/card';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { InspectionItem } from '@/components/inspection-item';
+ import { OTStatusBadge } from '@/components/ot-status-badge';
+ import { PressableScale } from '@/components/pressable-scale';
+@@ -153,12 +154,7 @@ export default function InspeccionScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        {/* Barra superior */}
+-        <View style={[styles.topBar, { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }]}>
+-          <View>
+-            <ThemedText variant="title">Inspección</ThemedText>
+-          </View>
+-        </View>
++        <EncabezadoFom seccion="Inspección" titulo="Inspección" bajada="Revisa tu unidad antes de salir." />
+ 
+         {!driving ? (
+           <EmptyState
+@@ -389,7 +385,6 @@ const styles = StyleSheet.create({
+   root: { flex: 1 },
+   safeArea: { flex: 1 },
+   flex: { flex: 1 },
+-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+   content: {
+     width: '100%',
+diff --git a/src/app/(driver)/mantenimiento.tsx b/src/app/(driver)/mantenimiento.tsx
+index a75dc5e..462115d 100644
+--- a/src/app/(driver)/mantenimiento.tsx
++++ b/src/app/(driver)/mantenimiento.tsx
+@@ -1,7 +1,7 @@
+ import { LinearGradient } from 'expo-linear-gradient';
+ import { Redirect, useFocusEffect, useRouter } from 'expo-router';
+ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
++import { Animated, Easing, StyleSheet, View } from 'react-native';
+ import { SafeAreaView } from 'react-native-safe-area-context';
+ 
+ import { useAuth } from '@/auth';
+@@ -12,7 +12,9 @@ import { BotonDestacado } from '@/components/boton-destacado';
+ import { Card } from '@/components/card';
+ import { EmptyState } from '@/components/empty-state';
+ import { ErrorState } from '@/components/error-state';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { EncabezadoGrupo } from '@/components/encabezado-grupo';
++import { KpiFila } from '@/components/kpi-fila';
+ import { PressableScale } from '@/components/pressable-scale';
+ import { PulseDot } from '@/components/pulse-dot';
+ import { SearchBar } from '@/components/search-bar';
+@@ -447,6 +449,12 @@ export default function MantenimientoScreen() {
+    * todavía no tiene—.
+    */
+   const alDia = !odtSinLeer && (resumen?.pendientes ?? 0) === 0;
++
++  // Las cifras de arriba, de TODAS las acciones (el filtro no las toca):
++  // abiertas = pendientes y vencidas, en revisión = en taller, resueltas = hechas.
++  const abiertas = acciones.filter((a) => a.estado === 'pendiente').length;
++  const enRevision = acciones.filter((a) => a.estado === 'en_proceso').length;
++  const resueltas = acciones.filter((a) => a.estado === 'realizada').length;
+   const tonoUnidad: keyof ColorTokens =
+     (resumen?.vencidas ?? 0) > 0
+       ? 'danger'
+@@ -470,30 +478,13 @@ export default function MantenimientoScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        {/* Barra superior: título + campana con badge de no leídas. */}
+-        <View style={[styles.topBar, { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }]}>
+-          <ThemedText variant="title" style={styles.flex1}>
+-            Mantenimiento
+-          </ThemedText>
+-          <Pressable
+-            onPress={() => router.navigate('/mis-notificaciones')}
+-            hitSlop={8}
+-            accessibilityRole="button"
+-            accessibilityLabel={`Notificaciones${noLeidas > 0 ? `, ${noLeidas} sin leer` : ''}`}
+-            style={[
+-              styles.bell,
+-              { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md },
+-            ]}>
+-            <TabIcon name="alertas" color={colors.textSecondary} size={20} />
+-            {noLeidas > 0 ? (
+-              <View style={[styles.badge, { backgroundColor: colors.danger, borderColor: colors.background }]}>
+-                <ThemedText style={[styles.badgeText, { color: colors.onPrimary }]}>
+-                  {noLeidas > 99 ? '99+' : String(noLeidas)}
+-                </ThemedText>
+-              </View>
+-            ) : null}
+-          </Pressable>
+-        </View>
++        {/* El encabezado de siempre; su campana lleva el número de no leídas. */}
++        <EncabezadoFom
++          seccion="Mantenimiento"
++          titulo="Mantenimiento"
++          bajada="Lo que reportaste y cómo va."
++          sinLeer={noLeidas}
++        />
+ 
+         {!vehicle ? (
+           <EmptyState
+@@ -502,6 +493,20 @@ export default function MantenimientoScreen() {
+           />
+         ) : (
+           <View style={styles.flex1}>
++            {/* Cuánto hay de cada cosa. Solo con las órdenes leídas: si no se
++                pudieron leer, unos ceros dirían algo que no se sabe. */}
++            {!cargando && !odtSinLeer ? (
++              <Appear style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
++                <KpiFila
++                  items={[
++                    { label: 'Abiertas', valor: abiertas, tono: 'warning' },
++                    { label: 'En revisión', valor: enRevision, tono: 'primary' },
++                    { label: 'Resueltas', valor: resueltas, tono: 'success' },
++                  ]}
++                />
++              </Appear>
++            ) : null}
++
+             {/* Estado de la unidad: identidad, odómetro y qué espera. */}
+             <Appear style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
+               <Card style={[styles.unidad, { gap: spacing.md, padding: spacing.md }]}>
+@@ -632,31 +637,9 @@ export default function MantenimientoScreen() {
+ const styles = StyleSheet.create({
+   root: { flex: 1 },
+   safeArea: { flex: 1 },
+-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+   flex1: { flex: 1, minWidth: 0 },
+   filtros: { flexDirection: 'row', alignItems: 'center', paddingRight: 4 },
+   chip: { height: 34, flexDirection: 'row', alignItems: 'center', borderWidth: StyleSheet.hairlineWidth },
+-  // Campana: caja propia, como en el encabezado del Inicio.
+-  bell: {
+-    width: 42,
+-    height: 42,
+-    alignItems: 'center',
+-    justifyContent: 'center',
+-    borderWidth: StyleSheet.hairlineWidth,
+-  },
+-  badge: {
+-    position: 'absolute',
+-    top: -5,
+-    right: -5,
+-    minWidth: 19,
+-    height: 19,
+-    borderRadius: 10,
+-    borderWidth: 2,
+-    paddingHorizontal: 5,
+-    alignItems: 'center',
+-    justifyContent: 'center',
+-  },
+-  badgeText: { fontSize: 11, fontWeight: '700', lineHeight: 15 },
+   // Deja aire abajo para que el botón flotante no tape la última tarjeta.
+   content: { width: '100%', maxWidth: 640, alignSelf: 'center', paddingBottom: 96 },
+ 
+diff --git a/src/app/(driver)/mas.tsx b/src/app/(driver)/mas.tsx
+index a43b52e..de3bfad 100644
+--- a/src/app/(driver)/mas.tsx
++++ b/src/app/(driver)/mas.tsx
+@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
+ import { esAdmin, esMultiempresa, etiquetaRol, useAuth, useSignOut } from '@/auth';
+ import { Appear } from '@/components/appear';
+ import { Card } from '@/components/card';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { PerfilHero } from '@/components/perfil-hero';
+ import { PerfilPortada } from '@/components/perfil-portada';
+ import { FilaDato, TarjetaIndice, TiraStats } from '@/components/perfil-piezas';
+@@ -174,6 +175,8 @@ export default function PerfilScreen() {
+     <ThemedView style={styles.root}>
+       <PerfilPortada />
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
++        {/* El encabezado de siempre, sin título: el héroe ya dice quién eres. */}
++        <EncabezadoFom seccion="Perfil" />
+         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+           {/* ── HERO ── */}
+           <View style={[styles.heroCaja, { paddingHorizontal: spacing.lg }]}>
+diff --git a/src/app/_layout.tsx b/src/app/_layout.tsx
+index 1f95d38..1f85a25 100644
+--- a/src/app/_layout.tsx
++++ b/src/app/_layout.tsx
+@@ -1,6 +1,7 @@
+ import '@/global.css';
+ 
+ import { DarkTheme, DefaultTheme, Stack, ThemeProvider as TemaNavegacion } from 'expo-router';
++import { useFonts } from 'expo-font';
+ import * as SplashScreen from 'expo-splash-screen';
+ import * as SystemUI from 'expo-system-ui';
+ import { useEffect, useMemo } from 'react';
+@@ -13,7 +14,7 @@ import { MedidorFom } from '@/components/medidor-fom';
+ import { SplashRuta } from '@/components/splash-ruta';
+ import { TransicionEntrada } from '@/components/transicion-entrada';
+ import { AdminProvider, DrivingProvider, TenantProvider } from '@/session';
+-import { ThemeProvider, useTheme, useThemeController } from '@/theme';
++import { FUENTES_FOM, ThemeProvider, useTheme, useThemeController } from '@/theme';
+ 
+ /**
+  * El splash nativo NO se retira solo.
+@@ -26,6 +27,11 @@ import { ThemeProvider, useTheme, useThemeController } from '@/theme';
+ void SplashScreen.preventAutoHideAsync().catch(() => {});
+ 
+ export default function RootLayout() {
++  // La letra del panel web. Mientras carga sigue el splash (no se retira solo);
++  // si fallara, la app arranca igual con la letra del sistema.
++  const [letraLista, errorLetra] = useFonts(FUENTES_FOM);
++  if (!letraLista && !errorLetra) return null;
++
+   return (
+     // Los gestos (arrastrar la lengüeta, el visor de fotos) necesitan esta raíz:
+     // sin ella, en Android no llegan los eventos.
+diff --git a/src/app/admin/_layout.tsx b/src/app/admin/_layout.tsx
+index f2830d6..bb31a91 100644
+--- a/src/app/admin/_layout.tsx
++++ b/src/app/admin/_layout.tsx
+@@ -56,7 +56,7 @@ export default function AdminFomTabsLayout() {
+       />
+       <Tabs.Screen
+         name="flota"
+-        options={{ title: 'Flota', tabBarIcon: ({ color, size }) => <TabIcon name="flota" color={color} size={size} /> }}
++        options={{ title: 'Vehículos', tabBarIcon: ({ color, size }) => <TabIcon name="flota" color={color} size={size} /> }}
+       />
+       <Tabs.Screen
+         name="mas"
+diff --git a/src/app/admin/empresas.tsx b/src/app/admin/empresas.tsx
+index 500b313..6524404 100644
+--- a/src/app/admin/empresas.tsx
++++ b/src/app/admin/empresas.tsx
+@@ -8,6 +8,7 @@ import { BotonNuevo } from '@/components/boton-nuevo';
+ import { Card } from '@/components/card';
+ import { Chip } from '@/components/chip';
+ import { EmptyState } from '@/components/empty-state';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { ErrorState } from '@/components/error-state';
+ import { EtiquetaSeccion } from '@/components/etiqueta-seccion';
+ import { OptionPickerModal, type PickerOption } from '@/components/option-picker';
+@@ -238,16 +239,12 @@ export default function AdminEmpresasSistemaScreen() {
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+         {/* Crear va ARRIBA, siempre a la vista aunque la lista crezca. */}
+-        <View
+-          style={[
+-            styles.topBar,
+-            { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg },
+-          ]}>
+-          <ThemedText variant="title" style={styles.titulo}>
+-            Empresas
+-          </ThemedText>
+-          <BotonNuevo label="Nueva" etiqueta="Crear empresa" onPress={() => router.navigate('/crear-empresa')} />
+-        </View>
++        <EncabezadoFom
++          seccion="Empresas"
++          titulo="Empresas"
++          bajada="Las empresas que usan FOM."
++          accion={<BotonNuevo label="Nueva" etiqueta="Crear empresa" onPress={() => router.navigate('/crear-empresa')} />}
++        />
+ 
+         {estado === 'error' ? (
+           <ErrorState description="No pudimos cargar las empresas." onRetry={recargar} />
+@@ -369,10 +366,6 @@ const styles = StyleSheet.create({
+   fila: { flexDirection: 'row', alignItems: 'center' },
+   filaIzq: { flexDirection: 'row' },
+ 
+-  // ── Cabecera ──
+-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+-  titulo: { fontSize: 29, lineHeight: 32, letterSpacing: -0.6 },
+-
+   // ── El filtro puesto ──
+   puesto: { flexDirection: 'row', alignItems: 'center' },
+   puestoTexto: { fontSize: 12.5, fontWeight: '600' },
+diff --git a/src/app/admin/flota.tsx b/src/app/admin/flota.tsx
+index 9349d29..11ebea9 100644
+--- a/src/app/admin/flota.tsx
++++ b/src/app/admin/flota.tsx
+@@ -8,6 +8,7 @@ import { BotonNuevo } from '@/components/boton-nuevo';
+ import { Card } from '@/components/card';
+ import { Chip } from '@/components/chip';
+ import { EmptyState } from '@/components/empty-state';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { ErrorState } from '@/components/error-state';
+ import { IconoAccion } from '@/components/icono-accion';
+ import { MapaVehiculo } from '@/components/map-vehiculo';
+@@ -779,34 +780,26 @@ export default function AdminFlotaSistemaScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        {/* Cabecera: el nombre, la acción y el pulso de la flota. */}
+-        <View
+-          style={[
+-            styles.topBar,
+-            {
+-              // El título entra un poco; el botón se queda pegado a su borde.
+-              paddingLeft: spacing.lg + spacing.sm,
+-              paddingRight: spacing.lg,
+-              paddingTop: spacing.md,
+-              paddingBottom: spacing.md,
+-              gap: spacing.md + 2,
+-            },
+-          ]}>
+-          <View style={[styles.fila, { gap: spacing.md }]}>
+-            <ThemedText variant="title" style={styles.titulo26}>
+-              Flota
+-            </ThemedText>
+-            {/* El pulso, en el hueco que queda: ni pegado al título ni al botón. */}
+-            <View style={[styles.flex1, styles.centrado]}>
++        {/* El encabezado del panel web; enfrente del título, el pulso de la
++            flota y el alta. */}
++        <EncabezadoFom
++          seccion="Vehículos"
++          titulo="Vehículos"
++          bajada="Todos los vehículos de todas las empresas."
++          accion={
++            <View style={[styles.fila, { gap: spacing.sm }]}>
+               <PulsoFom
+                 estado={estadoFom}
+                 desactualizado={desactualizado}
+                 ultimaConsulta={ultimaConsulta}
+                 ahora={ahora}
+               />
++              <BotonNuevo label="Nuevo" etiqueta="Crear vehículo" onPress={() => router.navigate('/crear-vehiculo')} />
+             </View>
+-            <BotonNuevo label="Nuevo" etiqueta="Crear vehículo" onPress={() => router.navigate('/crear-vehiculo')} />
+-          </View>
++          }
++        />
++        {/* Las cifras de la flota, justo debajo del título. */}
++        <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
+           <TiraEstado cifras={cifrasDe(visibles)} />
+         </View>
+ 
+@@ -1030,7 +1023,6 @@ const styles = StyleSheet.create({
+   encoge: { flexShrink: 1 },
+   fila: { flexDirection: 'row', alignItems: 'center' },
+   filaIzq: { flexDirection: 'row' },
+-  centrado: { alignItems: 'center' },
+   pulso: { flexDirection: 'row', alignItems: 'center' },
+   pulsoPunto: { width: 7, height: 7 },
+   pulsoLive: { fontSize: 10, lineHeight: 13, letterSpacing: 1.4, fontWeight: '700' },
+@@ -1039,10 +1031,6 @@ const styles = StyleSheet.create({
+   pulsoUnidad: { fontSize: 10, lineHeight: 13, fontWeight: '700' },
+   pulsoTexto: { fontSize: 12, fontWeight: '600' },
+ 
+-  // ── Cabecera ──
+-  topBar: {},
+-  titulo26: { fontSize: 26, lineHeight: 30, letterSpacing: -0.6 },
+-
+   // ── Mapa ──
+   mapa: { width: '100%', overflow: 'hidden' },
+   // Sin radio ni borde propios: va de borde a borde de la pantalla.
+diff --git a/src/app/admin/index.tsx b/src/app/admin/index.tsx
+index 768da1e..8b55c17 100644
+--- a/src/app/admin/index.tsx
++++ b/src/app/admin/index.tsx
+@@ -7,6 +7,7 @@ import { esMultiempresa, useAuth } from '@/auth';
+ import { Appear } from '@/components/appear';
+ import { Card } from '@/components/card';
+ import { EmptyState } from '@/components/empty-state';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { ErrorState } from '@/components/error-state';
+ import { EtiquetaSeccion } from '@/components/etiqueta-seccion';
+ import { HojaAbono } from '@/components/hoja-abono';
+@@ -594,18 +595,14 @@ export default function AdminResumenSistemaScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        {/* Barra superior: el nombre de la pestaña y, enfrente, el estado de los
++        {/* El encabezado del panel web; enfrente del título, el estado de los
+             tres servicios en una palabra. */}
+-        <View
+-          style={[
+-            styles.topBar,
+-            { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg },
+-          ]}>
+-          <ThemedText variant="title" style={styles.titulo}>
+-            Resumen
+-          </ThemedText>
+-          <PillGlobal tono={global.tono} label={global.label} />
+-        </View>
++        <EncabezadoFom
++          seccion="Resumen"
++          titulo="Resumen"
++          bajada="Toda la plataforma, en un solo lugar."
++          accion={<PillGlobal tono={global.tono} label={global.label} />}
++        />
+ 
+         {!data ? (
+           /* El esqueleto tiene la FORMA de lo que viene —rótulo, semáforo, barra
+@@ -844,8 +841,6 @@ const styles = StyleSheet.create({
+   tresPorFila: { flexBasis: '30%', flexGrow: 1 },
+ 
+   // ── Cabecera ──
+-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+-  titulo: { fontSize: 29, lineHeight: 32, letterSpacing: -0.6 },
+   pillGlobal: {
+     flexDirection: 'row',
+     alignItems: 'center',
+diff --git a/src/app/admin/mas.tsx b/src/app/admin/mas.tsx
+index 0e32f58..7ab514c 100644
+--- a/src/app/admin/mas.tsx
++++ b/src/app/admin/mas.tsx
+@@ -11,6 +11,7 @@ import { Appear } from '@/components/appear';
+ import { BotonDestacado } from '@/components/boton-destacado';
+ import { Card } from '@/components/card';
+ import { ConfirmarSalida } from '@/components/confirmar-salida';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { PerfilHero } from '@/components/perfil-hero';
+ import { PerfilPortada } from '@/components/perfil-portada';
+ import { FilaDato, TiraStats } from '@/components/perfil-piezas';
+@@ -128,6 +129,9 @@ export default function AdminMasSistemaScreen() {
+     <ThemedView style={styles.root}>
+       <PerfilPortada />
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
++        {/* El encabezado de todas las pestañas; sin título: el hero ya dice
++            quién eres. */}
++        <EncabezadoFom seccion="Perfil" />
+         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+           {/* ── HERO ── */}
+           <View style={[styles.heroCaja, { paddingHorizontal: spacing.lg }]}>
+diff --git a/src/app/admin/usuarios.tsx b/src/app/admin/usuarios.tsx
+index 9b352e8..4e5b89b 100644
+--- a/src/app/admin/usuarios.tsx
++++ b/src/app/admin/usuarios.tsx
+@@ -8,6 +8,7 @@ import { Avatar } from '@/components/avatar';
+ import { BotonNuevo } from '@/components/boton-nuevo';
+ import { Card } from '@/components/card';
+ import { Chip } from '@/components/chip';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { ErrorState } from '@/components/error-state';
+ import { EtiquetaSeccion } from '@/components/etiqueta-seccion';
+ import { IconoAccion } from '@/components/icono-accion';
+@@ -453,23 +454,15 @@ export default function AdminUsuariosSistemaScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        {/* Las acciones van en su PROPIA fila: no le quitan ancho al título. */}
+-        <View
+-          style={[
+-            styles.topBar,
+-            { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md + 2, gap: spacing.md + 1 },
+-          ]}>
+-          <ThemedText variant="title" style={styles.titulo}>
+-            Usuarios
+-          </ThemedText>
+-          <View style={[styles.acciones, { gap: spacing.sm }]}>
+-            <BotonNuevo
+-              label="Crear usuario"
+-              etiqueta="Crear un usuario"
+-              onPress={() => setEmpresaPicker(true)}
+-            />
+-          </View>
+-        </View>
++        {/* Crear va ARRIBA, junto al título, siempre a la vista. */}
++        <EncabezadoFom
++          seccion="Usuarios"
++          titulo="Usuarios"
++          bajada="Todas las personas con acceso."
++          accion={
++            <BotonNuevo label="Crear usuario" etiqueta="Crear un usuario" onPress={() => setEmpresaPicker(true)} />
++          }
++        />
+ 
+         {estado === 'error' ? (
+           <ErrorState description="No pudimos cargar los usuarios." onRetry={recargar} />
+@@ -802,11 +795,6 @@ const styles = StyleSheet.create({
+   flex1: { flex: 1, minWidth: 0 },
+   fila: { flexDirection: 'row', alignItems: 'center' },
+ 
+-  // ── Cabecera ──
+-  topBar: {},
+-  titulo: { fontSize: 29, lineHeight: 32, letterSpacing: -0.6 },
+-  acciones: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+-
+   // ── Grupo y sus filas ──
+   grupo: { paddingVertical: 0 },
+   nombre: { fontSize: 15 },
+diff --git a/src/app/compania/_layout.tsx b/src/app/compania/_layout.tsx
+index 4f8615b..7fb0cff 100644
+--- a/src/app/compania/_layout.tsx
++++ b/src/app/compania/_layout.tsx
+@@ -9,7 +9,7 @@ import { getCompanyBrandById } from '@/services';
+ 
+ /**
+  * VISTA DE COMPAÑÍA — la superficie de MONITOREO de la gente de una compañía
+- * (ej. Compañía): Resumen · Flota · Personal · Mantenimiento · Más. La compañía
++ * (ej. Compañía): Resumen · Vehículos · Usuarios · Mantenimiento · Perfil. La compañía
+  * NO opera flota propia: administra y supervisa a sus empresas asociadas —
+  * reportes (en PDF), mapa de las flotas de sus contratistas, su personal por
+  * ente y los costos/actividades de mantenimiento.
+@@ -60,15 +60,15 @@ export default function CompaniaTabsLayout() {
+       />
+       <Tabs.Screen
+         name="flota"
+-        options={{ title: 'Flota', tabBarIcon: ({ color, size }) => <TabIcon name="flota" color={color} size={size} /> }}
++        options={{ title: 'Vehículos', tabBarIcon: ({ color, size }) => <TabIcon name="flota" color={color} size={size} /> }}
+       />
+       <Tabs.Screen
+         name="personal"
+-        options={{ title: 'Personal', tabBarIcon: ({ color, size }) => <TabIcon name="personal" color={color} size={size} /> }}
++        options={{ title: 'Usuarios', tabBarIcon: ({ color, size }) => <TabIcon name="personal" color={color} size={size} /> }}
+       />
+       <Tabs.Screen
+         name="mantenimiento"
+-        options={{ title: 'Mantto.', tabBarIcon: ({ color, size }) => <TabIcon name="ot" color={color} size={size} /> }}
++        options={{ title: 'Mantenimiento', tabBarIcon: ({ color, size }) => <TabIcon name="ot" color={color} size={size} /> }}
+       />
+       <Tabs.Screen
+         name="mas"
+diff --git a/src/app/compania/flota.tsx b/src/app/compania/flota.tsx
+index 96f4f7f..a0798d3 100644
+--- a/src/app/compania/flota.tsx
++++ b/src/app/compania/flota.tsx
+@@ -7,6 +7,7 @@ import { useAuth } from '@/auth';
+ import { Card } from '@/components/card';
+ import { etiquetaCortaDeUnidad } from '@/lib/vehiculos';
+ import { EmptyState } from '@/components/empty-state';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { ErrorState } from '@/components/error-state';
+ import { MapaVehiculo } from '@/components/map-vehiculo';
+ import { PressableScale } from '@/components/pressable-scale';
+@@ -113,11 +114,7 @@ export default function CompaniaFlotaScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        <View style={[styles.topBar, { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }]}>
+-          <View style={styles.flex1}>
+-            <ThemedText variant="title">Flota</ThemedText>
+-          </View>
+-        </View>
++        <EncabezadoFom seccion="Vehículos" titulo="Vehículos" bajada="Las unidades de tus asociadas en el mapa." />
+ 
+         {estado === 'error' ? (
+           <ErrorState description="No pudimos cargar las flotas de tus asociadas." onRetry={recargar} />
+@@ -207,7 +204,6 @@ export default function CompaniaFlotaScreen() {
+ const styles = StyleSheet.create({
+   root: { flex: 1 },
+   safeArea: { flex: 1 },
+-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+   content: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingBottom: 32 },
+   row: { flexDirection: 'row', alignItems: 'center' },
+   check: { width: 24, height: 24, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+diff --git a/src/app/compania/index.tsx b/src/app/compania/index.tsx
+index c1d3e5c..ae6f342 100644
+--- a/src/app/compania/index.tsx
++++ b/src/app/compania/index.tsx
+@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
+ import { SafeAreaView } from 'react-native-safe-area-context';
+ 
+ import { useAuth } from '@/auth';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { OpcionRiel, RielOpciones } from '@/components/riel-opciones';
+ import { CapaCargando } from '@/components/capa-cargando';
+ import { CampoFecha } from '@/components/campo-fecha';
+@@ -192,12 +193,7 @@ export default function CompaniaResumenScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        <View style={[styles.topBar, { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }]}>
+-          <View style={styles.flex1}>
+-            <ThemedText variant="title">Reportes</ThemedText>
+-          </View>
+-          <Chip tone="info" label={user.name.split(' ')[0]} />
+-        </View>
++        <EncabezadoFom seccion="Reportes" titulo="Reportes" bajada="Lo que pasa en tus empresas asociadas." />
+ 
+         {estado === 'error' ? (
+           <ErrorState description="No pudimos cargar tus contratistas asociadas." onRetry={recargar} />
+@@ -366,7 +362,6 @@ export default function CompaniaResumenScreen() {
+ const styles = StyleSheet.create({
+   root: { flex: 1 },
+   safeArea: { flex: 1 },
+-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+   content: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingBottom: 32 },
+   row: { flexDirection: 'row', alignItems: 'center' },
+   lead: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+diff --git a/src/app/compania/mantenimiento.tsx b/src/app/compania/mantenimiento.tsx
+index 1be2761..ca2b671 100644
+--- a/src/app/compania/mantenimiento.tsx
++++ b/src/app/compania/mantenimiento.tsx
+@@ -8,7 +8,9 @@ import { CapaCargando } from '@/components/capa-cargando';
+ import { Card } from '@/components/card';
+ import { Chip } from '@/components/chip';
+ import { EmptyState } from '@/components/empty-state';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { ErrorState } from '@/components/error-state';
++import { KpiFila } from '@/components/kpi-fila';
+ import { OptionPickerModal, PickerField } from '@/components/option-picker';
+ import { ODT_ESTADO_LABEL, OTStatusBadge } from '@/components/ot-status-badge';
+ import { PillButton } from '@/components/pill-button';
+@@ -153,6 +155,13 @@ export default function CompaniaMantenimientoScreen() {
+ 
+   if (status !== 'signedIn' || !user) return <Redirect href="/login" />;
+ 
++  // Las ODT de todas las asociadas por estado, como las cifras del panel web.
++  // Son el histórico completo: el rango solo manda sobre los costos.
++  const todasOdts = data ? [...data.odtsPorEmpresa.values()].flat() : [];
++  const nAbiertas = todasOdts.filter((o) => o.estado === 'abierta').length;
++  const nEnRevision = todasOdts.filter((o) => o.estado === 'en_revision').length;
++  const nResueltas = todasOdts.filter((o) => o.estado === 'cerrada').length;
++
+   function toggleEmpresa(id: string) {
+     setAbiertas((prev) => {
+       const s = new Set(prev);
+@@ -185,18 +194,13 @@ export default function CompaniaMantenimientoScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        {/* Barra superior propia: esta vista es de la COMPAÑÍA, que monitorea. */}
+-        <View style={[styles.topBar, { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }]}>
+-          <View style={styles.flex1}>
+-            <ThemedText variant="title">Mantenimiento</ThemedText>
+-          </View>
+-          <Chip tone="info" label={user.name.split(' ')[0]} />
+-        </View>
++        <EncabezadoFom seccion="Mantenimiento" titulo="Mantenimiento" bajada="Órdenes de tus asociadas." />
+ 
+         {estado === 'error' ? (
+           <ErrorState description="No pudimos cargar el mantenimiento." onRetry={recargar} />
+         ) : !data ? (
+           <View style={[styles.content, { padding: spacing.lg, gap: spacing.lg }]}>
++            <Skeleton height={78} radius={radii.lg} />
+             <Skeleton height={64} radius={radii.md} />
+             <Skeleton height={96} radius={16} />
+             <Skeleton height={96} radius={16} />
+@@ -204,6 +208,14 @@ export default function CompaniaMantenimientoScreen() {
+           </View>
+         ) : (
+           <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg, gap: spacing.md }]}>
++            <KpiFila
++              items={[
++                { label: 'Abiertas', valor: nAbiertas, tono: 'warning' },
++                { label: 'En revisión', valor: nEnRevision, tono: 'primary' },
++                { label: 'Resueltas', valor: nResueltas, tono: 'success' },
++              ]}
++            />
++
+             {/* El rango manda sobre TODOS los costos de la pantalla. */}
+             <PickerField
+               label="Rango de fechas"
+@@ -424,7 +436,6 @@ export default function CompaniaMantenimientoScreen() {
+ const styles = StyleSheet.create({
+   root: { flex: 1 },
+   safeArea: { flex: 1 },
+-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+   content: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingBottom: 32 },
+   row: { flexDirection: 'row', alignItems: 'center' },
+   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+diff --git a/src/app/compania/mas.tsx b/src/app/compania/mas.tsx
+index a797c0b..49c84c1 100644
+--- a/src/app/compania/mas.tsx
++++ b/src/app/compania/mas.tsx
+@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
+ import { useAuth, useSignOut } from '@/auth';
+ import { ConfirmarSalida } from '@/components/confirmar-salida';
+ import { Card } from '@/components/card';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { PressableScale } from '@/components/pressable-scale';
+ import { TabIcon, type TabIconName } from '@/components/tab-icon';
+ import { ThemedText } from '@/components/themed-text';
+@@ -68,11 +69,7 @@ export default function CompaniaMasScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        <View style={[styles.topBar, { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }]}>
+-          <View>
+-            <ThemedText variant="title">Perfil</ThemedText>
+-          </View>
+-        </View>
++        <EncabezadoFom seccion="Perfil" titulo="Perfil" />
+ 
+         <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg, gap: spacing.xl }]}>
+ 
+@@ -141,7 +138,6 @@ export default function CompaniaMasScreen() {
+ const styles = StyleSheet.create({
+   root: { flex: 1 },
+   safeArea: { flex: 1 },
+-  topBar: { flexDirection: 'row', alignItems: 'center' },
+   content: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingBottom: 32 },
+   row: { flexDirection: 'row', alignItems: 'center' },
+   lead: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+diff --git a/src/app/compania/personal.tsx b/src/app/compania/personal.tsx
+index d85ff4c..92e853a 100644
+--- a/src/app/compania/personal.tsx
++++ b/src/app/compania/personal.tsx
+@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
+ import { esAdmin, etiquetaRol, useAuth } from '@/auth';
+ import { Card } from '@/components/card';
+ import { Chip } from '@/components/chip';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { ErrorState } from '@/components/error-state';
+ import { PillButton } from '@/components/pill-button';
+ import { PressableScale } from '@/components/pressable-scale';
+@@ -127,11 +128,7 @@ export default function CompaniaPersonalScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        <View style={[styles.topBar, { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }]}>
+-          <View style={styles.flex1}>
+-            <ThemedText variant="title">Personal</ThemedText>
+-          </View>
+-        </View>
++        <EncabezadoFom seccion="Usuarios" titulo="Usuarios" bajada="La gente de tus asociadas." />
+ 
+         {estado === 'error' ? (
+           <ErrorState description="No pudimos cargar el personal." onRetry={recargar} />
+@@ -245,7 +242,6 @@ export default function CompaniaPersonalScreen() {
+ const styles = StyleSheet.create({
+   root: { flex: 1 },
+   safeArea: { flex: 1 },
+-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+   content: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingBottom: 32 },
+   row: { flexDirection: 'row', alignItems: 'center' },
+   lead: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+diff --git a/src/app/gerencial/index.tsx b/src/app/gerencial/index.tsx
+index 3bee247..48dc117 100644
+--- a/src/app/gerencial/index.tsx
++++ b/src/app/gerencial/index.tsx
+@@ -7,6 +7,7 @@ import { useAuth, useSignOut } from '@/auth';
+ import { ConfirmarSalida } from '@/components/confirmar-salida';
+ import { Appear } from '@/components/appear';
+ import { Card } from '@/components/card';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { EmptyState } from '@/components/empty-state';
+ import { ErrorState } from '@/components/error-state';
+ import { PressableScale } from '@/components/pressable-scale';
+@@ -40,7 +41,7 @@ function iniciales(name: string): string {
+  * con la marca de la predefinida activa (P14).
+  */
+ export default function GerencialHomeScreen() {
+-  const { colors, spacing, radii, brand } = useTheme();
++  const { colors, spacing, radii } = useTheme();
+   const { setBrand } = useThemeController();
+   const { user } = useAuth();
+   const signOut = useSignOut();
+@@ -98,13 +99,8 @@ export default function GerencialHomeScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        <View style={[styles.topBar, { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }]}>
+-          <View style={styles.flex1}>
+-            <ThemedText variant="subtitle" numberOfLines={1}>
+-              {brand.name}
+-            </ThemedText>
+-          </View>
+-        </View>
++        {/* El encabezado de siempre: la cápsula ya lleva la marca de la cuenta. */}
++        <EncabezadoFom seccion="Resumen" titulo="Resumen" bajada="Tus empresas, de un vistazo." />
+ 
+         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+           <View style={[styles.content, { padding: spacing.lg, gap: spacing.md }]}>
+@@ -211,7 +207,6 @@ export default function GerencialHomeScreen() {
+ const styles = StyleSheet.create({
+   root: { flex: 1 },
+   safeArea: { flex: 1 },
+-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+   scrollContent: { paddingBottom: 32 },
+   content: { width: '100%', maxWidth: 720, alignSelf: 'center' },
+   companyCard: { flexDirection: 'row', alignItems: 'center' },
+diff --git a/src/app/notificaciones.tsx b/src/app/notificaciones.tsx
+index 94da0c3..3824475 100644
+--- a/src/app/notificaciones.tsx
++++ b/src/app/notificaciones.tsx
+@@ -265,7 +265,7 @@ export default function NotificacionesScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        <ScreenHeader title="Avisos" cargando={refrescando} />
++        <ScreenHeader title="Alertas" cargando={refrescando} />
+ 
+         {/* Solo el buscador se queda fijo; las pastillas encabezan la lista y
+             suben con ella, para dejarle la pantalla a los avisos. */}
+diff --git a/src/app/panel/_layout.tsx b/src/app/panel/_layout.tsx
+index 70fa890..6972617 100644
+--- a/src/app/panel/_layout.tsx
++++ b/src/app/panel/_layout.tsx
+@@ -9,10 +9,11 @@ import { getCompanyBrandById } from '@/services';
+ import { useThemeController } from '@/theme';
+ 
+ /**
+- * Panel de administración por PESTAÑAS (FOM-WEB móvil): Resumen · Flota ·
+- * Personal · OT · Más. Vive en el grupo `(admin)`, aparte del área de conductor.
+- * Se pinta con la marca de la empresa activa. Solo entra un admin con una
+- * empresa elegida; el admin general que no ha elegido va al menú de empresas.
++ * Panel de administración por PESTAÑAS (FOM-WEB móvil): Resumen · Vehículos ·
++ * Usuarios · Mantenimiento · Perfil. Vive en el grupo `(admin)`, aparte del
++ * área de conductor. Se pinta con la marca de la empresa activa. Solo entra un
++ * admin con una empresa elegida; el admin general que no ha elegido va al menú
++ * de empresas.
+  */
+ export default function AdminTabsLayout() {
+   const { setBrand } = useThemeController();
+@@ -58,15 +59,15 @@ export default function AdminTabsLayout() {
+       />
+       <Tabs.Screen
+         name="flota"
+-        options={{ title: 'Flota', tabBarIcon: ({ color, size }) => <TabIcon name="flota" color={color} size={size} /> }}
++        options={{ title: 'Vehículos', tabBarIcon: ({ color, size }) => <TabIcon name="flota" color={color} size={size} /> }}
+       />
+       <Tabs.Screen
+         name="personal"
+-        options={{ title: 'Personal', tabBarIcon: ({ color, size }) => <TabIcon name="personal" color={color} size={size} /> }}
++        options={{ title: 'Usuarios', tabBarIcon: ({ color, size }) => <TabIcon name="personal" color={color} size={size} /> }}
+       />
+       <Tabs.Screen
+         name="mantenimiento"
+-        options={{ title: 'Mantto.', tabBarIcon: ({ color, size }) => <TabIcon name="ot" color={color} size={size} /> }}
++        options={{ title: 'Mantenimiento', tabBarIcon: ({ color, size }) => <TabIcon name="ot" color={color} size={size} /> }}
+       />
+       <Tabs.Screen
+         name="mas"
+diff --git a/src/app/panel/flota.tsx b/src/app/panel/flota.tsx
+index 63a5d89..e949b62 100644
+--- a/src/app/panel/flota.tsx
++++ b/src/app/panel/flota.tsx
+@@ -8,6 +8,7 @@ import { BotonNuevo } from '@/components/boton-nuevo';
+ import { BuscadorFiltros } from '@/components/buscador-filtros';
+ import { Card } from '@/components/card';
+ import { EmptyState } from '@/components/empty-state';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { EncabezadoGrupo } from '@/components/encabezado-grupo';
+ import { ErrorState } from '@/components/error-state';
+ import { MapaVehiculo } from '@/components/map-vehiculo';
+@@ -441,24 +442,13 @@ export default function AdminFlotaScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        {/* Cabecera: el nombre, la acción y el pulso de la flota. */}
+-        <View
+-          style={[
+-            styles.topBar,
+-            {
+-              // El título entra un poco; el botón se queda pegado a su borde.
+-              paddingLeft: spacing.lg + spacing.sm,
+-              paddingRight: spacing.lg,
+-              paddingTop: spacing.md,
+-              paddingBottom: spacing.md,
+-              gap: spacing.md + 2,
+-            },
+-          ]}>
+-          <View style={[styles.row, { gap: spacing.md }]}>
+-            <ThemedText variant="title" style={[styles.flex1, styles.titulo26]}>
+-              Flota
+-            </ThemedText>
+-            {puedeCrear ? (
++        {/* Cabecera: el encabezado del panel web, con el alta a la derecha. */}
++        <EncabezadoFom
++          seccion="Vehículos"
++          titulo="Vehículos"
++          bajada="Dónde está y cómo está cada unidad."
++          accion={
++            puedeCrear ? (
+               <BotonNuevo
+                 label="Nuevo"
+                 etiqueta="Dar de alta un vehículo"
+@@ -466,8 +456,11 @@ export default function AdminFlotaScreen() {
+                   router.navigate({ pathname: '/crear-vehiculo', params: { companyId: empresaId ?? '' } })
+                 }
+               />
+-            ) : null}
+-          </View>
++            ) : undefined
++          }
++        />
++        {/* El pulso de la flota, justo debajo, alineado con el título. */}
++        <View style={{ paddingHorizontal: 18, paddingBottom: spacing.md }}>
+           <TiraEstado cifras={cifras} />
+         </View>
+ 
+@@ -715,10 +708,6 @@ const styles = StyleSheet.create({
+   detalle: { marginTop: 3 },
+   flex1: { flex: 1, minWidth: 0 },
+ 
+-  // ── Cabecera ──
+-  topBar: {},
+-  titulo26: { fontSize: 26, lineHeight: 30, letterSpacing: -0.6 },
+-
+   // ── Mapa ──
+   mapa: { width: '100%', overflow: 'hidden' },
+   // Sin radio ni borde propios: va de borde a borde de la pantalla.
+diff --git a/src/app/panel/index.tsx b/src/app/panel/index.tsx
+index 4d238ab..b56c15a 100644
+--- a/src/app/panel/index.tsx
++++ b/src/app/panel/index.tsx
+@@ -297,6 +297,7 @@ export default function AdminResumenScreen() {
+             en vez de al fondo de un scroll donde se quedaba cortada. */}
+         <AdminHeader
+           seccion="Resumen"
++          bajada="Toda tu operación, en un solo lugar."
+           cargando={refrescando}
+           accion={
+             <BotonNuevo
+diff --git a/src/app/panel/mantenimiento.tsx b/src/app/panel/mantenimiento.tsx
+index 635db8f..92e36bc 100644
+--- a/src/app/panel/mantenimiento.tsx
++++ b/src/app/panel/mantenimiento.tsx
+@@ -12,6 +12,7 @@ import { EncabezadoGrupo } from '@/components/encabezado-grupo';
+ import { ErrorState } from '@/components/error-state';
+ import { FilaTarea } from '@/components/fila-tarea';
+ import { Insignia } from '@/components/insignia';
++import { KpiFila } from '@/components/kpi-fila';
+ import { PressableScale } from '@/components/pressable-scale';
+ import { ProgressBar } from '@/components/progress-bar';
+ import { Relevo } from '@/components/relevo';
+@@ -23,7 +24,14 @@ import { ThemedText } from '@/components/themed-text';
+ import { ThemedView } from '@/components/themed-view';
+ import { useAsyncData } from '@/hooks/use-async-data';
+ import { GRACIA_ESQUELETO, useTardando } from '@/hooks/use-refresco';
+-import { getAlertasDeFlota, getAreas, getOrdenesAbiertas, getUnidadesFlota } from '@/services';
++import {
++  enteActivoFom,
++  getAlertasDeFlota,
++  getAreas,
++  getOrdenesAbiertas,
++  getResumenFom,
++  getUnidadesFlota,
++} from '@/services';
+ import { useAdmin } from '@/session';
+ import { useTheme } from '@/theme';
+ import { etiquetaCortaDeUnidad } from '@/lib/vehiculos';
+@@ -34,7 +42,10 @@ import { COLAS, porOrden, tareasDe, unidadesPorAtender, type Tarea } from '@/uti
+ /**
+  * MANTENIMIENTO (Tablero 2 · Módulo 5): QUÉ trabajo hay que hacer y CUÁNDO.
+  *
+- * Arriba, la flota por UNIDADES: cuántas están al día de cuántas hay. Las colas
++ * Primero, las ODT por estado —abiertas, en revisión, resueltas—, las mismas
++ * cifras del panel web. Cuentan órdenes, no tareas ni unidades.
++ *
++ * Luego, la flota por UNIDADES: cuántas están al día de cuántas hay. Las colas
+  * cuentan tareas y esta tarjeta cuenta unidades —responde otra pregunta—, así
+  * que no repite los números de las colas, que era lo que hacía la tira de
+  * cifras que hubo aquí. Al tocarla se ven todas las unidades.
+@@ -69,13 +80,16 @@ export default function AdminMantenimientoScreen() {
+   const cid = empresaId ?? '';
+   const { data, estado, refrescando: pidiendo, recargar } = useAsyncData(
+     async () => {
+-      const [ordenes, acciones, flota, areas] = await Promise.all([
++      const [ordenes, acciones, flota, areas, resumen] = await Promise.all([
+         getOrdenesAbiertas(cid),
+         getAlertasDeFlota(cid),
+         getUnidadesFlota(cid),
+         getAreas(cid),
++        // Las resueltas no vienen en las órdenes abiertas: las cuenta el
++        // resumen del servidor, que solo responde por el ente en sesión.
++        cid === enteActivoFom() ? getResumenFom().catch(() => null) : Promise.resolve(null),
+       ]);
+-      return { ordenes, acciones, flota, areas };
++      return { ordenes, acciones, flota, areas, resumen };
+     },
+     [cid],
+     { onFocus: true },
+@@ -107,6 +121,13 @@ export default function AdminMantenimientoScreen() {
+   const nUnidades = flota.length;
+   const nPorAtender = flota.filter((f) => pendientes.has(f.vehicle.id)).length;
+ 
++  // ── Las ODT por estado, como las cifras del panel web ──
++  const ordenes = data?.ordenes ?? [];
++  const nAbiertas = ordenes.filter((o) => o.estado === 'abierta').length;
++  const nEnRevision = ordenes.filter((o) => o.estado === 'en_revision').length;
++  // Sin resumen (otra empresa, o falló) no se inventa un cero.
++  const nResueltas = data?.resumen ? data.resumen.odtCerradas : '—';
++
+   // ── Buscar y filtrar: por tipo, y por el área de la unidad en su color ──
+   const filtros: Filtro<Tarea>[] = [
+     { id: 'tipo:correctivo', label: 'Correctivo · ODT', cumple: (t) => t.tipo === 'correctivo' },
+@@ -152,6 +173,7 @@ export default function AdminMantenimientoScreen() {
+             una ODT. A su lado, Control: las reglas de donde salen las alertas. */}
+         <AdminHeader
+           seccion="Mantenimiento"
++          bajada="Qué necesita atención y qué sigue."
+           cargando={refrescando}
+           accion={
+             <View style={[styles.fila, { gap: spacing.md }]}>
+@@ -176,6 +198,7 @@ export default function AdminMantenimientoScreen() {
+               // La FORMA de lo que viene —tarjeta, buscador y colas— para que al
+               // llegar los datos no salte nada de sitio.
+               <View style={[styles.content, { padding: spacing.lg, gap: spacing.lg }]}>
++                <Skeleton height={78} radius={radii.lg} />
+                 <Skeleton height={104} radius={radii.lg} />
+                 <Skeleton height={44} radius={radii.md} />
+                 {[0, 1].map((i) => (
+@@ -197,6 +220,16 @@ export default function AdminMantenimientoScreen() {
+               </View>
+             }>
+             <ScrollVisible contentContainerStyle={[styles.content, { padding: spacing.lg, gap: spacing.lg }]}>
++              {data ? (
++                <KpiFila
++                  items={[
++                    { label: 'Abiertas', valor: nAbiertas, tono: 'warning' },
++                    { label: 'En revisión', valor: nEnRevision, tono: 'primary' },
++                    { label: 'Resueltas', valor: nResueltas, tono: 'success' },
++                  ]}
++                />
++              ) : null}
++
+               <TarjetaAlDia
+                 alDia={nUnidades - nPorAtender}
+                 total={nUnidades}
+diff --git a/src/app/panel/mas.tsx b/src/app/panel/mas.tsx
+index 39bffe8..4284f7e 100644
+--- a/src/app/panel/mas.tsx
++++ b/src/app/panel/mas.tsx
+@@ -9,6 +9,7 @@ import { Appear } from '@/components/appear';
+ import { BotonDestacado } from '@/components/boton-destacado';
+ import { Card } from '@/components/card';
+ import { ConfirmarSalida } from '@/components/confirmar-salida';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { PerfilAcciones, type AccionPerfil } from '@/components/perfil-acciones';
+ import { PerfilAccesos, type AccesoPerfil } from '@/components/perfil-accesos';
+ import { PerfilHero } from '@/components/perfil-hero';
+@@ -96,7 +97,7 @@ export default function AdminMasScreen() {
+     {
+       icon: 'mensaje',
+       tono: 'info',
+-      label: 'Avisos',
++      label: 'Alertas',
+       estado: 'ODT reportadas y alertas del sistema',
+       onPress: () => router.navigate({ pathname: '/notificaciones', params: { companyId: cid } }),
+     },
+@@ -190,6 +191,9 @@ export default function AdminMasScreen() {
+     <ThemedView style={styles.root}>
+       <PerfilPortada />
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
++        {/* El encabezado de todas las pestañas; aquí sin título: el nombre ya
++            va grande en el hero. */}
++        <EncabezadoFom seccion="Perfil" />
+         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+           {/* ── HERO ── */}
+           <View style={[styles.heroCaja, { paddingHorizontal: spacing.lg }]}>
+diff --git a/src/app/panel/personal.tsx b/src/app/panel/personal.tsx
+index 5cede9c..6a02ed8 100644
+--- a/src/app/panel/personal.tsx
++++ b/src/app/panel/personal.tsx
+@@ -174,10 +174,11 @@ export default function AdminPersonalScreen() {
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+         {/* Dar de alta a alguien es la acción principal de la pestaña: en la
+-            cabecera, en el mismo sitio que "Nuevo" en Flota y "Reporte" en el
++            cabecera, en el mismo sitio que "Nuevo" en Vehículos y "Reporte" en el
+             Resumen. */}
+         <AdminHeader
+-          seccion="Personal"
++          seccion="Usuarios"
++          bajada="La gente de tu empresa."
+           cargando={refrescando}
+           accion={
+             <BotonNuevo
+diff --git a/src/app/personal/index.tsx b/src/app/personal/index.tsx
+index de17424..dad6b40 100644
+--- a/src/app/personal/index.tsx
++++ b/src/app/personal/index.tsx
+@@ -11,6 +11,7 @@ import { Button } from '@/components/button';
+ import { Card } from '@/components/card';
+ import { Chip } from '@/components/chip';
+ import { EmptyState } from '@/components/empty-state';
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ import { ErrorState } from '@/components/error-state';
+ import { MapaVehiculo } from '@/components/map-vehiculo';
+ import { OptionPickerModal } from '@/components/option-picker';
+@@ -36,7 +37,7 @@ import {
+ import { DEFAULT_BRAND, useTheme, useThemeController, type ColorTokens } from '@/theme';
+ import type { DocumentoEstado, MapMarker } from '@/types';
+ import { etiquetaCortaDeUnidad } from '@/lib/vehiculos';
+-import { formatVencimiento, saludoPorHora } from '@/utils/date';
++import { formatVencimiento } from '@/utils/date';
+ import { miles } from '@/utils/numero';
+ 
+ const DOC_VISTA: Record<DocumentoEstado, { tone: keyof ColorTokens; label: string }> = {
+@@ -171,16 +172,16 @@ export default function PersonalHomeScreen() {
+   return (
+     <ThemedView style={styles.root} ambient>
+       <SafeAreaView style={styles.safeArea} edges={['top']}>
+-        <View style={[styles.topBar, { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }]}>
+-          <View style={styles.flex1}>
+-            <ThemedText variant="overline" color="textMuted">
+-              {saludoPorHora()}
+-            </ThemedText>
+-            <ThemedText variant="subtitle" numberOfLines={1}>
+-              {user.name.split(' ')[0]}
+-            </ThemedText>
+-          </View>
+-        </View>
++        {/* El encabezado de siempre; la campana cuenta sola los avisos de la cuenta. */}
++        <EncabezadoFom
++          seccion="Resumen"
++          titulo="Resumen"
++          bajada={
++            esSupervisora
++              ? 'Tus carros, sus alertas y los documentos de tu equipo.'
++              : 'Tu vehículo, sus alertas y tus documentos.'
++          }
++        />
+ 
+         {estado === 'error' ? (
+           <ErrorState description="No pudimos cargar tus vehículos." onRetry={recargar} />
+@@ -224,7 +225,7 @@ export default function PersonalHomeScreen() {
+                   accessibilityLabel={`Ver avisos: ${data.sinLeer.sos} emergencias, ${data.sinLeer.odt} ODT y ${data.sinLeer.alerta} alertas sin leer`}>
+                   <Card style={[styles.rowBetween, { gap: spacing.md }]}>
+                     <View style={styles.flex1}>
+-                      <ThemedText variant="subtitle">Avisos</ThemedText>
++                      <ThemedText variant="subtitle">Alertas</ThemedText>
+                       <ThemedText variant="caption" color="textMuted">
+                         ODT reportadas · alertas del sistema
+                       </ThemedText>
+@@ -484,7 +485,6 @@ export default function PersonalHomeScreen() {
+ const styles = StyleSheet.create({
+   root: { flex: 1 },
+   safeArea: { flex: 1 },
+-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+   content: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingBottom: 32 },
+   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+   inline: { flexDirection: 'row', alignItems: 'center' },
+diff --git a/src/components/admin-header.tsx b/src/components/admin-header.tsx
+index 1b215be..b8e8a79 100644
+--- a/src/components/admin-header.tsx
++++ b/src/components/admin-header.tsx
+@@ -1,101 +1,23 @@
+ import type { ReactNode } from 'react';
+-import { StyleSheet, View } from 'react-native';
+ 
+-import { Appear } from '@/components/appear';
+-import { BarraCarga } from '@/components/barra-carga';
+-import { LogoEmpresa, hayLogoEmpresa } from '@/components/logo-empresa';
+-import { ThemedText } from '@/components/themed-text';
+-import { useTheme } from '@/theme';
+-
+-/** Iniciales para el logo placeholder de la empresa. */
+-function iniciales(name: string): string {
+-  return name
+-    .split(' ')
+-    .map((w) => w[0])
+-    .join('')
+-    .slice(0, 2)
+-    .toUpperCase();
+-}
++import { EncabezadoFom } from '@/components/encabezado-fom';
+ 
+ type AdminHeaderProps = {
+-  /** Nombre de la sección (tab) para el eyebrow. */
++  /** Nombre de la sección (tab): va en la cápsula y como título grande. */
+   seccion: string;
+-  /**
+-   * La acción principal de la pestaña, a la derecha de la marca. Opcional: la
+-   * pestaña que no tiene una deja la cabecera como estaba.
+-   */
++  /** Una frase corta debajo del título. */
++  bajada?: string;
++  /** La acción principal de la pestaña, a la derecha del título. */
+   accion?: ReactNode;
+   /** La pestaña está refrescando lo que ya se ve: enciende la barra fina. */
+   cargando?: boolean;
+ };
+ 
+ /**
+- * Encabezado del panel de admin, común a todas las pestañas: logo + nombre de
+- * la empresa (con su marca) y la sección actual. Sin acciones de navegación:
+- * cerrar sesión y el cambio de contexto viven en la pestaña "Más".
+- *
+- * Puede llevar UNA acción: la principal de su pestaña, a la derecha y siempre a
+- * la vista. La marca le cede el sitio y se trunca antes que ella.
++ * Encabezado de las pestañas del panel: el mismo del panel web (ver
++ * `EncabezadoFom`). La cápsula lleva la empresa activa y la sección; debajo
++ * va el título grande con su acción.
+  */
+-export function AdminHeader({ seccion, accion, cargando }: AdminHeaderProps) {
+-  const { colors, spacing, radii, brand } = useTheme();
+-  // Con isotipo propio (Samfor), la marca va en una tarjeta NEUTRA: sus colores
+-  // —rojo y azul— son suyos y un cuadro de acento competiría con ellos. Sin
+-  // isotipo, se conserva el cuadro de marca con las iniciales.
+-  const conLogo = hayLogoEmpresa(brand.logoKey);
+-
+-  return (
+-    <Appear distance={10}>
+-    <View style={[styles.bar, { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomColor: colors.border }]}>
+-      <View style={[styles.inline, styles.brandBlock, { gap: spacing.md }]}>
+-        {conLogo ? (
+-          <View
+-            style={[
+-              styles.brandMark,
+-              {
+-                backgroundColor: colors.surface,
+-                borderColor: colors.border,
+-                borderWidth: StyleSheet.hairlineWidth,
+-                borderRadius: radii.md,
+-              },
+-            ]}>
+-            <LogoEmpresa logoKey={brand.logoKey} size={28} />
+-          </View>
+-        ) : (
+-          <View style={[styles.brandMark, { backgroundColor: colors.primary, borderRadius: radii.md }]}>
+-            <ThemedText variant="subtitle" style={{ color: colors.onPrimary }}>
+-              {iniciales(brand.name)}
+-            </ThemedText>
+-          </View>
+-        )}
+-        <View style={styles.flex1}>
+-          <ThemedText variant="overline" color="textMuted" numberOfLines={1}>
+-            {seccion}
+-          </ThemedText>
+-          <ThemedText variant="subtitle" numberOfLines={1}>
+-            {brand.name}
+-          </ThemedText>
+-        </View>
+-      </View>
+-      {accion}
+-
+-      <BarraCarga visible={!!cargando} />
+-    </View>
+-    </Appear>
+-  );
++export function AdminHeader({ seccion, bajada, accion, cargando }: AdminHeaderProps) {
++  return <EncabezadoFom seccion={seccion} titulo={seccion} bajada={bajada} accion={accion} cargando={cargando} />;
+ }
+-
+-const styles = StyleSheet.create({
+-  bar: {
+-    flexDirection: 'row',
+-    alignItems: 'center',
+-    justifyContent: 'space-between',
+-    gap: 12,
+-    borderBottomWidth: StyleSheet.hairlineWidth,
+-  },
+-  brandMark: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+-  inline: { flexDirection: 'row', alignItems: 'center' },
+-  // La marca cede espacio (se trunca).
+-  brandBlock: { flex: 1, minWidth: 0 },
+-  flex1: { flex: 1, minWidth: 0 },
+-});
+diff --git a/src/components/boton-nuevo.tsx b/src/components/boton-nuevo.tsx
+index 18725a9..ab7329d 100644
+--- a/src/components/boton-nuevo.tsx
++++ b/src/components/boton-nuevo.tsx
+@@ -38,7 +38,8 @@ export function BotonNuevo({
+             backgroundColor: colors.primary,
+             borderRadius: radii.pill,
+             paddingHorizontal: spacing.md + 2,
+-            paddingVertical: spacing.sm + 1,
++            // Alto de la píldora del panel web.
++            minHeight: 40,
+             gap: spacing.xs + 2,
+             boxShadow: `0 2px 10px ${tinte(colors.primary, 0.3)}`,
+           },
+@@ -54,5 +55,5 @@ export function BotonNuevo({
+ 
+ const styles = StyleSheet.create({
+   pill: { flexDirection: 'row', alignItems: 'center' },
+-  texto: { fontSize: 13, fontWeight: '700' },
++  texto: { fontSize: 13, fontWeight: '600' },
+ });
+diff --git a/src/components/card.tsx b/src/components/card.tsx
+index 81113e1..f20c99b 100644
+--- a/src/components/card.tsx
++++ b/src/components/card.tsx
+@@ -2,16 +2,17 @@ import { View, type ViewProps } from 'react-native';
+ 
+ import { useTheme } from '@/theme';
+ 
+-/** Tarjeta temática: superficie + borde + radio + padding + sombra, del tema. */
++/**
++ * Tarjeta temática, como las del panel web: superficie sobre el fondo, radio
++ * grande y SIN raya alrededor (la separa el color, no un borde).
++ */
+ export function Card({ style, children, ...rest }: ViewProps) {
+-  const { colors, radii, spacing, shadows, borderWidths } = useTheme();
++  const { colors, radii, spacing, shadows } = useTheme();
+   return (
+     <View
+       style={[
+         {
+           backgroundColor: colors.surface,
+-          borderColor: colors.border,
+-          borderWidth: borderWidths.hairline,
+           borderRadius: radii.lg,
+           padding: spacing.lg,
+         },
+diff --git a/src/components/chip.tsx b/src/components/chip.tsx
+index 07b38b5..94bb2ed 100644
+--- a/src/components/chip.tsx
++++ b/src/components/chip.tsx
+@@ -37,7 +37,8 @@ export function Chip({ tone, label, dot = false, textoTono }: ChipProps) {
+     <View style={[styles.chip, { borderRadius: radii.pill }]}>
+       <View style={[StyleSheet.absoluteFill, { backgroundColor: colors[tone], opacity: 0.14, borderRadius: radii.pill }]} />
+       {dot ? <View style={[styles.punto, { backgroundColor: colors[tone], borderRadius: radii.pill }]} /> : null}
+-      <ThemedText variant="overline" color={textoTono ?? tone}>
++      {/* Como las etiquetas del panel web: en frase normal, no en mayúsculas. */}
++      <ThemedText variant="caption" color={textoTono ?? tone} style={styles.texto}>
+         {label}
+       </ThemedText>
+     </View>
+@@ -49,10 +50,11 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     alignItems: 'center',
+     gap: 5,
+-    paddingHorizontal: 8,
++    paddingHorizontal: 10,
+     paddingVertical: 3,
+     overflow: 'hidden',
+     alignSelf: 'flex-start',
+   },
+   punto: { width: 6, height: 6 },
++  texto: { fontSize: 12, lineHeight: 16, fontWeight: '600' },
+ });
+diff --git a/src/components/encabezado-fom.tsx b/src/components/encabezado-fom.tsx
+new file mode 100644
+index 0000000..2a311dc
+--- /dev/null
++++ b/src/components/encabezado-fom.tsx
+@@ -0,0 +1,269 @@
++import { useFocusEffect, usePathname, useRouter, type Href } from 'expo-router';
++import { useCallback, useState, type ReactNode } from 'react';
++import { StyleSheet, View } from 'react-native';
++import { useSafeAreaInsets } from 'react-native-safe-area-context';
++
++import { useAuth } from '@/auth';
++import { Appear } from '@/components/appear';
++import { BarraCarga } from '@/components/barra-carga';
++import { LogoEmpresa, hayLogoEmpresa } from '@/components/logo-empresa';
++import { PressableScale } from '@/components/pressable-scale';
++import { TabIcon } from '@/components/tab-icon';
++import { ThemedText } from '@/components/themed-text';
++import { getSinLeerPanel } from '@/services';
++import { useAdmin } from '@/session';
++import { useTheme } from '@/theme';
++
++/**
++ * EL ENCABEZADO DE LA APP, el mismo del panel web.
++ *
++ * Tres piezas flotantes con bordes redondos —la cápsula con la empresa y la
++ * sección, la campana en un círculo y tu avatar— y, debajo, el título grande
++ * de la pantalla con su bajada y su acción. Lo usan todas las pestañas de
++ * todos los roles, así que la app se ve igual en cualquier sitio.
++ *
++ * Sobre un mapa va `flotante`: las piezas se apoyan encima del mapa, un poco
++ * transparentes, y el título se omite (el mapa es el protagonista).
++ */
++
++/** El avatar del panel web: azul profundo con su aro. */
++const AVATAR_FONDO = '#194A74';
++const AVATAR_ARO = '#31608B';
++const AVATAR_TEXTO = '#EEF7FF';
++/** Superficie de las piezas cuando flotan sobre el mapa. */
++const SOBRE_MAPA = 'rgba(20, 26, 34, 0.94)';
++
++type Contexto = 'admin' | 'panel' | 'compania' | 'gerencial' | 'personal' | 'conductor';
++
++/** De qué superficie es la pantalla, por su ruta. */
++function contextoDe(ruta: string): Contexto {
++  const primero = ruta.split('/').filter(Boolean)[0] ?? '';
++  if (primero === 'admin' || primero === 'panel' || primero === 'compania' || primero === 'gerencial' || primero === 'personal') {
++    return primero;
++  }
++  return 'conductor';
++}
++
++/** A dónde lleva el avatar: la pestaña Perfil de cada rol. */
++const PERFIL: Partial<Record<Contexto, Href>> = {
++  admin: '/admin/mas',
++  panel: '/panel/mas',
++  compania: '/compania/mas',
++  conductor: '/mas',
++  // Sin pestaña Perfil: van directo a su ficha.
++  gerencial: '/mi-perfil',
++  personal: '/mi-perfil',
++};
++
++/** Iniciales (primera y última palabra), como en el panel web. */
++function iniciales(nombre: string): string {
++  const partes = nombre.trim().split(/\s+/).filter(Boolean);
++  if (partes.length === 0) return '';
++  const ultima = partes.length > 1 ? (partes[partes.length - 1][0] ?? '') : '';
++  return `${partes[0][0] ?? ''}${ultima}`.toUpperCase();
++}
++
++type EncabezadoFomProps = {
++  /** La línea chica en mayúsculas de la cápsula (la sección, o un saludo). */
++  seccion: string;
++  /** La línea grande de la cápsula. Por defecto, el nombre de la empresa. */
++  nombre?: string;
++  /** Título grande de la pantalla, debajo de las piezas. */
++  titulo?: string;
++  /** Una frase corta debajo del título. */
++  bajada?: string;
++  /** La acción principal de la pantalla, a la derecha del título. */
++  accion?: ReactNode;
++  /** La pantalla está refrescando lo que ya se ve: enciende la barra fina. */
++  cargando?: boolean;
++  /** Va encima de un mapa: piezas translúcidas y sin título. */
++  flotante?: boolean;
++  /**
++   * Cuántos avisos sin leer, cuando la pantalla ya los cuenta (el conductor).
++   * Sin este dato, el encabezado los cuenta solo con la empresa activa.
++   */
++  sinLeer?: number;
++};
++
++export function EncabezadoFom({
++  seccion,
++  nombre,
++  titulo,
++  bajada,
++  accion,
++  cargando,
++  flotante,
++  sinLeer,
++}: EncabezadoFomProps) {
++  const { colors, spacing, radii, brand } = useTheme();
++  const { user } = useAuth();
++  const { empresaId } = useAdmin();
++  const router = useRouter();
++  const ruta = usePathname();
++  const insets = useSafeAreaInsets();
++  const contexto = contextoDe(ruta);
++
++  // La empresa de la que se cuentan los avisos: la elegida en el panel o la
++  // propia. El admin FOM, fuera de una empresa, no tiene bandeja.
++  const companyId = contexto === 'admin' ? null : (empresaId ?? user?.companyId ?? null);
++  const [contados, setContados] = useState(0);
++  const cuentaPropia = sinLeer === undefined && contexto !== 'conductor' && !!companyId;
++
++  useFocusEffect(
++    useCallback(() => {
++      if (!cuentaPropia || !companyId) return;
++      let activo = true;
++      getSinLeerPanel(companyId)
++        .then((s) => {
++          if (activo) setContados(s.total);
++        })
++        // Sin poder contarlos, la campana se queda sin número.
++        .catch(() => undefined);
++      return () => {
++        activo = false;
++      };
++    }, [cuentaPropia, companyId]),
++  );
++
++  const avisos = sinLeer ?? (cuentaPropia ? contados : 0);
++  const conCampana = contexto === 'conductor' || !!companyId;
++  const irAvisos = () => {
++    if (contexto === 'conductor') router.navigate('/mis-notificaciones');
++    else if (companyId) router.navigate({ pathname: '/notificaciones', params: { companyId } });
++  };
++  const perfil = PERFIL[contexto];
++
++  const pieza = flotante ? SOBRE_MAPA : colors.surface;
++  // Con isotipo propio, la marca va sobre un cuadro neutro (sus colores son
++  // suyos); sin él, el cuadro de acento con las iniciales.
++  const conLogo = hayLogoEmpresa(brand.logoKey);
++
++  const fila = (
++    <View style={[styles.fila, { gap: spacing.sm }]}>
++      <View style={[styles.capsula, { backgroundColor: pieza }]}>
++        {conLogo ? (
++          <View style={[styles.marca, { backgroundColor: colors.surfaceSunken }]}>
++            <LogoEmpresa logoKey={brand.logoKey} size={26} />
++          </View>
++        ) : (
++          <View style={[styles.marca, { backgroundColor: colors.primary }]}>
++            <ThemedText style={[styles.marcaTexto, { color: colors.onPrimary }]}>{iniciales(brand.name)}</ThemedText>
++          </View>
++        )}
++        <View style={styles.flex1}>
++          <ThemedText style={[styles.eyebrow, { color: colors.textSecondary }]} numberOfLines={1}>
++            {seccion.toUpperCase()}
++          </ThemedText>
++          <ThemedText style={styles.nombre} numberOfLines={1}>
++            {nombre ?? brand.name}
++          </ThemedText>
++        </View>
++      </View>
++
++      {conCampana ? (
++        <PressableScale
++          onPress={irAvisos}
++          accessibilityRole="button"
++          accessibilityLabel={avisos > 0 ? `Alertas: ${avisos} sin leer` : 'Alertas'}
++          style={[styles.circulo, { backgroundColor: pieza, borderRadius: radii.pill }]}>
++          <TabIcon name="alertas" color={colors.text} size={20} />
++          {avisos > 0 ? (
++            <View style={[styles.insignia, { backgroundColor: colors.danger }]}>
++              <ThemedText style={[styles.insigniaTexto, { color: colors.onDanger }]} tabular>
++                {avisos > 99 ? '99+' : String(avisos)}
++              </ThemedText>
++            </View>
++          ) : null}
++        </PressableScale>
++      ) : null}
++
++      {user ? (
++        <PressableScale
++          onPress={perfil ? () => router.navigate(perfil) : undefined}
++          disabled={!perfil}
++          accessibilityRole="button"
++          accessibilityLabel="Mi perfil"
++          style={[styles.circulo, styles.avatar, { borderRadius: radii.pill }]}>
++          <ThemedText style={styles.avatarTexto}>{iniciales(user.name)}</ThemedText>
++        </PressableScale>
++      ) : null}
++    </View>
++  );
++
++  if (flotante) {
++    return (
++      <View pointerEvents="box-none" style={[styles.flotante, { paddingTop: insets.top + spacing.md, paddingHorizontal: 14 }]}>
++        {fila}
++        <BarraCarga visible={!!cargando} />
++      </View>
++    );
++  }
++
++  return (
++    <Appear distance={10}>
++      <View style={{ paddingTop: spacing.md, paddingHorizontal: 14 }}>
++        {fila}
++        {titulo ? (
++          <View style={[styles.cabecera, { gap: spacing.md }]}>
++            <View style={[styles.flex1, { gap: 6 }]}>
++              <ThemedText style={styles.titulo} numberOfLines={2}>
++                {titulo}
++              </ThemedText>
++              {bajada ? (
++                <ThemedText style={[styles.bajada, { color: colors.textSecondary }]} numberOfLines={2}>
++                  {bajada}
++                </ThemedText>
++              ) : null}
++            </View>
++            {accion ? <View style={styles.accion}>{accion}</View> : null}
++          </View>
++        ) : accion ? (
++          <View style={[styles.soloAccion, { paddingTop: spacing.md }]}>{accion}</View>
++        ) : null}
++        <BarraCarga visible={!!cargando} />
++      </View>
++    </Appear>
++  );
++}
++
++const styles = StyleSheet.create({
++  fila: { flexDirection: 'row', alignItems: 'center' },
++  capsula: {
++    flex: 1,
++    minWidth: 0,
++    minHeight: 52,
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 10,
++    paddingVertical: 8,
++    paddingLeft: 8,
++    paddingRight: 14,
++    borderRadius: 20,
++  },
++  marca: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
++  marcaTexto: { fontSize: 14, lineHeight: 18, fontWeight: '700' },
++  eyebrow: { fontSize: 10, lineHeight: 13, letterSpacing: 1.4, fontWeight: '600' },
++  nombre: { fontSize: 14, lineHeight: 18, fontWeight: '600' },
++  circulo: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
++  insignia: {
++    position: 'absolute',
++    top: -3,
++    right: -3,
++    minWidth: 18,
++    height: 18,
++    paddingHorizontal: 5,
++    borderRadius: 9,
++    alignItems: 'center',
++    justifyContent: 'center',
++  },
++  insigniaTexto: { fontSize: 11, lineHeight: 14, fontWeight: '700' },
++  avatar: { backgroundColor: AVATAR_FONDO, borderWidth: 1, borderColor: AVATAR_ARO },
++  avatarTexto: { fontSize: 14, lineHeight: 18, fontWeight: '600', color: AVATAR_TEXTO },
++  cabecera: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingTop: 22, paddingBottom: 10, paddingHorizontal: 4 },
++  titulo: { fontSize: 28, lineHeight: 32, fontWeight: '700', letterSpacing: -0.6 },
++  bajada: { fontSize: 13, lineHeight: 18 },
++  accion: { flexShrink: 0 },
++  soloAccion: { flexDirection: 'row', justifyContent: 'flex-end' },
++  flex1: { flex: 1, minWidth: 0 },
++  flotante: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
++});
+diff --git a/src/components/kpi-fila.tsx b/src/components/kpi-fila.tsx
+new file mode 100644
+index 0000000..3f61c63
+--- /dev/null
++++ b/src/components/kpi-fila.tsx
+@@ -0,0 +1,42 @@
++import { StyleSheet, View } from 'react-native';
++
++import { ThemedText } from '@/components/themed-text';
++import { useTheme, type ColorTokens } from '@/theme';
++
++export type Kpi = {
++  /** Lo que cuenta, en minúscula de frase ("Abiertas", "En revisión"). */
++  label: string;
++  valor: number | string;
++  /** Color del número. Por defecto, el texto normal. */
++  tono?: keyof ColorTokens;
++};
++
++/**
++ * Fila de cifras arriba de una pantalla, como las del panel web: una tarjeta
++ * con hasta cuatro casillas hundidas, número grande y etiqueta chica debajo.
++ * Lo que se ve primero es cuánto hay de cada cosa.
++ */
++export function KpiFila({ items }: { items: Kpi[] }) {
++  const { colors, radii, spacing } = useTheme();
++  return (
++    <View style={[styles.tarjeta, { backgroundColor: colors.surface, borderRadius: radii.lg, gap: spacing.sm }]}>
++      {items.map((k) => (
++        <View key={k.label} style={[styles.casilla, { backgroundColor: colors.surfaceSunken }]}>
++          <ThemedText style={styles.valor} color={k.tono ?? 'text'} tabular numberOfLines={1}>
++            {typeof k.valor === 'number' ? String(k.valor) : k.valor}
++          </ThemedText>
++          <ThemedText style={styles.label} color="textSecondary" numberOfLines={2}>
++            {k.label}
++          </ThemedText>
++        </View>
++      ))}
++    </View>
++  );
++}
++
++const styles = StyleSheet.create({
++  tarjeta: { flexDirection: 'row', padding: 14 },
++  casilla: { flex: 1, minWidth: 0, padding: 10, borderRadius: 14, gap: 2 },
++  valor: { fontSize: 20, lineHeight: 26, fontWeight: '700' },
++  label: { fontSize: 11, lineHeight: 14 },
++});
+diff --git a/src/components/map-vehiculo-clasico.tsx b/src/components/map-vehiculo-clasico.tsx
+index a740e3a..96bfd45 100644
+--- a/src/components/map-vehiculo-clasico.tsx
++++ b/src/components/map-vehiculo-clasico.tsx
+@@ -62,6 +62,11 @@ export type MapaVehiculoProps = {
+   insetBottom?: number;
+   /** Controles ARRIBA a la derecha (cuando la parte baja está ocupada). */
+   controlesArriba?: boolean;
++  /**
++   * Espacio tapado por arriba (el encabezado que flota sobre el mapa): los
++   * controles de arriba bajan esa cantidad para seguir a la vista.
++   */
++  margenArriba?: number;
+   /**
+    * Cambia cuando cambia el CONJUNTO de marcadores (un filtro nuevo, no un
+    * refresco de posiciones): el mapa re-encuadra para que quepan todos. Sin
+@@ -253,6 +258,7 @@ export function ControlesMapa({
+   actualizar,
+   insetBottom = 0,
+   arriba = false,
++  margenArriba = 0,
+   onEncuadrar,
+   onRecentrar,
+ }: {
+@@ -261,6 +267,8 @@ export function ControlesMapa({
+   insetBottom?: number;
+   /** Coloca los controles ARRIBA a la derecha (cuando abajo hay lengüeta/SOS). */
+   arriba?: boolean;
++  /** Lo que tapa el mapa por arriba: los controles de arriba bajan eso. */
++  margenArriba?: number;
+   /** "Que quepa todo": vuelve a encuadrar los marcadores. Solo en multi. */
+   onEncuadrar?: () => void;
+   /** Va al marcador destacado. Solo cuando hay uno. */
+@@ -284,7 +292,7 @@ export function ControlesMapa({
+         style={[
+           estilosMapa.overlay,
+           arriba ? estilosMapa.topRightCtrl : estilosMapa.bottomRight,
+-          arriba ? null : { bottom: 12 + insetBottom },
++          arriba ? { top: 12 + margenArriba } : { bottom: 12 + insetBottom },
+         ]}>
+         {onRecentrar ? (
+           <PressableScale
+@@ -358,6 +366,7 @@ export function MapaVehiculoClasico({
+   sinUsuario = false,
+   insetBottom = 0,
+   controlesArriba = false,
++  margenArriba = 0,
+   encuadreClave,
+   resaltadoId = null,
+   onMapaPress,
+@@ -619,6 +628,7 @@ export function MapaVehiculoClasico({
+           actualizar={actualizar}
+           insetBottom={insetBottom}
+           arriba={controlesArriba}
++          margenArriba={margenArriba}
+           onEncuadrar={encuadrar}
+           onRecentrar={resaltadoId ? recentrar : undefined}
+         />
+@@ -714,7 +724,7 @@ export function MapaVehiculoClasico({
+       ) : null}
+       {mapaListo ? avisoSinPermiso : null}
+       {mapaListo ? (
+-        <ControlesMapa prefs={prefs} actualizar={actualizar} insetBottom={insetBottom} arriba={controlesArriba} />
++        <ControlesMapa prefs={prefs} actualizar={actualizar} insetBottom={insetBottom} arriba={controlesArriba} margenArriba={margenArriba} />
+       ) : null}
+     </View>
+   );
+diff --git a/src/components/map-vehiculo-mapbox.tsx b/src/components/map-vehiculo-mapbox.tsx
+index 4e0f4e2..cb8401d 100644
+--- a/src/components/map-vehiculo-mapbox.tsx
++++ b/src/components/map-vehiculo-mapbox.tsx
+@@ -51,6 +51,7 @@ export function MapaVehiculoMapbox({
+   sinUsuario = false,
+   insetBottom = 0,
+   controlesArriba = false,
++  margenArriba = 0,
+   encuadreClave,
+   resaltadoId = null,
+   onMapaPress,
+@@ -165,6 +166,8 @@ export function MapaVehiculoMapbox({
+   const ornamentos = {
+     logoPosition: { bottom: 8 + insetBottom, left: 8 },
+     attributionPosition: { bottom: 8 + insetBottom, left: 92 },
++    // La brújula baja con lo que tape el mapa por arriba (el encabezado flotante).
++    ...(margenArriba > 0 ? { compassPosition: { top: 8 + margenArriba, right: 8 } } : {}),
+   };
+ 
+   // ── Modo flota ─────────────────────────────────────────────────────────────
+@@ -253,6 +256,7 @@ export function MapaVehiculoMapbox({
+           actualizar={actualizar}
+           insetBottom={insetBottom}
+           arriba={controlesArriba}
++          margenArriba={margenArriba}
+           onEncuadrar={encuadrar}
+           onRecentrar={resaltadoId ? recentrar : undefined}
+         />
+@@ -323,7 +327,7 @@ export function MapaVehiculoMapbox({
+         </View>
+       ) : null}
+       {mapaListo ? avisoSinPermiso : null}
+-      {mapaListo ? <ControlesMapa prefs={prefs} actualizar={actualizar} insetBottom={insetBottom} arriba={controlesArriba} /> : null}
++      {mapaListo ? <ControlesMapa prefs={prefs} actualizar={actualizar} insetBottom={insetBottom} arriba={controlesArriba} margenArriba={margenArriba} /> : null}
+     </View>
+   );
+ }
+diff --git a/src/components/map-vehiculo-mapbox.web.tsx b/src/components/map-vehiculo-mapbox.web.tsx
+index 9c8b367..ad413e1 100644
+--- a/src/components/map-vehiculo-mapbox.web.tsx
++++ b/src/components/map-vehiculo-mapbox.web.tsx
+@@ -31,6 +31,8 @@ type Props = {
+   onMapaPress?: () => void;
+   encuadreClave?: string;
+   style?: StyleProp<ViewStyle>;
++  /** Lo que tapa el mapa por arriba (el encabezado flotante): los controles bajan eso. */
++  margenArriba?: number;
+ };
+ 
+ type MapaGl = import('mapbox-gl').Map;
+@@ -38,7 +40,7 @@ type GlModulo = typeof import('mapbox-gl');
+ 
+ const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+ 
+-export function MapaVehiculoMapboxWeb({ vehicleName, live = false, markerColor, vehicleCoords, markers, onMarkerPress, hideOverlays = false, soloUsuario = false, resaltadoId = null, onMapaPress, encuadreClave, style }: Props) {
++export function MapaVehiculoMapboxWeb({ vehicleName, live = false, markerColor, vehicleCoords, markers, onMarkerPress, hideOverlays = false, soloUsuario = false, resaltadoId = null, onMapaPress, encuadreClave, style, margenArriba = 0 }: Props) {
+   const { colors, radii, colorScheme } = useTheme();
+   const { prefs, actualizar } = useMapaPrefs();
+   const caja = useRef<View>(null);
+@@ -204,13 +206,13 @@ export function MapaVehiculoMapboxWeb({ vehicleName, live = false, markerColor,
+     <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.lg }, style]}>
+       <View ref={caja} style={StyleSheet.absoluteFill} />
+       {!hideOverlays ? (
+-        <View style={[styles.pill, styles.arribaIzq, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
++        <View style={[styles.pill, styles.arribaIzq, { top: 12 + margenArriba, backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+           <ThemedText variant="caption" color="text">
+             {esMulti ? `${markers!.length} vehículos · ${enMarcha} en marcha` : vehicleName}
+           </ThemedText>
+         </View>
+       ) : null}
+-      <View style={styles.controles}>
++      <View style={[styles.controles, { top: 12 + margenArriba }]}>
+         <Pressable accessibilityRole="button" accessibilityLabel={`Ver ${siguiente.label.toLowerCase()}`} onPress={() => actualizar({ tipo: siguiente.id })} style={[styles.ctrl, fondo]}>
+           <ThemedText variant="overline" color={prefs.tipo === 'standard' ? 'text' : 'primary'}>{prefs.tipo === 'standard' ? 'MAPA' : 'SAT'}</ThemedText>
+         </Pressable>
+diff --git a/src/components/map-vehiculo.web.tsx b/src/components/map-vehiculo.web.tsx
+index 6e2aa00..6731dd0 100644
+--- a/src/components/map-vehiculo.web.tsx
++++ b/src/components/map-vehiculo.web.tsx
+@@ -29,6 +29,9 @@ type MapaVehiculoProps = {
+   resaltadoId?: string | null;
+   onMapaPress?: () => void;
+   encuadreClave?: string;
++  /** Paridad con el nativo: los controles de arriba bajan lo que tape el encabezado. */
++  controlesArriba?: boolean;
++  margenArriba?: number;
+ };
+ 
+ /** En el navegador: con token de Mapbox, el mapa real; sin él, el recuadro de siempre. */
+diff --git a/src/components/option-picker.tsx b/src/components/option-picker.tsx
+index a193fbf..963b8f5 100644
+--- a/src/components/option-picker.tsx
++++ b/src/components/option-picker.tsx
+@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
+   container: { flex: 1, justifyContent: 'flex-end' },
+   backdrop: { backgroundColor: '#000' },
+   grabber: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
+-  buscador: { height: 46, borderWidth: StyleSheet.hairlineWidth, fontSize: 15 },
++  buscador: { height: 46, borderWidth: StyleSheet.hairlineWidth, fontSize: 15, fontFamily: 'SplineSans_400Regular' },
+   // flexShrink: 1 es OBLIGATORIO: en RN el valor por defecto es 0, así que sin
+   // esto la lista NO encoge y desborda la hoja acotada por maxHeight —
+   // recortando resultados y, en modo múltiple, el botón "Listo".
+diff --git a/src/components/screen-header.tsx b/src/components/screen-header.tsx
+index fd219df..b9e36bf 100644
+--- a/src/components/screen-header.tsx
++++ b/src/components/screen-header.tsx
+@@ -22,38 +22,27 @@ type ScreenHeaderProps = {
+ };
+ 
+ /**
+- * Encabezado ESTÁNDAR de las pantallas de pila (fuera del panel de admin, que
+- * tiene su `AdminHeader`). Lleva un botón "Volver" arriba a la izquierda que
+- * regresa a la vista anterior — el gesto de deslizar está desactivado en la
+- * pila, así que este botón es el único regreso. Todo sale del tema.
++ * Encabezado ESTÁNDAR de las pantallas de pila, con las piezas del panel web:
++ * el botón "Volver" en un círculo y el título en una cápsula redonda. El
++ * gesto de deslizar está desactivado en la pila, así que este botón es el
++ * único regreso. Todo sale del tema.
+  */
+ export function ScreenHeader({ title, overline, right, showBack = true, cargando }: ScreenHeaderProps) {
+-  const { spacing, colors, radii, borderWidths } = useTheme();
++  const { spacing, colors, radii } = useTheme();
+   const router = useRouter();
+-  const puedeVolver = showBack && router.canGoBack();
++  // Sin historial (la app se reabrió directo en esta pantalla) el botón no desaparece:
++  // lleva al inicio, para que nadie se quede encerrado.
++  const puedeVolver = showBack;
+ 
+   return (
+-    <View
+-      style={[
+-        styles.bar,
+-        {
+-          gap: spacing.md,
+-          paddingHorizontal: spacing.lg,
+-          paddingVertical: spacing.sm,
+-          borderBottomColor: colors.border,
+-          borderBottomWidth: borderWidths.hairline,
+-        },
+-      ]}>
++    <View style={[styles.bar, { gap: spacing.sm, paddingHorizontal: 14, paddingTop: spacing.sm, paddingBottom: spacing.sm }]}>
+       {puedeVolver ? (
+         <PressableScale
+-          onPress={() => router.back()}
++          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+           hitSlop={8}
+           accessibilityRole="button"
+           accessibilityLabel="Volver"
+-          style={[
+-            styles.backBtn,
+-            { backgroundColor: colors.surfaceElevated, borderColor: colors.border, borderRadius: radii.pill },
+-          ]}>
++          style={[styles.backBtn, { backgroundColor: colors.surface, borderRadius: radii.pill }]}>
+           <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+             <Path d="M15 18l-6-6 6-6" stroke={colors.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+           </Svg>
+@@ -61,14 +50,14 @@ export function ScreenHeader({ title, overline, right, showBack = true, cargando
+       ) : null}
+ 
+       {title || overline ? (
+-        <View style={styles.title}>
++        <View style={[styles.title, styles.capsula, { backgroundColor: colors.surface }]}>
+           {overline ? (
+-            <ThemedText variant="overline" color="textMuted" numberOfLines={1}>
+-              {overline}
++            <ThemedText style={[styles.eyebrow, { color: colors.textSecondary }]} numberOfLines={1}>
++              {overline.toUpperCase()}
+             </ThemedText>
+           ) : null}
+           {title ? (
+-            <ThemedText variant="subtitle" numberOfLines={1}>
++            <ThemedText style={styles.titulo} numberOfLines={1}>
+               {title}
+             </ThemedText>
+           ) : null}
+@@ -86,9 +75,12 @@ export function ScreenHeader({ title, overline, right, showBack = true, cargando
+ 
+ const styles = StyleSheet.create({
+   bar: { flexDirection: 'row', alignItems: 'center' },
+-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth, flexShrink: 0 },
++  backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+   // El título ocupa el espacio libre (alineado a la izquierda) y se trunca en
+   // una línea: nunca se monta sobre la acción derecha.
+   title: { flex: 1, minWidth: 0 },
++  capsula: { minHeight: 52, justifyContent: 'center', gap: 2, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20 },
++  eyebrow: { fontSize: 10, lineHeight: 13, letterSpacing: 1.4, fontWeight: '600' },
++  titulo: { fontSize: 16, lineHeight: 21, fontWeight: '600' },
+   right: { flexShrink: 0 },
+ });
+diff --git a/src/components/search-bar.tsx b/src/components/search-bar.tsx
+index a018000..b8671c0 100644
+--- a/src/components/search-bar.tsx
++++ b/src/components/search-bar.tsx
+@@ -7,7 +7,7 @@ import { useScrollVisible } from '@/components/scroll-visible';
+ import { TabIcon, type TabIconName } from '@/components/tab-icon';
+ import { ThemedText } from '@/components/themed-text';
+ import { tinte } from '@/lib/color';
+-import { useTheme } from '@/theme';
++import { familiaPorPeso, useTheme } from '@/theme';
+ 
+ type Props = {
+   value: string;
+@@ -110,7 +110,7 @@ export function normalizar(texto: string): string {
+ 
+ const styles = StyleSheet.create({
+   wrap: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, borderWidth: StyleSheet.hairlineWidth },
+-  input: { flex: 1, fontSize: 15, height: '100%' },
++  input: { flex: 1, fontSize: 15, height: '100%', fontFamily: familiaPorPeso('400') },
+   // Pegado al borde derecho de la caja: el aire lo pone el `paddingHorizontal`.
+   accion: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', marginRight: -6 },
+   badge: {
+diff --git a/src/components/text-field.tsx b/src/components/text-field.tsx
+index f41a473..b7032fc 100644
+--- a/src/components/text-field.tsx
++++ b/src/components/text-field.tsx
+@@ -4,7 +4,7 @@ import { Animated, Pressable, StyleSheet, TextInput, View, type TextInputProps }
+ import { EyeIcon } from '@/components/eye-icon';
+ import { useScrollVisible } from '@/components/scroll-visible';
+ import { ThemedText } from '@/components/themed-text';
+-import { useReducedMotion, useTheme } from '@/theme';
++import { familiaPorPeso, useReducedMotion, useTheme } from '@/theme';
+ 
+ export type TextFieldProps = TextInputProps & {
+   /** Etiqueta opcional encima del campo. */
+@@ -126,6 +126,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
+               // Deja sitio al ojito para que no tape el texto.
+               paddingRight: esPassword ? 48 : spacing.md,
+               fontSize: typography.fontSize.md,
++              fontFamily: familiaPorPeso('400'),
+             },
+             multiline && styles.multiline,
+             style,
+diff --git a/src/components/themed-text.tsx b/src/components/themed-text.tsx
+index d18fa90..baf8f72 100644
+--- a/src/components/themed-text.tsx
++++ b/src/components/themed-text.tsx
+@@ -1,6 +1,6 @@
+ import { StyleSheet, Text, type TextProps, type TextStyle } from 'react-native';
+ 
+-import { useTheme, typography, type ColorTokens } from '@/theme';
++import { familiaPorPeso, useTheme, typography, type ColorTokens } from '@/theme';
+ 
+ /** Variantes tipográficas, derivadas de los tokens de `typography`. */
+ export type TextVariant =
+@@ -25,12 +25,14 @@ export type ThemedTextProps = TextProps & {
+ /** `Text` con tipografía y color tomados del tema (nunca hardcodeado). */
+ export function ThemedText({ style, variant = 'body', color = 'text', tabular = false, ...rest }: ThemedTextProps) {
+   const { colors } = useTheme();
+-  return (
+-    <Text
+-      style={[variantStyles[variant], { color: colors[color] }, tabular && styles.tabular, style]}
+-      {...rest}
+-    />
+-  );
++  const plano: TextStyle = StyleSheet.flatten([variantStyles[variant], { color: colors[color] }, tabular && styles.tabular, style]);
++  // Spline Sans: el peso pedido elige la cara (ver theme/fuentes). La mono se
++  // queda con su familia.
++  const letra: TextStyle =
++    variant === 'mono' || plano.fontFamily === typography.fontFamily.mono
++      ? plano
++      : { ...plano, fontFamily: familiaPorPeso(plano.fontWeight), fontWeight: 'normal' };
++  return <Text style={letra} {...rest} />;
+ }
+ 
+ const styles = StyleSheet.create({
+diff --git a/src/theme/ThemeProvider.tsx b/src/theme/ThemeProvider.tsx
+index 8edd074..82621f4 100644
+--- a/src/theme/ThemeProvider.tsx
++++ b/src/theme/ThemeProvider.tsx
+@@ -39,14 +39,14 @@ interface ThemeProviderProps {
+   children: ReactNode;
+   /** Marca inicial (por defecto, la identidad general de la app). */
+   initialBrand?: CompanyBrand;
+-  /** Modo inicial (por defecto, seguir al sistema). */
++  /** Modo inicial (por defecto, oscuro: el mismo aspecto del panel web). */
+   initialMode?: ThemeMode;
+ }
+ 
+ export function ThemeProvider({
+   children,
+   initialBrand = DEFAULT_BRAND,
+-  initialMode = 'system',
++  initialMode = 'dark',
+ }: ThemeProviderProps) {
+   // Esquema del dispositivo ('light' | 'dark' | null en arranque/web).
+   const systemScheme = useColorScheme();
+diff --git a/src/theme/fuentes.ts b/src/theme/fuentes.ts
+new file mode 100644
+index 0000000..103ad32
+--- /dev/null
++++ b/src/theme/fuentes.ts
+@@ -0,0 +1,33 @@
++/**
++ * Spline Sans, la misma letra del panel web.
++ *
++ * Una fuente cargada con expo-font es UNA cara por peso: no se le puede pedir
++ * `fontWeight: '700'` a la regular (Android la engorda a mano y en web el
++ * navegador la "sintetiza"). Por eso el peso se traduce a la familia de su
++ * cara y el `fontWeight` se deja en normal.
++ */
++
++import {
++  SplineSans_400Regular,
++  SplineSans_500Medium,
++  SplineSans_600SemiBold,
++  SplineSans_700Bold,
++} from '@expo-google-fonts/spline-sans';
++import type { TextStyle } from 'react-native';
++
++/** Lo que se le pasa a `useFonts` en la raíz. */
++export const FUENTES_FOM = {
++  SplineSans_400Regular,
++  SplineSans_500Medium,
++  SplineSans_600SemiBold,
++  SplineSans_700Bold,
++};
++
++/** Familia de la cara que corresponde a un peso. */
++export function familiaPorPeso(peso: TextStyle['fontWeight']): string {
++  const n = typeof peso === 'number' ? peso : peso === 'bold' ? 700 : Number(peso) || 400;
++  if (n >= 700) return 'SplineSans_700Bold';
++  if (n >= 600) return 'SplineSans_600SemiBold';
++  if (n >= 500) return 'SplineSans_500Medium';
++  return 'SplineSans_400Regular';
++}
+diff --git a/src/theme/index.ts b/src/theme/index.ts
+index e1ee8f8..9299d76 100644
+--- a/src/theme/index.ts
++++ b/src/theme/index.ts
+@@ -12,6 +12,7 @@ export { useReducedMotion } from './useReducedMotion';
+ export { createTheme } from './createTheme';
+ export { getContrastingTextColor, darken, lighten } from './colorUtils';
+ export { DEFAULT_BRAND } from './brand';
++export { FUENTES_FOM, familiaPorPeso } from './fuentes';
+ export { borderWidths, colorSchemes, motion, opacity, radii, spacing, typography } from './tokens';
+ export type {
+   BorderWidths,
+diff --git a/src/theme/tokens.ts b/src/theme/tokens.ts
+index 2ab97e8..1921048 100644
+--- a/src/theme/tokens.ts
++++ b/src/theme/tokens.ts
+@@ -55,11 +55,12 @@ export const spacing: SpacingScale = {
+ /** Escala de radios de borde. */
+ export const radii: RadiiScale = {
+   none: 0,
+-  sm: 6,
+-  // T8 · inputs/botones a 12 (más actual; v1 §4 pedía 12–14).
+-  md: 12,
+-  lg: 16,
+-  xl: 24,
++  // Mismos radios que el panel web: piezas internas 10, campos 16, tarjetas
++  // 24 y hojas 28.
++  sm: 10,
++  md: 16,
++  lg: 24,
++  xl: 28,
+   pill: 999,
+ };
+ 
+@@ -168,7 +169,8 @@ const dark: ColorTokens = {
+   // Texto
+   text: '#F3F5F8',
+   textSecondary: '#ABB3BF',
+-  textMuted: '#69727E',
++  // El mismo gris tenue del panel web (más legible que el #69727E de antes).
++  textMuted: '#8C97A7',
+   textInverted: '#0A0D12',
+   // Bordes
+   border: '#262E39',
+-- 
+2.55.0.windows.3
+
