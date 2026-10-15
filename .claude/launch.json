@@ -126,6 +126,15 @@
         "cd /d C:/Users/home/Downloads/fom-driver-juan && set CI=1&& set EXPO_PUBLIC_FOM_API_URL=http://localhost:8098&& npx expo start --web --port 8099"
       ],
       "port": 8099
+    },
+    {
+      "name": "fom-app-telefono",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd /d C:/Users/home/Downloads/fom-driver-juan && set CI=1&& npx expo start --tunnel --port 8081"
+      ],
+      "port": 8081
     }
   ]
 }
