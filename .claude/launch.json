@@ -132,7 +132,7 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
         "/c",
-        "cd /d C:/Users/home/Downloads/fom-driver-juan && set CI=1&& npx expo start --tunnel --port 8081 --no-dev --minify"
+        "cd /d C:/Users/home/Downloads/fom-driver-juan && set CI=1&& npx expo start --tunnel --port 8081 --minify"
       ],
       "port": 8081
     },
