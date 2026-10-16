@@ -1,0 +1,1444 @@
+From e4c2461092e3fd1fa665bf5edd96bef60fc5d59a Mon Sep 17 00:00:00 2001
+From: marcodpa <marcodpa@users.noreply.github.com>
+Date: Fri, 16 Oct 2026 09:30:00 -0400
+Subject: [PATCH] =?UTF-8?q?perf(api):=20ETag/no-cache=20en=20cat=C3=A1logo?=
+ =?UTF-8?q?s,=20unread-count=20y=20daily-metrics=20en=20lote=20(consola),?=
+ =?UTF-8?q?=20emergencias=20multi-estado,=20latestPosition=20en=20/console?=
+ =?UTF-8?q?/vehicles,=20planes=20por=20unidad,=20tope=20200,=20=C3=ADndice?=
+ =?UTF-8?q?=20de=20=C3=BAltima=20posici=C3=B3n?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Propuesta de nginx (gzip, Retry-After, HTTP/2, keep-alive, límite de consola por sesión) en ops/mobile-ingress/PROPUESTA-T13-RENDIMIENTO-NGINX.md, sin aplicar.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ docs/team/FOM-MOBILE-AUTH-OPENAPI.json        |  10 +-
+ .../PROPUESTA-T13-RENDIMIENTO-NGINX.md        | 147 +++++++
+ src/alerts/alert-events.dto.ts                |   4 +-
+ .../console-fleet-insights.controller.ts      |  24 +-
+ src/console-api/console-fleet.service.ts      | 125 +++++-
+ .../console-maintenance.controller.ts         |   2 +
+ .../console-operations.controller.ts          |  31 ++
+ src/console-api/console-operations.service.ts |  32 ++
+ .../console-tenant-daily-reads.controller.ts  |   5 +-
+ src/console-api/console.controller.ts         |  22 +-
+ src/console-api/console.dto.ts                |  57 +++
+ ...ndex_gps_positions_vehicle_latest_valid.ts |  59 +++
+ src/emergencies/emergency.dto.ts              |  42 +-
+ src/emergencies/emergency.service.ts          |  14 +-
+ src/fleet/driver-session-query.dto.ts         |   4 +-
+ src/main.ts                                   |   8 +-
+ src/mobile/mobile-operations.controller.ts    |   6 +-
+ src/mobile/mobile-tenant-scope.controller.ts  |   7 +-
+ test/alert-events-http.test.js                |   2 +-
+ test/api-performance-t13.test.js              | 376 ++++++++++++++++++
+ test/driver-session-history.test.js           |   2 +-
+ test/maintenance-and-mobile-read.test.js      |   9 +-
+ 22 files changed, 953 insertions(+), 35 deletions(-)
+ create mode 100644 ops/mobile-ingress/PROPUESTA-T13-RENDIMIENTO-NGINX.md
+ create mode 100644 src/database/migrations/files/20261016120000000_index_gps_positions_vehicle_latest_valid.ts
+ create mode 100644 test/api-performance-t13.test.js
+
+diff --git a/docs/team/FOM-MOBILE-AUTH-OPENAPI.json b/docs/team/FOM-MOBILE-AUTH-OPENAPI.json
+index a17dd9c..ce60103 100644
+--- a/docs/team/FOM-MOBILE-AUTH-OPENAPI.json
++++ b/docs/team/FOM-MOBILE-AUTH-OPENAPI.json
+@@ -855,7 +855,7 @@
+     "/api/v1/mobile/tenants/{tenantId}/documents/{documentId}": {"patch":{"tags":["Mobile Administration"],"operationId":"mobileTenantDocumentUpdate","summary":"Actualizar un documento en un ente escribible","security":[{"mobile-bearer":[]}],"parameters":[{"name":"tenantId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"documentId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/UpdateDocumentDto"}}}},"responses":{"200":{"description":"Documento actualizado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileDocumentUpdateResponseDto"}}}}}}},
+     "/api/v1/mobile/tenants/{tenantId}/alert-rules": {"get":{"tags":["Mobile Administration"],"operationId":"mobileTenantAlertRuleList","summary":"Listar reglas de alerta de un ente visible","security":[{"mobile-bearer":[]}],"parameters":[{"name":"tenantId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Reglas de alerta","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileAlertRuleListResponseDto"}}}}}},"post":{"tags":["Mobile Administration"],"operationId":"mobileTenantAlertRuleCreate","summary":"Crear una regla de alerta en un ente escribible","security":[{"mobile-bearer":[]}],"parameters":[{"name":"tenantId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateAlertRuleDto"}}}},"responses":{"201":{"description":"Regla creada","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileAlertRuleEnvelopeDto"}}}}}}},
+     "/api/v1/mobile/tenants/{tenantId}/alert-rules/{alertRuleId}": {"patch":{"tags":["Mobile Administration"],"operationId":"mobileTenantAlertRuleUpdate","summary":"Actualizar una regla de alerta en un ente escribible","security":[{"mobile-bearer":[]}],"parameters":[{"name":"tenantId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"alertRuleId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/UpdateAlertRuleDto"}}}},"responses":{"200":{"description":"Regla actualizada","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileAlertRuleEnvelopeDto"}}}}}}},
+-    "/api/v1/mobile/tenants/{tenantId}/maintenance/plans": {"get":{"tags":["Mobile Administration"],"operationId":"mobileTenantMaintenancePlanList","summary":"Listar planes de mantenimiento de un ente visible","security":[{"mobile-bearer":[]}],"parameters":[{"name":"tenantId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"enabledOnly","in":"query","required":false,"schema":{"type":"boolean","default":false}},{"name":"limit","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":200,"default":50}},{"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"default":0}}],"responses":{"200":{"description":"Respuesta exitosa.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileTenantMaintenancePlanListResponseDto"}}}},"400":{"$ref":"#/components/responses/InvalidRequest"},"401":{"$ref":"#/components/responses/InvalidAccessToken"},"403":{"description":"Requiere supervisor o administrador FOM"},"404":{"description":"Ente inexistente o fuera del alcance"}}}},
++    "/api/v1/mobile/tenants/{tenantId}/maintenance/plans": {"get":{"tags":["Mobile Administration"],"operationId":"mobileTenantMaintenancePlanList","summary":"Listar planes de mantenimiento de un ente visible","security":[{"mobile-bearer":[]}],"parameters":[{"name":"tenantId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"enabledOnly","in":"query","required":false,"schema":{"type":"boolean","default":false}},{"name":"vehicleId","in":"query","required":false,"description":"Solo los planes que cubren esta unidad.","schema":{"type":"string","format":"uuid"}},{"name":"limit","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":200,"default":50}},{"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"default":0}}],"responses":{"200":{"description":"Respuesta exitosa.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileTenantMaintenancePlanListResponseDto"}}}},"400":{"$ref":"#/components/responses/InvalidRequest"},"401":{"$ref":"#/components/responses/InvalidAccessToken"},"403":{"description":"Requiere supervisor o administrador FOM"},"404":{"description":"Ente inexistente o fuera del alcance"}}}},
+     "/api/v1/mobile/tenants/{tenantId}/maintenance/plans/{planId}": {
+       "get":{"tags":["Mobile Administration"],"operationId":"mobileTenantMaintenancePlanDetail","summary":"Consultar un plan y sus unidades en un ente visible","security":[{"mobile-bearer":[]}],"parameters":[{"name":"tenantId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"planId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Plan y cobertura por unidad","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileMaintenancePlanDetailResponseDto"}}}},"401":{"$ref":"#/components/responses/InvalidAccessToken"},"403":{"description":"Requiere supervisor o administrador FOM"},"404":{"description":"Ente, plan o recurso inexistente, o fuera del alcance"}}},
+       "put":{"tags":["Mobile Administration"],"operationId":"mobileTenantMaintenancePlanPut","summary":"Crear o reemplazar un plan en un ente escribible","security":[{"mobile-bearer":[]}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/PutMaintenancePlanDto"}}}},"responses":{"200":{"description":"Plan guardado","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileMaintenancePlanMutationResponseDto"}}}}}},
+@@ -931,7 +931,7 @@
+       "patch": {"tags":["Mobile Operations"],"operationId":"mobileAlertRuleUpdate","summary":"Ajustar o desactivar una regla sin cambiar su tipo","security":[{"mobile-bearer":[]}],"parameters":[{"name":"alertRuleId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/UpdateAlertRuleDto"}}}},"responses":{"200":{"description":"Regla actualizada y auditada","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileAlertRuleEnvelopeDto"}}}},"400":{"$ref":"#/components/responses/InvalidRequest"},"401":{"$ref":"#/components/responses/InvalidAccessToken"},"403":{"description":"Solo un supervisor o administrador FOM puede modificar reglas"},"404":{"description":"Regla inexistente o de otro tenant"},"409":{"description":"La clave idempotente representa otra intención"}}}
+     },
+     "/api/v1/mobile/alerts": {
+-      "get": {"tags":["Mobile Personal Alerts"],"operationId":"mobilePersonalAlertsList","summary":"Listar la bandeja personal del actor","security":[{"mobile-bearer":[]}],"parameters":[{"name":"category","in":"query","required":false,"schema":{"type":"string","enum":["fleet","maintenance","document","emergency","system"]}},{"name":"unreadOnly","in":"query","required":false,"schema":{"type":"boolean","default":false}},{"name":"limit","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":25}},{"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"default":0}}],"responses":{"200":{"description":"Alertas personales del actor","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobilePersonalAlertPageDto"}}}},"401":{"$ref":"#/components/responses/InvalidAccessToken"}}}
++      "get": {"tags":["Mobile Personal Alerts"],"operationId":"mobilePersonalAlertsList","summary":"Listar la bandeja personal del actor","security":[{"mobile-bearer":[]}],"parameters":[{"name":"category","in":"query","required":false,"schema":{"type":"string","enum":["fleet","maintenance","document","emergency","system"]}},{"name":"unreadOnly","in":"query","required":false,"schema":{"type":"boolean","default":false}},{"name":"limit","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":200,"default":25}},{"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"default":0}}],"responses":{"200":{"description":"Alertas personales del actor","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobilePersonalAlertPageDto"}}}},"401":{"$ref":"#/components/responses/InvalidAccessToken"}}}
+     },
+     "/api/v1/mobile/alerts/{alertId}": {
+       "get": {"tags":["Mobile Personal Alerts"],"operationId":"mobilePersonalAlertGet","summary":"Consultar una alerta personal propia","security":[{"mobile-bearer":[]}],"parameters":[{"name":"alertId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Alerta personal","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobilePersonalAlertEnvelopeDto"}}}},"401":{"$ref":"#/components/responses/InvalidAccessToken"},"404":{"description":"Alerta inexistente o de otro tenant/actor"}}}
+@@ -1035,7 +1035,7 @@
+         }
+       }
+     },
+-    "/api/v1/mobile/driver-sessions": {"get":{"tags":["Mobile Driver Sessions"],"operationId":"mobileDriverSessionsList","summary":"Listar el historial de conducción propio","security":[{"mobile-bearer":[]}],"parameters":[{"name":"status","in":"query","required":false,"schema":{"type":"string","enum":["active","ended"]}},{"name":"vehicleId","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"limit","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":25}},{"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"default":0}}],"responses":{"200":{"description":"Sesiones propias paginadas","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileDriverSessionPageDto"}}}},"400":{"$ref":"#/components/responses/InvalidRequest"},"401":{"$ref":"#/components/responses/InvalidAccessToken"}}}},
++    "/api/v1/mobile/driver-sessions": {"get":{"tags":["Mobile Driver Sessions"],"operationId":"mobileDriverSessionsList","summary":"Listar el historial de conducción propio","security":[{"mobile-bearer":[]}],"parameters":[{"name":"status","in":"query","required":false,"schema":{"type":"string","enum":["active","ended"]}},{"name":"vehicleId","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"limit","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":200,"default":25}},{"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"default":0}}],"responses":{"200":{"description":"Sesiones propias paginadas","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileDriverSessionPageDto"}}}},"400":{"$ref":"#/components/responses/InvalidRequest"},"401":{"$ref":"#/components/responses/InvalidAccessToken"}}}},
+     "/api/v1/mobile/driver-sessions/current": {"get":{"tags":["Mobile Driver Sessions"],"operationId":"mobileDriverSessionCurrent","summary":"Consultar la sesión de conducción abierta","security":[{"mobile-bearer":[]}],"responses":{"200":{"description":"Sesión propia o null","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileDriverSessionEnvelopeDto"}}}},"401":{"$ref":"#/components/responses/InvalidAccessToken"}}}},
+     "/api/v1/mobile/driver-sessions/{sessionId}": {"get":{"tags":["Mobile Driver Sessions"],"operationId":"mobileDriverSessionGet","summary":"Consultar una sesión de conducción propia","security":[{"mobile-bearer":[]}],"parameters":[{"name":"sessionId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Sesión propia","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileDriverSessionEnvelopeDto"}}}},"401":{"$ref":"#/components/responses/InvalidAccessToken"},"404":{"description":"Sesión inexistente, ajena o de otro tenant"}}}},
+     "/api/v1/mobile/vehicles/{vehicleId}/driver-sessions": {"post":{"tags":["Mobile Driver Sessions"],"operationId":"mobileDriverSessionStart","summary":"Iniciar conducción sobre una asignación vigente","security":[{"mobile-bearer":[]}],"parameters":[{"name":"vehicleId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","format":"uuid"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/StartDriverSessionDto"}}}},"responses":{"201":{"description":"Sesión iniciada","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MobileDriverSessionEnvelopeDto"}}}},"400":{"$ref":"#/components/responses/InvalidRequest"},"401":{"$ref":"#/components/responses/InvalidAccessToken"},"403":{"description":"Sin asignación vigente o PIN inválido"},"404":{"description":"Vehículo inexistente o de otro tenant"},"409":{"description":"La persona o la unidad ya tiene una sesión abierta"}}}},
+@@ -1225,8 +1225,8 @@
+         "description": "Supervisor y administrador ven el ente; los demás roles solo sus propios reportes.",
+         "security": [{"mobile-bearer": []}],
+         "parameters": [
+-          {"name": "status", "in": "query", "required": false, "schema": {"$ref": "#/components/schemas/EmergencyStatus"}},
+-          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 25}},
++          {"name": "status", "in": "query", "required": false, "description": "Uno o varios estados; admite valores separados por coma (active,acknowledged) o el parámetro repetido.", "style": "form", "explode": false, "schema": {"type": "array", "items": {"$ref": "#/components/schemas/EmergencyStatus"}, "maxItems": 4, "uniqueItems": true}},
++          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 1, "maximum": 200, "default": 25}},
+           {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 0, "default": 0}}
+         ],
+         "responses": {
+diff --git a/ops/mobile-ingress/PROPUESTA-T13-RENDIMIENTO-NGINX.md b/ops/mobile-ingress/PROPUESTA-T13-RENDIMIENTO-NGINX.md
+new file mode 100644
+index 0000000..eda48e4
+--- /dev/null
++++ b/ops/mobile-ingress/PROPUESTA-T13-RENDIMIENTO-NGINX.md
+@@ -0,0 +1,147 @@
++# Propuesta T-13: rendimiento en Nginx (no aplicada)
++
++Estado: **propuesta**. Nada de este archivo está instalado ni lo instala ningún
++script. Los `.conf` versionados de esta carpeta no cambian; las pruebas que los
++fijan (`issue-420-session-rate-limit`, `client-capability-matrix`,
++`mobile-ingress`) siguen describiendo lo publicado. Aplicarla exige su propio
++Issue, respaldo de la configuración vigente, `nginx -t` y reload, con
++rollback = restaurar el respaldo y recargar.
++
++## Lo que hay hoy (leído de `nginx-fom-mobile-tls.conf`)
++
++- El límite de pedidos vive en Nginx, no en la API:
++  - móvil: `fom_mobile_session_v2`, **60 r/min, ráfaga 20, por sesión**
++    (clave = encabezado `Authorization`); sin Bearer cae a la IP.
++    Login 5 r/min y refresh 10 r/min siguen por IP.
++  - consola: `fom_console_api`, **120 r/min, ráfaga 40, por IP**.
++- Un 429 de `limit_req` no lleva `Retry-After`.
++- No hay `gzip` en el server TLS: el JSON viaja sin comprimir.
++- `listen 443 ssl` sin HTTP/2; `keepalive_timeout 15s`.
++- `add_header Cache-Control "no-store" always` a nivel de server: se suma a
++  lo que mande la API, de modo que el `private, no-cache` de los catálogos
++  llega acompañado de `no-store` y el navegador no guarda la respuesta para
++  revalidarla con `If-None-Match`.
++- Las `location` de consola no fijan `proxy_http_version 1.1` ni
++  `Connection ""`: el `keepalive 8` del upstream no se usa.
++
++## Cambios propuestos
++
++### 1. Compresión (gzip) en el server TLS
++
++La compresión va en Nginx y no en la API: Nginx ya termina TLS para todo el
++tráfico, no añade dependencias a `fom-core` y saca el trabajo del hilo de
++Node. Dentro del bloque `server` TLS:
++
++```nginx
++gzip on;
++gzip_comp_level 5;
++gzip_min_length 1024;
++gzip_proxied any;
++gzip_vary on;
++gzip_types application/json application/problem+json text/plain;
++```
++
++Brotli requiere el módulo `ngx_brotli`, que no viene en el paquete de la
++distribución; gzip cubre a Expo/OkHttp/NSURLSession y a los navegadores.
++Nginx convierte el ETag fuerte en débil al comprimir; la API ya emite ETag
++débil, así que no cambia nada.
++
++### 2. Catálogos revalidables (ETag + 304)
++
++La API ya responde 304 cuando el cliente repite el `If-None-Match`
++(ETag débil, fijado en `src/main.ts`). Para que el navegador lo aproveche,
++el `no-store` del server debe aplicarse solo cuando la API no mandó su propio
++`Cache-Control`. En el contexto `http`:
++
++```nginx
++map $upstream_http_cache_control $fom_default_cache_control {
++    ""      "no-store";
++    default "";
++}
++```
++
++y en el server TLS reemplazar `add_header Cache-Control "no-store" always;`
++por:
++
++```nginx
++add_header Cache-Control $fom_default_cache_control always;
++```
++
++(`add_header` con valor vacío no añade el encabezado.) Toda ruta de la API
++que hoy manda `no-store` lo sigue mandando; las que no mandan nada siguen
++recibiendo `no-store` de Nginx.
++
++### 3. `Retry-After` en los 429
++
++`limit_req` no lo emite. Dentro del server TLS:
++
++```nginx
++limit_req_status 429;
++error_page 429 = @fom_rate_limited;
++
++location @fom_rate_limited {
++    default_type application/json;
++    add_header Retry-After 1 always;
++    add_header Cache-Control "no-store" always;
++    return 429 '{"statusCode":429,"error":"Too Many Requests","code":"rate_limited"}';
++}
++```
++
++Con 60 r/min la ficha se repone cada segundo: `Retry-After: 1` es el valor
++honesto para la zona de sesión. Login/refresh (5 y 10 r/min) merecen 12 y 6;
++si se quiere afinar, una `location` nombrada por zona.
++
++**Un 304 no puede gastar menos cupo.** `limit_req` cuenta en la fase de
++acceso, antes de que exista respuesta; eximir pedidos con `If-None-Match`
++permitiría saltarse el límite poniendo ese encabezado. Lo que sí baja el
++consumo es pedir menos: las rutas en lote de T-13 y el contador de avisos.
++
++### 4. Límite por usuario en consola
++
++La consola sigue por IP (120 r/min): varias personas detrás del mismo NAT de
++una empresa comparten el cupo. Igual que en móvil, se puede usar la cookie de
++sesión como clave con respaldo por IP, en una zona nueva (Nginx no permite
++cambiar la clave de una zona existente en un reload):
++
++```nginx
++# El nombre de la cookie lleva guion y no cabe en $cookie_<nombre>.
++map $http_cookie $fom_console_session_key {
++    "~(?:^|;\s*)__Host-fom_session=(?<fom_console_sid>[^;]+)" $fom_console_sid;
++    default "anonymous:$binary_remote_addr";
++}
++limit_req_zone $fom_console_session_key zone=fom_console_session_v2:10m rate=120r/m;
++```
++
++y en `location ^~ /api/v1/console/` usar `zone=fom_console_session_v2`.
++La clave vive solo en memoria de Nginx y no entra al `log_format`.
++
++### 5. Conexiones: HTTP/2 y keep-alive
++
++Los ~0,45 s por pedido medidos desde las apps son en buena parte el
++handshake TLS de una conexión nueva. Propuesta:
++
++```nginx
++listen 10.20.30.10:443 ssl default_server;
++http2 on;                 # Nginx >= 1.25.1; en versiones previas: listen ... ssl http2
++keepalive_timeout 75s;    # hoy 15s: un sondeo cada 30 s abre TLS cada vez
++keepalive_requests 1000;
++```
++
++`limit_conn fom_mobile_connections 20` sigue valiendo: con HTTP/2 un
++teléfono usa una sola conexión. `ssl_session_cache` ya está activo, así que
++las reconexiones pueden reanudar sesión.
++
++En las `location` de consola, para reutilizar el `keepalive 8` del upstream:
++
++```nginx
++proxy_http_version 1.1;
++proxy_set_header Connection "";
++```
++
++## Rutas nuevas de T-13 y Nginx
++
++Las rutas nuevas son de consola (`/api/v1/console/...`) y pasan por la
++`location ^~ /api/v1/console/` existente: **no requieren cambios de Nginx**.
++No se añadió ninguna ruta móvil, así que la lista blanca de
++`nginx-fom-mobile-vehicles-locations.conf` y el contrato de 216 operaciones
++no cambian.
+diff --git a/src/alerts/alert-events.dto.ts b/src/alerts/alert-events.dto.ts
+index a0c632c..e9f74a8 100644
+--- a/src/alerts/alert-events.dto.ts
++++ b/src/alerts/alert-events.dto.ts
+@@ -21,12 +21,12 @@ export const USER_ALERT_CATEGORIES = [
+ ] as const;
+ 
+ class PageQueryDto {
+-  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 25 })
++  @ApiPropertyOptional({ minimum: 1, maximum: 200, default: 25 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+   @Min(1)
+-  @Max(100)
++  @Max(200)
+   limit: number = 25;
+ 
+   @ApiPropertyOptional({ minimum: 0, default: 0 })
+diff --git a/src/console-api/console-fleet-insights.controller.ts b/src/console-api/console-fleet-insights.controller.ts
+index 718de21..bcdefd4 100644
+--- a/src/console-api/console-fleet-insights.controller.ts
++++ b/src/console-api/console-fleet-insights.controller.ts
+@@ -39,7 +39,11 @@ import {
+ } from './fleet-insights.dto';
+ import { FleetInsightsService } from './fleet-insights.service';
+ import { ConsoleFleetService } from './console-fleet.service';
+-import { DailyMetricsQueryDto, ListQueryDto } from './console.dto';
++import {
++  DailyMetricsQueryDto,
++  FleetDailyMetricsQueryDto,
++  ListQueryDto,
++} from './console.dto';
+ 
+ @ApiTags('Console Fleet Insights')
+ @ApiCookieAuth('__Host-fom_session')
+@@ -65,6 +69,24 @@ export class ConsoleFleetInsightsController {
+     return this.fleet.listVehicles(query, tenantId);
+   }
+ 
++  @Get('tenants/:tenantId/daily-metrics')
++  @Header('Cache-Control', 'no-store')
++  @ApiOperation({
++    operationId: 'consoleTenantFleetDailyMetrics',
++    summary: 'Métricas diarias de todas las unidades de un ente visible',
++    description:
++      'Agrupadas por unidad, en un solo pedido. Rango máximo de 31 días.',
++  })
++  @ApiOkResponse({
++    description: '{ vehicles: [{ vehicleId, items }], range }',
++  })
++  listFleetDailyMetrics(
++    @Param('tenantId', new ParseUUIDPipe({ version: '4' })) tenantId: string,
++    @Query() query: FleetDailyMetricsQueryDto,
++  ) {
++    return this.fleet.listFleetDailyMetrics(query, tenantId);
++  }
++
+   @Get('tenants/:tenantId/vehicles/:vehicleId/daily-metrics')
+   @Header('Cache-Control', 'no-store')
+   @ApiOperation({ operationId: 'consoleTenantVehicleDailyMetrics', summary: 'Métricas diarias de una unidad de un ente visible' })
+diff --git a/src/console-api/console-fleet.service.ts b/src/console-api/console-fleet.service.ts
+index 7a2b493..4af451b 100644
+--- a/src/console-api/console-fleet.service.ts
++++ b/src/console-api/console-fleet.service.ts
+@@ -7,9 +7,11 @@ import { currentActor } from '../authentication/actor-context';
+ import { DatabaseService } from '../database/database.service';
+ import type {
+   DailyMetricsQueryDto,
++  FleetDailyMetricsQueryDto,
+   ListQueryDto,
+   DriverAssignmentQueryDto,
+ } from './console.dto';
++import { FLEET_DAILY_METRICS_MAX_DAYS } from './console.dto';
+ import { TenantScopeService } from './tenant-scope.service';
+ 
+ /**
+@@ -66,6 +68,11 @@ export class ConsoleFleetService {
+           live.last_report_at AS "lastReportAt",
+           live.has_position AS "hasPosition",
+           live.motion_state AS "motionState",
++          live.last_position_at AS "latestPositionAt",
++          live.latitude AS "latestLatitude",
++          live.longitude AS "latestLongitude",
++          live.speed_kph AS "latestSpeedKph",
++          live.heading_deg AS "latestHeadingDeg",
+           count(*) OVER () AS "total"
+         FROM fom.vehicles vehicle
+         LEFT JOIN fom.areas area
+@@ -85,7 +92,53 @@ export class ConsoleFleetService {
+       `,
+       [tenantId, search, query.limit, query.offset],
+     );
+-    return this.page(result.rows, query);
++    return this.page(
++      result.rows.map((row) => this.withLatestPosition(row)),
++      query,
++    );
++  }
++
++  /**
++   * Última posición conocida dentro de la fila de la lista, igual que la
++   * lista móvil, para que el mapa no pida una posición por unidad.
++   *
++   * Sale de fom.vehicle_live_state, la proyección que ya se une para el
++   * estado vivo: cero consultas extra. Velocidad y rumbo son los del último
++   * reporte (la proyección los toma así), y null cuando la trama no los trae.
++   */
++  private withLatestPosition(row: Record<string, unknown>) {
++    const {
++      latestPositionAt,
++      latestLatitude,
++      latestLongitude,
++      latestSpeedKph,
++      latestHeadingDeg,
++      ...rest
++    } = row;
++    const hasPosition =
++      row['hasPosition'] === true &&
++      latestLatitude !== null &&
++      latestLatitude !== undefined &&
++      latestLongitude !== null &&
++      latestLongitude !== undefined;
++    return {
++      ...rest,
++      latestPosition: hasPosition
++        ? {
++            latitude: Number(latestLatitude),
++            longitude: Number(latestLongitude),
++            receivedAt: latestPositionAt ?? null,
++            speedKph: this.nullableNumber(latestSpeedKph),
++            headingDeg: this.nullableNumber(latestHeadingDeg),
++          }
++        : null,
++    };
++  }
++
++  private nullableNumber(value: unknown): number | null {
++    if (value === null || value === undefined) return null;
++    const parsed = Number(value);
++    return Number.isFinite(parsed) ? parsed : null;
+   }
+ 
+   async getVehicle(vehicleId: string, requestedTenantId?: string) {
+@@ -260,6 +313,76 @@ export class ConsoleFleetService {
+     };
+   }
+ 
++  /**
++   * Métricas diarias de todas las unidades del ente, agrupadas por unidad.
++   *
++   * Reemplaza un pedido por unidad: una sola consulta que usa el índice
++   * (tenant_id, metric_date DESC, vehicle_id). Las columnas y su forma son
++   * las mismas que las de listVehicleDailyMetrics.
++   */
++  async listFleetDailyMetrics(
++    query: FleetDailyMetricsQueryDto,
++    requestedTenantId?: string,
++  ) {
++    const tenantId = await this.visibleTenantId(requestedTenantId);
++    const from = this.metricDate(query.from, 'from');
++    const to = this.metricDate(query.to, 'to');
++    const days = (to.getTime() - from.getTime()) / 86_400_000;
++    if (days < 0) {
++      throw new BadRequestException('from must not be after to');
++    }
++    if (days > FLEET_DAILY_METRICS_MAX_DAYS - 1) {
++      throw new BadRequestException(
++        `date range must not exceed ${FLEET_DAILY_METRICS_MAX_DAYS} days`,
++      );
++    }
++    const vehicleIds =
++      query.vehicleIds && query.vehicleIds.length > 0 ? query.vehicleIds : null;
++
++    const result = await this.database.query<Record<string, unknown>>(
++      `SELECT metric.vehicle_id::text AS "vehicleId",
++              metric.metric_date::text AS "metricDate",
++              metric.timezone_name AS "timezoneName",
++              metric.calculation_status AS "calculationStatus",
++              metric.distance_meters AS "distanceMeters",
++              metric.position_count AS "positionCount",
++              metric.valid_position_count AS "validPositionCount",
++              metric.max_speed_kph AS "maxSpeedKph",
++              metric.speeding_events AS "speedingEvents",
++              metric.harsh_braking_events AS "harshBrakingEvents",
++              metric.harsh_acceleration_events AS "harshAccelerationEvents",
++              metric.safety_index AS "safetyIndex",
++              metric.computed_at AS "computedAt"
++         FROM fom.vehicle_daily_metrics metric
++        WHERE metric.tenant_id = $1
++          AND metric.metric_date BETWEEN $2::date AND $3::date
++          AND ($4::uuid[] IS NULL OR metric.vehicle_id = ANY($4::uuid[]))
++        ORDER BY metric.vehicle_id, metric.metric_date DESC, metric.id DESC`,
++      [tenantId, query.from, query.to, vehicleIds],
++    );
++
++    const byVehicle = new Map<string, Record<string, unknown>[]>();
++    for (const row of result.rows) {
++      const { vehicleId, ...metric } = row;
++      const key = String(vehicleId);
++      const items = byVehicle.get(key) ?? [];
++      items.push(this.metricDecimals(metric));
++      byVehicle.set(key, items);
++    }
++    return {
++      vehicles: [...byVehicle.entries()].map(([vehicleId, items]) => ({
++        vehicleId,
++        items,
++      })),
++      range: {
++        from: query.from,
++        to: query.to,
++        vehicleCount: byVehicle.size,
++        count: result.rows.length,
++      },
++    };
++  }
++
+   /** `numeric` vuelve como cadena; se expone como número o `null`. */
+   private decimals(row: Record<string, unknown>) {
+     const out: Record<string, unknown> = { ...row };
+diff --git a/src/console-api/console-maintenance.controller.ts b/src/console-api/console-maintenance.controller.ts
+index 023d1de..4916c4e 100644
+--- a/src/console-api/console-maintenance.controller.ts
++++ b/src/console-api/console-maintenance.controller.ts
+@@ -77,6 +77,7 @@ export class ConsoleMaintenanceController {
+     return actor.tenantId;
+   }
+ 
++  @Header('Cache-Control', 'private, no-cache')
+   @Get('maintenance/plans')
+   @ApiOperation({
+     summary: 'Planes de servicio y a cuántas unidades alcanzan',
+@@ -89,6 +90,7 @@ export class ConsoleMaintenanceController {
+       limit: query.limit,
+       offset: query.offset,
+       enabledOnly: query.enabledOnly,
++      vehicleId: query.vehicleId,
+       tenantId: this.tenantId(),
+     });
+   }
+diff --git a/src/console-api/console-operations.controller.ts b/src/console-api/console-operations.controller.ts
+index 95aef6f..aa3a553 100644
+--- a/src/console-api/console-operations.controller.ts
++++ b/src/console-api/console-operations.controller.ts
+@@ -185,6 +185,7 @@ export class ConsoleOperationsController {
+     return this.operations.listDocuments(query);
+   }
+ 
++  @Header('Cache-Control', 'private, no-cache')
+   @Get('alert-rules')
+   @ApiOperation({ summary: 'Reglas de alerta y a cuántas unidades alcanzan' })
+   listAlertRules(@Query() query: ListQueryDto) {
+@@ -216,6 +217,36 @@ export class ConsoleOperationsController {
+     return this.operations.listTenantNotifications(query, tenantId);
+   }
+ 
++  @Header('Cache-Control', 'no-store')
++  @Get('notifications/unread-count')
++  @ApiOperation({
++    operationId: 'consoleNotificationUnreadCount',
++    summary: 'Cuántos avisos tengo sin leer, sin listarlos',
++    description:
++      'Cuenta los avisos del ente de la sesión sin recibo de lectura del ' +
++      'actor y excluye los descartados. Es el número de la campana.',
++  })
++  @ApiOkResponse({ description: '{ unread: number }' })
++  unreadNotificationCount() {
++    return this.operations.countUnreadNotifications();
++  }
++
++  @Header('Cache-Control', 'no-store')
++  @Get('tenants/:tenantId/notifications/unread-count')
++  @ApiOperation({
++    operationId: 'consoleTenantNotificationUnreadCount',
++    summary: 'Cuántos avisos sin leer tengo en un ente visible',
++    description:
++      'Misma regla que la bandeja del ente: sin leer para el actor y sin ' +
++      'descartar. El ente se comprueba contra el alcance de la sesión.',
++  })
++  @ApiOkResponse({ description: '{ unread: number }' })
++  tenantUnreadNotificationCount(
++    @Param('tenantId', new ParseUUIDPipe({ version: '4' })) tenantId: string,
++  ) {
++    return this.operations.countUnreadNotifications(tenantId);
++  }
++
+   @Get('summary')
+   @ApiOperation({
+     summary: 'Contadores del panel',
+diff --git a/src/console-api/console-operations.service.ts b/src/console-api/console-operations.service.ts
+index daec702..4d7d536 100644
+--- a/src/console-api/console-operations.service.ts
++++ b/src/console-api/console-operations.service.ts
+@@ -2322,6 +2322,38 @@ export class ConsoleOperationsService {
+     return this.notificationList(query, tenantId);
+   }
+ 
++  /**
++   * Cuántos avisos tiene el actor sin leer, sin listarlos.
++   *
++   * Misma regla que la bandeja y que alertasSinLeer del resumen: cuenta los
++   * avisos del ente sin recibo de lectura y deja fuera los descartados. La
++   * campana pregunta esto a menudo; traer una página para contarla, o los
++   * ocho contadores del resumen, es pagar de más por un número.
++   */
++  async countUnreadNotifications(requestedTenantId?: string) {
++    const tenantId =
++      requestedTenantId === undefined
++        ? this.tenantId()
++        : await this.visibleTenantId(requestedTenantId);
++    const actor = currentActor();
++    if (!actor) throw new NotFoundException('Resource not found');
++    const result = await this.database.query<{ unread: string }>(
++      `
++        SELECT count(*) AS unread
++        FROM fom.notifications notification
++        LEFT JOIN fom.notification_receipts receipt
++          ON receipt.tenant_id = notification.tenant_id
++         AND receipt.notification_id = notification.id
++         AND receipt.user_id = $2
++        WHERE notification.tenant_id = $1
++          AND receipt.read_at IS NULL
++          AND receipt.dismissed_at IS NULL
++      `,
++      [tenantId, actor.userId],
++    );
++    return { unread: Number(result.rows[0]?.unread ?? 0) };
++  }
++
+   /**
+    * Contadores del resumen, en una sola consulta.
+    *
+diff --git a/src/console-api/console-tenant-daily-reads.controller.ts b/src/console-api/console-tenant-daily-reads.controller.ts
+index ceb3c89..fe06f61 100644
+--- a/src/console-api/console-tenant-daily-reads.controller.ts
++++ b/src/console-api/console-tenant-daily-reads.controller.ts
+@@ -210,7 +210,7 @@ export class ConsoleTenantDailyReadsController {
+     return this.operations.listDocuments(query, tenantId);
+   }
+ 
+-  @Header('Cache-Control', 'no-store')
++  @Header('Cache-Control', 'private, no-cache')
+   @Get('alert-rules')
+   @ApiOperation({
+     operationId: 'consoleTenantAlertRulesList',
+@@ -223,7 +223,7 @@ export class ConsoleTenantDailyReadsController {
+     return this.operations.listAlertRules(query, tenantId);
+   }
+ 
+-  @Header('Cache-Control', 'no-store')
++  @Header('Cache-Control', 'private, no-cache')
+   @Get('maintenance/plans')
+   @ApiOperation({
+     operationId: 'consoleTenantMaintenancePlansList',
+@@ -238,6 +238,7 @@ export class ConsoleTenantDailyReadsController {
+       limit: query.limit,
+       offset: query.offset,
+       enabledOnly: query.enabledOnly,
++      vehicleId: query.vehicleId,
+       tenantId: selectedTenantId,
+     });
+   }
+diff --git a/src/console-api/console.controller.ts b/src/console-api/console.controller.ts
+index e33f2f9..6256ea9 100644
+--- a/src/console-api/console.controller.ts
++++ b/src/console-api/console.controller.ts
+@@ -19,6 +19,7 @@ import { TelemetryCapabilitiesService } from './telemetry-capabilities.service';
+ import { ConsoleSessionGuard } from './console-session.guard';
+ import {
+   DailyMetricsQueryDto,
++  FleetDailyMetricsQueryDto,
+   DriverAssignmentQueryDto,
+   ListQueryDto,
+   PositionRangeQueryDto,
+@@ -176,6 +177,24 @@ export class ConsoleController {
+     );
+   }
+ 
++  @Header('Cache-Control', 'no-store')
++  @Get('daily-metrics')
++  @ApiOperation({
++    operationId: 'consoleFleetDailyMetrics',
++    summary: 'Métricas diarias de todas las unidades en un pedido',
++    description:
++      'Agrupadas por unidad. Reemplaza un pedido por unidad; el rango ' +
++      'máximo es de 31 días y vehicleIds acota a unidades concretas.',
++  })
++  @ApiOkResponse({
++    description:
++      '{ vehicles: [{ vehicleId, items: [métrica diaria] }], range }. ' +
++      'Cada métrica tiene la misma forma que en la ruta por unidad.',
++  })
++  listFleetDailyMetrics(@Query() query: FleetDailyMetricsQueryDto) {
++    return this.fleet.listFleetDailyMetrics(query);
++  }
++
+   @Header('Cache-Control', 'no-store')
+   @Get('vehicles/:vehicleId/daily-metrics')
+   @ApiOperation({
+@@ -218,13 +237,14 @@ export class ConsoleController {
+     return this.telemetryCapabilities.forVehicle(vehicleId, tenantId);
+   }
+ 
++  @Header('Cache-Control', 'private, no-cache')
+   @Get('areas')
+   @ApiOperation({ summary: 'Áreas de la empresa, con su número de unidades' })
+   listAreas(@Query() query: ListQueryDto) {
+     return this.fleet.listAreas(query);
+   }
+ 
+-  @Header('Cache-Control', 'no-store')
++  @Header('Cache-Control', 'private, no-cache')
+   @Get('tenants/:tenantId/areas')
+   @ApiOperation({
+     operationId: 'consoleTenantAreas',
+diff --git a/src/console-api/console.dto.ts b/src/console-api/console.dto.ts
+index cd728d7..6cbd3f5 100644
+--- a/src/console-api/console.dto.ts
++++ b/src/console-api/console.dto.ts
+@@ -142,6 +142,53 @@ export class DailyMetricsQueryDto {
+   limit: number = 90;
+ }
+ 
++/** Días máximos que cubre el lote de métricas de todas las unidades. */
++export const FLEET_DAILY_METRICS_MAX_DAYS = 31;
++/** Unidades máximas que se pueden nombrar en un lote. */
++export const FLEET_DAILY_METRICS_MAX_VEHICLES = 200;
++
++/**
++ * Métricas diarias de varias unidades en un pedido. El rango es más corto que
++ * el de una sola unidad: el lote multiplica filas por unidades, y un mes es lo
++ * que piden el resumen y la tabla de calificación.
++ */
++export class FleetDailyMetricsQueryDto {
++  @ApiProperty({
++    format: 'date',
++    description: 'Primer día incluido, en formato YYYY-MM-DD.',
++  })
++  @IsString()
++  @Matches(/^\d{4}-\d{2}-\d{2}$/u)
++  from!: string;
++
++  @ApiProperty({
++    format: 'date',
++    description: `Último día incluido, en formato YYYY-MM-DD. Máximo ${FLEET_DAILY_METRICS_MAX_DAYS} días desde from.`,
++  })
++  @IsString()
++  @Matches(/^\d{4}-\d{2}-\d{2}$/u)
++  to!: string;
++
++  @ApiPropertyOptional({
++    type: [String],
++    format: 'uuid',
++    maxItems: FLEET_DAILY_METRICS_MAX_VEHICLES,
++    description:
++      'Unidades a incluir; separadas por coma o parámetro repetido. Sin él, ' +
++      'todas las del ente que tengan métricas en el rango.',
++  })
++  @IsOptional()
++  @Transform(({ value }) => {
++    const values = Array.isArray(value) ? value : [value];
++    return values.flatMap((item) => String(item).split(','));
++  })
++  @IsArray()
++  @ArrayMaxSize(FLEET_DAILY_METRICS_MAX_VEHICLES)
++  @ArrayUnique()
++  @IsUUID('4', { each: true })
++  vehicleIds?: string[];
++}
++
+ /** Telemetría de una posición. Ver el Issue #159 para el porqué de los nulos. */
+ export class PositionTelemetryDto {
+   @ApiProperty({
+@@ -465,6 +512,16 @@ export class MaintenancePlanQueryDto extends ListQueryDto {
+   @Transform(({ value }) => value === true || value === 'true')
+   @IsBoolean()
+   enabledOnly: boolean = false;
++
++  @ApiPropertyOptional({
++    format: 'uuid',
++    description:
++      'Solo los planes que cubren esta unidad. Evita pedir el detalle de ' +
++      'cada plan para saber cuáles le tocan.',
++  })
++  @IsOptional()
++  @IsUUID('4')
++  vehicleId?: string;
+ }
+ 
+ /** Filtros de las acciones de mantenimiento. */
+diff --git a/src/database/migrations/files/20261016120000000_index_gps_positions_vehicle_latest_valid.ts b/src/database/migrations/files/20261016120000000_index_gps_positions_vehicle_latest_valid.ts
+new file mode 100644
+index 0000000..609009f
+--- /dev/null
++++ b/src/database/migrations/files/20261016120000000_index_gps_positions_vehicle_latest_valid.ts
+@@ -0,0 +1,59 @@
++import type { MigrationBuilder } from 'node-pg-migrate/dist/bundle/index';
++
++/**
++ * Índice para la última posición válida de cada unidad.
++ *
++ * La lista móvil de vehículos (un LATERAL por unidad), la ficha y las rutas
++ * position/latest de móvil y consola piden lo mismo:
++ *
++ *   WHERE tenant_id = $1 AND vehicle_id = $2 AND position_valid = true
++ *   ORDER BY event_time DESC NULLS LAST, received_at DESC, id DESC
++ *   LIMIT 1
++ *
++ * El índice existente gps_positions_vehicle_received_idx no sirve para ese
++ * orden porque empieza por received_at: PostgreSQL recorre todas las
++ * posiciones de la unidad y las ordena para quedarse con una. Con este índice,
++ * cuyo orden es exactamente el de la consulta, la respuesta es leer una
++ * entrada. Es parcial (solo posiciones válidas con unidad), así que no paga
++ * nada por las tramas inválidas ni por los equipos sin vincular.
++ *
++ * Las consultas no cambian: el índice solo acelera lo que ya se pide. El
++ * recorrido (received_at DESC, id DESC) sigue usando el índice existente.
++ *
++ * BLOQUEO. El repositorio aplica migraciones con --single-transaction, que no
++ * admite CREATE INDEX CONCURRENTLY. Un CREATE INDEX normal toma SHARE sobre
++ * fom.gps_positions: las lecturas siguen, pero los INSERT del ingestor esperan
++ * mientras se construye. El lock_timeout de tres segundos hace que aborte
++ * limpia si no consigue el bloqueo; el statement_timeout acota cuánto puede
++ * frenar la ingesta: si la tabla ya es tan grande que la construcción no cabe
++ * en ese tiempo, la migración falla sin efecto y el índice debe crearse en
++ * una ventana operativa propia (CONCURRENTLY fuera de este flujo).
++ *
++ * Sin datos que mover: up y down son solo esquema y down no pierde nada.
++ */
++export const up = (pgm: MigrationBuilder): void => {
++  pgm.sql(`SET LOCAL lock_timeout = '3s';`);
++  pgm.sql(`SET LOCAL statement_timeout = '120s';`);
++  pgm.sql(`
++    CREATE INDEX gps_positions_vehicle_latest_valid_idx
++      ON fom.gps_positions (
++        tenant_id,
++        vehicle_id,
++        event_time DESC NULLS LAST,
++        received_at DESC,
++        id DESC
++      )
++      WHERE position_valid AND vehicle_id IS NOT NULL;
++
++    COMMENT ON INDEX fom.gps_positions_vehicle_latest_valid_idx IS
++      'Latest valid position per vehicle; same order as the latest-position queries';
++  `);
++  // Con --single-transaction el ajuste seguiría vivo para las migraciones que
++  // vengan detrás en la misma corrida; el tope es solo para este índice.
++  pgm.sql(`RESET statement_timeout;`);
++};
++
++export const down = (pgm: MigrationBuilder): void => {
++  pgm.sql(`SET LOCAL lock_timeout = '3s';`);
++  pgm.sql(`DROP INDEX fom.gps_positions_vehicle_latest_valid_idx;`);
++};
+diff --git a/src/emergencies/emergency.dto.ts b/src/emergencies/emergency.dto.ts
+index b3e5e9e..e761241 100644
+--- a/src/emergencies/emergency.dto.ts
++++ b/src/emergencies/emergency.dto.ts
+@@ -1,6 +1,9 @@
+ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+-import { Type } from 'class-transformer';
++import { Transform, Type } from 'class-transformer';
+ import {
++  ArrayMaxSize,
++  ArrayUnique,
++  IsArray,
+   IsIn,
+   IsISO8601,
+   IsInt,
+@@ -107,18 +110,43 @@ export class UpdateEmergencyLocationDto {
+   observedAt!: string;
+ }
+ 
++/** Tope de página de emergencias; el mismo de las demás listas móviles. */
++export const EMERGENCY_PAGE_MAXIMUM = 200;
++
+ export class EmergencyListQueryDto {
+-  @ApiPropertyOptional({ enum: EMERGENCY_STATUSES })
++  /**
++   * Uno o varios estados. `status=active,acknowledged` (o el parámetro
++   * repetido) trae las abiertas en un solo pedido; un único valor sigue
++   * funcionando igual que antes.
++   */
++  @ApiPropertyOptional({
++    enum: EMERGENCY_STATUSES,
++    isArray: true,
++    description:
++      'Uno o varios estados; admite valores separados por coma ' +
++      '(active,acknowledged) o el parámetro repetido.',
++  })
+   @IsOptional()
+-  @IsIn(EMERGENCY_STATUSES as unknown as string[])
+-  status?: (typeof EMERGENCY_STATUSES)[number];
+-
+-  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 25 })
++  @Transform(({ value }) => {
++    const values = Array.isArray(value) ? value : [value];
++    return values.flatMap((item) => String(item).split(','));
++  })
++  @IsArray()
++  @ArrayMaxSize(EMERGENCY_STATUSES.length)
++  @ArrayUnique()
++  @IsIn(EMERGENCY_STATUSES as unknown as string[], { each: true })
++  status?: (typeof EMERGENCY_STATUSES)[number][];
++
++  @ApiPropertyOptional({
++    minimum: 1,
++    maximum: EMERGENCY_PAGE_MAXIMUM,
++    default: 25,
++  })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+   @Min(1)
+-  @Max(100)
++  @Max(EMERGENCY_PAGE_MAXIMUM)
+   limit: number = 25;
+ 
+   @ApiPropertyOptional({ minimum: 0, default: 0 })
+diff --git a/src/emergencies/emergency.service.ts b/src/emergencies/emergency.service.ts
+index 59f334c..ffd2ce6 100644
+--- a/src/emergencies/emergency.service.ts
++++ b/src/emergencies/emergency.service.ts
+@@ -252,14 +252,19 @@ export class EmergencyService {
+     const result = await this.database.query<EmergencyRow>(
+       `SELECT * FROM fom.emergency_reports
+         WHERE tenant_id = $1 AND reported_by_user_id = $2
+-          AND ($3::varchar IS NULL OR status = $3)
++          AND ($3::varchar[] IS NULL OR status = ANY($3::varchar[]))
+         ORDER BY reported_at DESC, id DESC
+         LIMIT $4 OFFSET $5`,
+-      [actor.tenantId, actor.userId, query.status ?? null, query.limit, query.offset],
++      [actor.tenantId, actor.userId, this.statusFilter(query), query.limit, query.offset],
+     );
+     return { items: result.rows.map((row) => this.response(row)) };
+   }
+ 
++  /** Estados pedidos, o null para no filtrar. Lista vacía = sin filtro. */
++  private statusFilter(query: EmergencyListQueryDto): string[] | null {
++    return query.status && query.status.length > 0 ? query.status : null;
++  }
++
+   async listVisible(actor: MobileActor, query: EmergencyListQueryDto) {
+     const visible = await (this.isMobileManager(actor)
+       ? this.listForActorTenant(actor, query)
+@@ -496,10 +501,11 @@ export class EmergencyService {
+   ) {
+     const result = await this.database.query<EmergencyRow>(
+       `SELECT * FROM fom.emergency_reports
+-        WHERE tenant_id = $1 AND ($2::varchar IS NULL OR status = $2)
++        WHERE tenant_id = $1
++          AND ($2::varchar[] IS NULL OR status = ANY($2::varchar[]))
+         ORDER BY reported_at DESC, id DESC
+         LIMIT $3 OFFSET $4`,
+-      [tenantId, query.status ?? null, query.limit, query.offset],
++      [tenantId, this.statusFilter(query), query.limit, query.offset],
+     );
+     return { items: result.rows.map((row) => this.response(row)) };
+   }
+diff --git a/src/fleet/driver-session-query.dto.ts b/src/fleet/driver-session-query.dto.ts
+index 0117b32..6595eb8 100644
+--- a/src/fleet/driver-session-query.dto.ts
++++ b/src/fleet/driver-session-query.dto.ts
+@@ -15,12 +15,12 @@ export class DriverSessionHistoryQueryDto {
+   @IsUUID('4')
+   vehicleId?: string;
+ 
+-  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 25 })
++  @ApiPropertyOptional({ minimum: 1, maximum: 200, default: 25 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+   @Min(1)
+-  @Max(100)
++  @Max(200)
+   limit: number = 25;
+ 
+   @ApiPropertyOptional({ minimum: 0, default: 0 })
+diff --git a/src/main.ts b/src/main.ts
+index 176a30a..658a0e0 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -1,6 +1,7 @@
+ import 'reflect-metadata';
+ import { Logger, ValidationPipe } from '@nestjs/common';
+ import { NestFactory } from '@nestjs/core';
++import type { NestExpressApplication } from '@nestjs/platform-express';
+ import { AppModule } from './app.module';
+ import { AppConfigService } from './config/config.service';
+ import { configureSwagger } from './docs/swagger';
+@@ -8,8 +9,13 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
+ import { basename, join } from 'node:path';
+ 
+ async function bootstrap(): Promise<void> {
+-  const app = await NestFactory.create(AppModule);
++  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+ 
++  // ETag débil explícito: Express lo calcula al enviar el JSON y responde 304
++  // cuando el cliente repite el If-None-Match. Se fija aquí para que sea parte
++  // del contrato y no un valor por defecto que una actualización pueda mover.
++  // El 304 ahorra el cuerpo, no la consulta: el handler se ejecuta igual.
++  app.set('etag', 'weak');
+   app.enableShutdownHooks();
+   app.use(
+     '/gps-console/assets',
+diff --git a/src/mobile/mobile-operations.controller.ts b/src/mobile/mobile-operations.controller.ts
+index a7f2239..b76658f 100644
+--- a/src/mobile/mobile-operations.controller.ts
++++ b/src/mobile/mobile-operations.controller.ts
+@@ -304,7 +304,7 @@ export class MobileOperationsController {
+     );
+   }
+ 
+-  @Header('Cache-Control', 'no-store')
++  @Header('Cache-Control', 'private, no-cache')
+   @Get('alert-rules')
+   @ApiOperation({ operationId: 'mobileAlertRuleList', summary: 'Reglas de alerta y a cuántas unidades alcanzan' })
+   @ApiOkResponse({ type: MobileAlertRuleListResponseDto })
+@@ -461,7 +461,7 @@ export class MobileOperationsController {
+     return conActorMovil(actor, () => this.operations.summary());
+   }
+ 
+-  @Header('Cache-Control', 'no-store')
++  @Header('Cache-Control', 'private, no-cache')
+   @Get('areas')
+   @ApiOperation({ operationId: 'mobileAreaList', summary: 'Áreas de la empresa, con cuántas unidades tiene cada una' })
+   @ApiOkResponse({ type: MobileAreaListResponseDto })
+@@ -489,7 +489,7 @@ export class MobileOperationsController {
+     return conActorMovil(actor, () => this.fleet.listDrivers(query));
+   }
+ 
+-  @Header('Cache-Control', 'no-store')
++  @Header('Cache-Control', 'private, no-cache')
+   @Get('maintenance/plans')
+   @AllowAssignedVehicleRead()
+   @ApiOperation({
+diff --git a/src/mobile/mobile-tenant-scope.controller.ts b/src/mobile/mobile-tenant-scope.controller.ts
+index dd88e20..bc99390 100644
+--- a/src/mobile/mobile-tenant-scope.controller.ts
++++ b/src/mobile/mobile-tenant-scope.controller.ts
+@@ -505,7 +505,7 @@ export class MobileTenantScopeController {
+   }
+ 
+   @Get('areas')
+-  @Header('Cache-Control', 'no-store')
++  @Header('Cache-Control', 'private, no-cache')
+   @ApiOperation({
+     operationId: 'mobileTenantAreaList',
+     summary: 'Listar las áreas de un ente visible, con sus unidades',
+@@ -627,7 +627,7 @@ export class MobileTenantScopeController {
+   }
+ 
+   @Get('maintenance/plans')
+-  @Header('Cache-Control', 'no-store')
++  @Header('Cache-Control', 'private, no-cache')
+   @ApiOperation({
+     operationId: 'mobileTenantMaintenancePlanList',
+     summary: 'Listar planes de mantenimiento de un ente visible',
+@@ -644,6 +644,7 @@ export class MobileTenantScopeController {
+         limit: query.limit,
+         offset: query.offset,
+         enabledOnly: query.enabledOnly,
++        vehicleId: query.vehicleId,
+         tenantId: scope.tenantId,
+       });
+     });
+@@ -850,7 +851,7 @@ export class MobileTenantScopeController {
+   }
+ 
+   @Get('alert-rules')
+-  @Header('Cache-Control', 'no-store')
++  @Header('Cache-Control', 'private, no-cache')
+   @ApiOperation({
+     operationId: 'mobileTenantAlertRuleList',
+     summary: 'Listar reglas de alerta de un ente visible',
+diff --git a/test/alert-events-http.test.js b/test/alert-events-http.test.js
+index 0b313d7..51e5036 100644
+--- a/test/alert-events-http.test.js
++++ b/test/alert-events-http.test.js
+@@ -161,5 +161,5 @@ test('query strings inválidos se rechazan antes del servicio', async (t) => {
+   const address = app.getHttpServer().address();
+   const base = `http://127.0.0.1:${address.port}`;
+   assert.equal((await fetch(`${base}/api/v1/mobile/alerts?category=other`)).status, 400);
+-  assert.equal((await fetch(`${base}/api/v1/mobile/alerts?limit=101`)).status, 400);
++  assert.equal((await fetch(`${base}/api/v1/mobile/alerts?limit=201`)).status, 400);
+ });
+diff --git a/test/api-performance-t13.test.js b/test/api-performance-t13.test.js
+new file mode 100644
+index 0000000..1960cd0
+--- /dev/null
++++ b/test/api-performance-t13.test.js
+@@ -0,0 +1,376 @@
++'use strict';
++
++// T-13: menos pedidos y más baratos. Cada prueba fija una de las piezas:
++// ETag/304 en catálogos, contador de avisos, estados múltiples de SOS,
++// última posición en la lista de consola, métricas en lote, planes por
++// unidad, tope de página e índice de última posición.
++
++const assert = require('node:assert/strict');
++const { readFileSync } = require('node:fs');
++const { request } = require('node:http');
++const { join } = require('node:path');
++const { test } = require('node:test');
++const { ValidationPipe } = require('@nestjs/common');
++const { Test } = require('@nestjs/testing');
++const { plainToInstance } = require('class-transformer');
++const { validateSync } = require('class-validator');
++
++const { ConsoleController } = require('../dist/console-api/console.controller.js');
++const {
++  ConsoleOperationsController,
++} = require('../dist/console-api/console-operations.controller.js');
++const { ConsoleFleetService } = require('../dist/console-api/console-fleet.service.js');
++const {
++  ConsoleOperationsService,
++} = require('../dist/console-api/console-operations.service.js');
++const {
++  TelemetryCapabilitiesService,
++} = require('../dist/console-api/telemetry-capabilities.service.js');
++const { ConsoleSessionGuard } = require('../dist/console-api/console-session.guard.js');
++const {
++  ConsoleBrowserMutationGuard,
++} = require('../dist/console-api/console-browser-mutation.guard.js');
++const { TenantScopeService } = require('../dist/console-api/tenant-scope.service.js');
++const {
++  GpsPositionQueryService,
++} = require('../dist/gps-console/gps-position-query.service.js');
++const {
++  MaintenancePlanQueryDto,
++  FleetDailyMetricsQueryDto,
++} = require('../dist/console-api/console.dto.js');
++const { EmergencyListQueryDto } = require('../dist/emergencies/emergency.dto.js');
++const {
++  runWithActorStore,
++  setCurrentActor,
++} = require('../dist/authentication/actor-context.js');
++
++const root = join(__dirname, '..');
++const read = (file) => readFileSync(join(root, file), 'utf8');
++
++const TENANT = '10000000-0000-4000-8000-000000000001';
++const VEHICLE_A = '40000000-0000-4000-8000-000000000001';
++const VEHICLE_B = '40000000-0000-4000-8000-000000000002';
++const allow = { canActivate: () => true };
++
++function validationPipe() {
++  return new ValidationPipe({
++    transform: true,
++    whitelist: true,
++    forbidNonWhitelisted: true,
++  });
++}
++
++function fakeDatabase(rows) {
++  const calls = [];
++  return {
++    calls,
++    async query(sql, params) {
++      calls.push({ sql, params });
++      return { rows: typeof rows === 'function' ? rows(sql, params) : rows };
++    },
++  };
++}
++
++const visibleScope = {
++  async requireVisible(tenantId) {
++    return { tenantId };
++  },
++};
++
++test('main fija ETag débil y los catálogos se revalidan con 304', async (t) => {
++  const main = read('src/main.ts');
++  assert.match(main, /app\.set\('etag', 'weak'\)/u);
++
++  let listed = 0;
++  const fleet = {
++    listAreas: async () => {
++      listed += 1;
++      return { items: [{ id: 'a', name: 'Norte' }], page: { limit: 50, offset: 0, count: 1, total: 1 } };
++    },
++  };
++  const module = await Test.createTestingModule({
++    controllers: [ConsoleController],
++    providers: [
++      { provide: ConsoleFleetService, useValue: fleet },
++      { provide: TelemetryCapabilitiesService, useValue: {} },
++      { provide: GpsPositionQueryService, useValue: {} },
++      { provide: TenantScopeService, useValue: {} },
++      { provide: ConsoleSessionGuard, useValue: allow },
++    ],
++  })
++    .overrideGuard(ConsoleSessionGuard)
++    .useValue(allow)
++    .compile();
++  const app = module.createNestApplication();
++  app.set('etag', 'weak');
++  app.useGlobalPipes(validationPipe());
++  await app.listen(0, '127.0.0.1');
++  t.after(async () => app.close());
++  const port = app.getHttpServer().address().port;
++  const url = `http://127.0.0.1:${port}/api/v1/console/areas`;
++
++  const first = await fetch(url);
++  assert.equal(first.status, 200);
++  assert.equal(first.headers.get('cache-control'), 'private, no-cache');
++  const etag = first.headers.get('etag');
++  assert.match(etag, /^W\/"/u);
++
++  // node:http y no fetch: el fetch de Node (como el del navegador cuando se
++  // pone If-None-Match a mano) añade Cache-Control: no-cache, y Express trata
++  // esa petición como no revalidable. El navegador revalida solo, sin ese
++  // encabezado, gracias a 'private, no-cache'.
++  const second = await new Promise((resolve, reject) => {
++    request(url, { headers: { 'If-None-Match': etag } }, (response) => {
++      let body = '';
++      response.on('data', (chunk) => { body += chunk; });
++      response.on('end', () => resolve({ status: response.statusCode, body }));
++    }).on('error', reject).end();
++  });
++  assert.equal(second.status, 304);
++  assert.equal(second.body, '');
++  assert.equal(listed, 2, 'el 304 ahorra el cuerpo, no la consulta');
++});
++
++test('catálogos móviles y de consola dejan no-store por revalidación privada', () => {
++  const files = {
++    'src/console-api/console.controller.ts': 2,
++    'src/console-api/console-operations.controller.ts': 1,
++    'src/console-api/console-maintenance.controller.ts': 1,
++    'src/console-api/console-tenant-daily-reads.controller.ts': 2,
++    'src/mobile/mobile-operations.controller.ts': 3,
++    'src/mobile/mobile-tenant-scope.controller.ts': 3,
++  };
++  for (const [file, expected] of Object.entries(files)) {
++    const source = read(file);
++    assert.equal(
++      (source.match(/@Header\('Cache-Control', 'private, no-cache'\)/gu) ?? []).length,
++      expected,
++      file,
++    );
++  }
++  // El directorio lleva datos personales: sigue sin guardarse en disco.
++  assert.doesNotMatch(
++    read('src/mobile/mobile-administration.controller.ts'),
++    /private, no-cache/u,
++  );
++});
++
++test('consola cuenta avisos sin leer sin listarlos y excluye descartados', async (t) => {
++  const calls = [];
++  const operations = {
++    countUnreadNotifications: async (tenantId) => {
++      calls.push(tenantId);
++      return { unread: 3 };
++    },
++  };
++  const module = await Test.createTestingModule({
++    controllers: [ConsoleOperationsController],
++    providers: [{ provide: ConsoleOperationsService, useValue: operations }],
++  })
++    .overrideGuard(ConsoleSessionGuard)
++    .useValue(allow)
++    .overrideGuard(ConsoleBrowserMutationGuard)
++    .useValue(allow)
++    .compile();
++  const app = module.createNestApplication();
++  app.useGlobalPipes(validationPipe());
++  await app.listen(0, '127.0.0.1');
++  t.after(async () => app.close());
++  const base = `http://127.0.0.1:${app.getHttpServer().address().port}/api/v1/console`;
++
++  const own = await fetch(`${base}/notifications/unread-count`);
++  assert.equal(own.status, 200);
++  assert.deepEqual(await own.json(), { unread: 3 });
++  assert.equal(own.headers.get('cache-control'), 'no-store');
++  const scoped = await fetch(`${base}/tenants/${TENANT}/notifications/unread-count`);
++  assert.equal(scoped.status, 200);
++  assert.equal(
++    (await fetch(`${base}/tenants/not-a-uuid/notifications/unread-count`)).status,
++    400,
++  );
++  assert.deepEqual(calls, [undefined, TENANT]);
++
++  const database = fakeDatabase([{ unread: '7' }]);
++  const service = Object.create(ConsoleOperationsService.prototype);
++  service.database = database;
++  service.tenantScope = visibleScope;
++  const result = await runWithActorStore(async () => {
++    setCurrentActor({ tenantId: TENANT, userId: 'u1', role: 'supervisor' });
++    return service.countUnreadNotifications(TENANT);
++  });
++  assert.deepEqual(result, { unread: 7 });
++  const { sql, params } = database.calls[0];
++  assert.match(sql, /count\(\*\)/u);
++  assert.match(sql, /receipt\.read_at IS NULL/u);
++  assert.match(sql, /receipt\.dismissed_at IS NULL/u);
++  assert.doesNotMatch(sql, /LIMIT/u);
++  assert.deepEqual(params, [TENANT, 'u1']);
++});
++
++test('emergencias aceptan varios estados en un pedido y tope 200', () => {
++  const parse = (query) => {
++    const dto = plainToInstance(EmergencyListQueryDto, query);
++    return { dto, errors: validateSync(dto, { whitelist: true, forbidNonWhitelisted: true }) };
++  };
++  const both = parse({ status: 'active,acknowledged' });
++  assert.equal(both.errors.length, 0);
++  assert.deepEqual(both.dto.status, ['active', 'acknowledged']);
++  const repeated = parse({ status: ['active', 'resolved'] });
++  assert.equal(repeated.errors.length, 0);
++  assert.deepEqual(repeated.dto.status, ['active', 'resolved']);
++  const single = parse({ status: 'active' });
++  assert.deepEqual(single.dto.status, ['active']);
++  assert.ok(parse({ status: 'active,bogus' }).errors.length > 0);
++  assert.ok(parse({ status: 'active,active' }).errors.length > 0);
++  assert.equal(parse({ limit: '200' }).errors.length, 0);
++  assert.ok(parse({ limit: '201' }).errors.length > 0);
++
++  const service = read('src/emergencies/emergency.service.ts');
++  assert.match(service, /status = ANY\(\$3::varchar\[\]\)/u);
++  assert.match(service, /status = ANY\(\$2::varchar\[\]\)/u);
++  assert.doesNotMatch(service, /query\.status \?\? null/u);
++});
++
++test('la lista de consola trae la última posición del estado vivo', async () => {
++  const database = fakeDatabase([
++    {
++      id: VEHICLE_A,
++      code: 'U-1',
++      hasPosition: true,
++      motionState: 'parada',
++      latestPositionAt: '2026-10-16T10:00:00.000Z',
++      latestLatitude: 19.43,
++      latestLongitude: -99.13,
++      latestSpeedKph: '12.50',
++      latestHeadingDeg: null,
++      total: '2',
++    },
++    {
++      id: VEHICLE_B,
++      code: 'U-2',
++      hasPosition: false,
++      motionState: 'unknown',
++      latestPositionAt: null,
++      latestLatitude: null,
++      latestLongitude: null,
++      latestSpeedKph: null,
++      latestHeadingDeg: null,
++      total: '2',
++    },
++  ]);
++  const fleet = new ConsoleFleetService(database, visibleScope);
++  const page = await fleet.listVehicles({ limit: 50, offset: 0 }, TENANT);
++  assert.deepEqual(page.items[0].latestPosition, {
++    latitude: 19.43,
++    longitude: -99.13,
++    receivedAt: '2026-10-16T10:00:00.000Z',
++    speedKph: 12.5,
++    headingDeg: null,
++  });
++  assert.equal(page.items[1].latestPosition, null);
++  assert.equal(page.items[0].latestLatitude, undefined);
++  assert.equal(page.items[0].hasPosition, true, 'los campos previos siguen');
++  assert.equal(page.page.total, 2);
++  assert.equal(database.calls.length, 1, 'sin consultas por unidad');
++  assert.match(database.calls[0].sql, /fom\.vehicle_live_state live/u);
++});
++
++test('métricas diarias en lote: una consulta, agrupadas por unidad', async () => {
++  const database = fakeDatabase([
++    { vehicleId: VEHICLE_A, metricDate: '2026-10-02', distanceMeters: '1000.5', maxSpeedKph: '80.00', safetyIndex: null },
++    { vehicleId: VEHICLE_A, metricDate: '2026-10-01', distanceMeters: '10', maxSpeedKph: null, safetyIndex: '95.5' },
++    { vehicleId: VEHICLE_B, metricDate: '2026-10-01', distanceMeters: '0', maxSpeedKph: null, safetyIndex: null },
++  ]);
++  const fleet = new ConsoleFleetService(database, visibleScope);
++  const result = await fleet.listFleetDailyMetrics(
++    { from: '2026-10-01', to: '2026-10-31', vehicleIds: [VEHICLE_A, VEHICLE_B] },
++    TENANT,
++  );
++  assert.equal(database.calls.length, 1);
++  assert.deepEqual(database.calls[0].params, [
++    TENANT, '2026-10-01', '2026-10-31', [VEHICLE_A, VEHICLE_B],
++  ]);
++  assert.match(database.calls[0].sql, /metric\.vehicle_id = ANY\(\$4::uuid\[\]\)/u);
++  assert.equal(result.vehicles.length, 2);
++  assert.equal(result.vehicles[0].vehicleId, VEHICLE_A);
++  assert.equal(result.vehicles[0].items.length, 2);
++  assert.equal(result.vehicles[0].items[0].distanceMeters, 1000.5);
++  assert.equal(result.vehicles[0].items[0].vehicleId, undefined);
++  assert.deepEqual(result.range, {
++    from: '2026-10-01', to: '2026-10-31', vehicleCount: 2, count: 3,
++  });
++
++  await fleet.listFleetDailyMetrics({ from: '2026-10-01', to: '2026-10-01' }, TENANT);
++  assert.equal(database.calls[1].params[3], null);
++  await assert.rejects(
++    fleet.listFleetDailyMetrics({ from: '2026-10-01', to: '2026-11-01' }, TENANT),
++    /must not exceed 31 days/u,
++  );
++  await assert.rejects(
++    fleet.listFleetDailyMetrics({ from: '2026-10-02', to: '2026-10-01' }, TENANT),
++    /from must not be after to/u,
++  );
++
++  const dto = (query) =>
++    validateSync(plainToInstance(FleetDailyMetricsQueryDto, query), {
++      whitelist: true,
++      forbidNonWhitelisted: true,
++    });
++  assert.equal(dto({ from: '2026-10-01', to: '2026-10-02', vehicleIds: `${VEHICLE_A},${VEHICLE_B}` }).length, 0);
++  assert.ok(dto({ from: '2026-10-01', to: '2026-10-02', vehicleIds: 'x' }).length > 0);
++  assert.ok(dto({ to: '2026-10-02' }).length > 0);
++
++  const consoleController = read('src/console-api/console.controller.ts');
++  const insights = read('src/console-api/console-fleet-insights.controller.ts');
++  assert.match(consoleController, /@Get\('daily-metrics'\)/u);
++  assert.match(consoleController, /operationId: 'consoleFleetDailyMetrics'/u);
++  assert.match(insights, /@Get\('tenants\/:tenantId\/daily-metrics'\)/u);
++  assert.match(insights, /operationId: 'consoleTenantFleetDailyMetrics'/u);
++});
++
++test('los planes se filtran por unidad sin pedir el detalle de cada uno', () => {
++  const dto = (query) =>
++    validateSync(plainToInstance(MaintenancePlanQueryDto, query), {
++      whitelist: true,
++      forbidNonWhitelisted: true,
++    });
++  assert.equal(dto({ vehicleId: VEHICLE_A }).length, 0);
++  assert.ok(dto({ vehicleId: 'x' }).length > 0);
++  for (const file of [
++    'src/console-api/console-maintenance.controller.ts',
++    'src/console-api/console-tenant-daily-reads.controller.ts',
++    'src/mobile/mobile-tenant-scope.controller.ts',
++  ]) {
++    assert.match(read(file), /vehicleId: query\.vehicleId,/u, file);
++  }
++});
++
++test('listas móviles de alertas y turnos aceptan hasta 200', () => {
++  for (const file of ['src/alerts/alert-events.dto.ts', 'src/fleet/driver-session-query.dto.ts']) {
++    const source = read(file);
++    assert.match(source, /@Max\(200\)/u, file);
++    assert.doesNotMatch(source, /@Max\(100\)/u, file);
++  }
++});
++
++test('índice de última posición: mismo orden que la consulta, sin CONCURRENTLY', () => {
++  const migration = read(
++    'src/database/migrations/files/20261016120000000_index_gps_positions_vehicle_latest_valid.ts',
++  );
++  assert.match(
++    migration,
++    /CREATE INDEX gps_positions_vehicle_latest_valid_idx[\s\S]*tenant_id,\s*vehicle_id,\s*event_time DESC NULLS LAST,\s*received_at DESC,\s*id DESC[\s\S]*WHERE position_valid AND vehicle_id IS NOT NULL/u,
++  );
++  assert.match(migration, /SET LOCAL lock_timeout = '3s'/u);
++  assert.match(migration, /SET LOCAL statement_timeout = '120s'/u);
++  assert.match(migration, /RESET statement_timeout/u);
++  assert.match(migration, /DROP INDEX fom\.gps_positions_vehicle_latest_valid_idx/u);
++  assert.doesNotMatch(migration, /pgm\.noTransaction|CREATE INDEX CONCURRENTLY gps/u);
++
++  // Las consultas que el índice sirve conservan exactamente ese orden.
++  const mobile = read('src/mobile/mobile-vehicles.service.ts');
++  assert.match(
++    mobile,
++    /ORDER BY p\.event_time DESC NULLS LAST, p\.received_at DESC, p\.id DESC/u,
++  );
++});
+diff --git a/test/driver-session-history.test.js b/test/driver-session-history.test.js
+index 5e117c8..894c4bb 100644
+--- a/test/driver-session-history.test.js
++++ b/test/driver-session-history.test.js
+@@ -56,7 +56,7 @@ test('la respuesta omite secretos y referencias internas', () => {
+ 
+ test('los filtros y la paginación tienen techo', () => {
+   assert.match(dto, /DRIVER_SESSION_STATUSES = \['active', 'ended'\]/u);
+-  assert.match(dto, /@Max\(100\)/u);
++  assert.match(dto, /@Max\(200\)/u);
+   assert.match(dto, /@Min\(0\)/u);
+   assert.doesNotMatch(
+     dto.slice(0, dto.indexOf('ConsoleDriverSessionQueryDto')),
+diff --git a/test/maintenance-and-mobile-read.test.js b/test/maintenance-and-mobile-read.test.js
+index ca9824e..f2ca41d 100644
+--- a/test/maintenance-and-mobile-read.test.js
++++ b/test/maintenance-and-mobile-read.test.js
+@@ -117,7 +117,14 @@ test('toda respuesta movil prohibe la cache intermedia', () => {
+   const cabeceras = (
+     movilOperaciones.match(/@Header\('Cache-Control', 'no-store'\)/gu) ?? []
+   ).length;
+-  assert.equal(cabeceras, rutas, 'una cabecera no-store por ruta');
++  // T-13: los catálogos (áreas, reglas, planes) se revalidan con ETag. Siguen
++  // fuera de toda caché intermedia: 'private' solo admite la del propio
++  // cliente, y 'no-cache' le obliga a preguntar antes de reutilizar.
++  const catalogos = (
++    movilOperaciones.match(/@Header\('Cache-Control', 'private, no-cache'\)/gu) ?? []
++  ).length;
++  assert.equal(catalogos, 3, 'solo los tres catálogos se revalidan');
++  assert.equal(cabeceras + catalogos, rutas, 'una cabecera de caché por ruta');
+ });
+ 
+ test('las dos superficies exigen sesion antes de consultar', () => {
+-- 
+2.55.0.windows.3
+
