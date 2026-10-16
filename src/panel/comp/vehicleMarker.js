@@ -13,14 +13,20 @@ export function vehicleMarkerSvg(vehicle, selected = false) {
   const heading = Number.isFinite(vehicle.rumbo) ? ((vehicle.rumbo % 360) + 360) % 360 : null
   const plate = escapeXml(String(vehicle.placa || vehicle.alias || 'Sin placa').slice(0, 22))
   const labelSize = plate.length > 11 ? 10 : 13
+  // La sombra va dibujada dentro del SVG (formas negras translúcidas, sin <filter>): un
+  // `filter: drop-shadow` en CSS obligaba a repintar cada marcador en cada cuadro al mover el mapa.
   return `<svg xmlns="http://www.w3.org/2000/svg" width="174" height="76" viewBox="0 0 174 76">
     <g class="fleet-marker-label">
+      <rect x="45" y="5" width="127" height="49" rx="13" fill="#000" fill-opacity=".14"/>
+      <rect x="46" y="5.5" width="125" height="46.5" rx="12" fill="#000" fill-opacity=".2"/>
       <rect x="46" y="3" width="125" height="46" rx="12" fill="#0b1927" stroke="${accent}" stroke-width="${selected ? 2.5 : 1}"/>
       <circle cx="58" cy="18" r="4" fill="${color}"/>
       <text x="69" y="23" fill="#f5f8fc" font-family="Arial,sans-serif" font-size="${labelSize}" font-weight="700">${plate}</text>
       <text x="69" y="39" fill="${color}" font-family="Arial,sans-serif" font-size="11">${status.texto}</text>
     </g>
     <g transform="rotate(${heading ?? 0} 26 40)">
+      <rect x="13" y="19" width="26" height="47" rx="9" fill="#000" fill-opacity=".14"/>
+      <rect x="14" y="20" width="24" height="45" rx="8" fill="#000" fill-opacity=".2"/>
       ${selected ? '<rect x="12" y="14" width="28" height="52" rx="9" fill="#0c2e4f" stroke="#168fff" stroke-width="2"/>' : ''}
       <rect x="11" y="26" width="5" height="10" rx="2" fill="#070e16"/>
       <rect x="36" y="26" width="5" height="10" rx="2" fill="#070e16"/>

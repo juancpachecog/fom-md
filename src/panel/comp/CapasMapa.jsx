@@ -5,7 +5,7 @@ import { PREFS_POR_DEFECTO } from './mapaPrefs'
 // PANEL «CAPAS» DEL MAPA
 // ------------------------------------------------------------
 // Un botón sobre el mapa que abre las opciones de Mapbox: luz, vista,
-// 3D, relieve, tráfico, lugares, tema y lluvia. Cada cambio se aplica al
+// tráfico, lugares, tema y lluvia (el mapa de flota va siempre plano, sin 3D). Cada cambio se aplica al
 // instante y se recuerda en el navegador (ver mapaPrefs.js).
 // ============================================================
 
@@ -90,9 +90,6 @@ export default function CapasMapa({ prefs, alCambiar, luzActual }) {
           <Opciones titulo={`Luz${prefs.luz === 'auto' && luzActual ? ` · ahora ${LUCES.find((l) => l.v === luzActual)?.t.toLowerCase() ?? ''}` : ''}`} opciones={LUCES} valor={prefs.luz} alCambiar={(v) => poner({ luz: v })} />
           <Opciones titulo="Vista" opciones={VISTAS} valor={prefs.vista} alCambiar={(v) => poner({ vista: v })} />
           {!satelite && <Opciones titulo="Tema" opciones={TEMAS} valor={prefs.tema} alCambiar={(v) => poner({ tema: v })} />}
-          <Interruptor texto="Vista 3D" nota="Inclina la cámara. Arrastra con el botón derecho para girar." valor={prefs.vista3d} alCambiar={(v) => poner({ vista3d: v })} />
-          {!satelite && <Interruptor texto="Edificios y árboles en 3D" valor={prefs.edificios3d} alCambiar={(v) => poner({ edificios3d: v })} />}
-          <Interruptor texto="Relieve del terreno" valor={prefs.relieve} alCambiar={(v) => poner({ relieve: v })} />
           <Interruptor texto="Tráfico en vivo" nota="Verde fluido, rojo trancado." valor={prefs.trafico} alCambiar={(v) => poner({ trafico: v })} />
           <Interruptor texto="Nombres de lugares y negocios" valor={prefs.lugares} alCambiar={(v) => poner({ lugares: v })} />
           <Interruptor texto="Lluvia" nota="Solo decorativa." valor={prefs.lluvia} alCambiar={(v) => poner({ lluvia: v })} />

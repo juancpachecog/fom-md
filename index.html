@@ -13,6 +13,11 @@
     <meta name="twitter:card" content="summary" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Mapbox: estilo, teselas y fuentes del mapa salen de api.mapbox.com (con CORS);
+         abrir la conexión antes ahorra el saludo TLS al abrir el mapa. events.mapbox.com
+         solo recibe el aviso de «carga de mapa», así que basta con resolver su nombre. -->
+    <link rel="preconnect" href="https://api.mapbox.com" crossorigin />
+    <link rel="dns-prefetch" href="https://events.mapbox.com" />
     <!-- Space Grotesk y Plus Jakarta Sans: sitio de marketing.
          Spline Sans: la fuente que usa la app de flotas en web (su
          --font-display), para que la consola y la app se vean iguales. -->

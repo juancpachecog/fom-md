@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import repo from '../datos/repo'
+import { HAY_API, api } from '../datos/api'
 import { useDatos } from '../useDatos'
 import { Cabecera, Cargando, ErrorCarga, Tarjeta, Vacio, Kpi } from '../comp/ui'
 import Mapa from '../comp/Mapa'
@@ -26,20 +27,28 @@ import RankingManejo from '../comp/RankingManejo'
 /** Una unidad cuenta como «reportando» si mandó algo en el último cuarto de hora. */
 const VIVO_MS = 15 * 60 * 1000
 
-function cargarTablero() {
+// Cada dato a su ritmo. Antes todo se pedía junto cada 30 s (~8 pedidos más
+// todas las páginas de ODT de la historia) y el servidor limita a cada usuario.
+const MEDIO_MINUTO = 30_000 // el mapa y la lista de unidades: lo que se mueve
+const UN_MINUTO = 60_000 // los contadores del día
+const TRES_MINUTOS = 3 * 60_000 // «Hoy, en orden»: solo enseña los últimos 12
+
+/**
+ * Los contadores del día. Conectado se pide solo `/summary`: `repo.resumen()`
+ * además vuelve a pedir la flota, los conductores y las áreas, que esta
+ * pantalla no usa (la flota ya llega aparte). Sin base real, la semilla.
+ */
+function cargarContadores() {
+  return HAY_API ? api.resumenOperacion().then((r) => r ?? {}) : repo.resumen()
+}
+
+/** Lo que alimenta «Hoy, en orden»: órdenes, avisos e inspecciones. */
+function cargarEventos() {
   return Promise.all([
-    repo.resumen(),
-    repo.vehiculos.listar(),
     repo.odts.listar(),
     repo.alertas.listar(),
     repo.inspecciones.listar(),
-  ]).then(([resumen, vehiculos, odts, alertas, inspecciones]) => ({
-    resumen,
-    vehiculos,
-    odts,
-    alertas,
-    inspecciones,
-  }))
+  ]).then(([odts, alertas, inspecciones]) => ({ odts, alertas, inspecciones }))
 }
 
 /** ¿Viva o callada? Con la hora de la última señal, no con «alguna vez reportó». */
@@ -111,8 +120,22 @@ function eventosDeHoy({ vehiculos, odts, alertas, inspecciones }, hoy, ahora) {
 
 export default function Resumen() {
   // El mapa sigue algo vivo: refresco silencioso cada medio minuto.
-  const { datos, estado, error, recargar } = useDatos(cargarTablero, [], 30000)
+  const vehiculos = useDatos(() => repo.vehiculos.listar(), [], MEDIO_MINUTO)
+  const contadores = useDatos(cargarContadores, [], UN_MINUTO)
+  const eventos = useDatos(cargarEventos, [], TRES_MINUTOS)
   const [seleccionado, setSeleccionado] = useState(null)
+
+  // Se sigue mostrando como un solo tablero: carga hasta tener las tres
+  // partes y, si una falla, se avisa como antes.
+  const partes = [vehiculos, contadores, eventos]
+  const fallida = partes.find((p) => p.estado === 'error')
+  const estado = fallida ? 'error' : partes.some((p) => p.estado === 'cargando') ? 'cargando' : 'ok'
+  const error = fallida?.error ?? null
+  // Reintentar solo lo que falló, sin volver a pedir lo que ya llegó bien.
+  const recargar = () => partes.filter((p) => p.estado === 'error').forEach((p) => p.recargar())
+  const datos = estado === 'ok'
+    ? { resumen: contadores.datos, vehiculos: vehiculos.datos, ...eventos.datos }
+    : null
 
   return (
     <>

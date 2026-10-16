@@ -62,6 +62,34 @@ function kmDeHoy(recorrido, hoy) {
   return total
 }
 
+/**
+ * Pone la última posición encima de la ficha. La ficha (placa, modelo,
+ * equipo) se pide una sola vez porque cuesta unos 8 pedidos; lo que cambia
+ * —dónde está, a qué velocidad, cuándo reportó— sale de un pedido pequeño de
+ * posiciones que sí se repite. También lo usa el mapa del conductor.
+ */
+export function conPosicionFresca(unidad, punto) {
+  if (!unidad || !punto) return unidad
+  const conPunto = { ...unidad, lat: punto.lat, lng: punto.lng }
+  // Solo si el punto es más nuevo que lo que ya decía la ficha: un punto viejo
+  // no debe pisar una señal más reciente.
+  const nuevo = !unidad.ultimoReporte || Date.parse(punto.hora) > Date.parse(unidad.ultimoReporte)
+  if (!nuevo) return conPunto
+  const v = punto.velocidadKmh ?? null
+  return {
+    ...conPunto,
+    ultimoReporte: punto.hora,
+    posicionEn: punto.hora,
+    velocidadKmh: v,
+    rumbo: punto.rumbo ?? unidad.rumbo ?? null,
+    ignition: 'ignition' in punto ? punto.ignition : unidad.ignition,
+    // Igual que la base: la marcha se deduce de la velocidad; sin velocidad no se afirma.
+    estadoMarcha: v == null ? null : v > 0 ? 'en_marcha' : 'parada',
+    conectado: true,
+    conexion: 'reportando',
+  }
+}
+
 /** Una cifra sobre el mapa: etiqueta pequeña arriba, valor tabular debajo. */
 function Cifra({ etiqueta: k, valor, tono = '' }) {
   return (
@@ -78,34 +106,41 @@ export default function MiUnidad() {
 
   // `repo.conductores()` devuelve las asignaciones vigentes de la empresa:
   // { id, nombre, rol, vehiculoId, vehiculo, desde }.
-  // La pantalla del conductor se refresca sola cada minuto. Sin esto, quien
-  // la deja abierta no se entera de que le asignaron una unidad —o de que se
-  // la quitaron— hasta que recarga a mano, y lo que ve es mentira sin saberlo.
-  const CADA_MINUTO = 60_000
-  const asignaciones = useDatos(() => repo.conductores(), [], CADA_MINUTO)
+  // Se vuelve a preguntar cada 5 minutos: quien deja la pantalla abierta se
+  // entera solo de que le asignaron una unidad —o se la quitaron—, y una
+  // asignación cambia pocas veces al día; preguntar cada minuto era cupo
+  // del servidor gastado en la misma respuesta.
+  const CINCO_MINUTOS = 5 * 60_000
+  const asignaciones = useDatos(() => repo.conductores(), [], CINCO_MINUTOS)
 
   const asignacion = useMemo(
     () => miAsignacion(perfil, asignaciones.datos ?? []),
     [perfil, asignaciones.datos],
   )
+  const vehiculoId = asignacion?.vehiculoId ?? null
   // Solo SU unidad. Listar la flota entera descargaría la posición de todos
   // los vehículos de la empresa para un conductor que solo necesita el suyo:
   // más tráfico, y más de lo que le toca ver.
+  // El expediente se pide UNA vez por unidad: ya trae sus órdenes e
+  // inspecciones (filtradas por la unidad), así que no se vuelven a pedir.
   const vehiculos = useDatos(
-    () => (asignacion ? repo.vehiculos.obtener(asignacion.vehiculoId) : Promise.resolve(null)),
-    [asignacion?.vehiculoId],
-    CADA_MINUTO,
+    () => (vehiculoId ? repo.vehiculos.obtener(vehiculoId) : Promise.resolve(null)),
+    [vehiculoId],
   )
-  const unidad = vehiculos.datos ?? null
-
-  const odts = useDatos(
-    () => (unidad ? repo.odts.listar({}).then((l) => l.filter((o) => o.vehiculoId === unidad.id)) : Promise.resolve([])),
-    [unidad?.id],
+  // Lo vivo —dónde está y por dónde ha ido hoy— sale de UN pedido de
+  // posiciones cada 30 s: da el punto del mapa, el trazo y los km de hoy.
+  const vivo = useDatos(
+    async () => ({ vehiculoId, recorrido: vehiculoId ? await repo.recorrido(vehiculoId) : [] }),
+    [vehiculoId],
+    30_000,
   )
-  const inspecciones = useDatos(
-    () => (unidad ? repo.inspecciones.listar({ vehiculoId: unidad.id }) : Promise.resolve([])),
-    [unidad?.id],
-  )
+  const ficha = vehiculos.datos ?? null
+  const recorridoVivo = ficha && vivo.datos?.vehiculoId === ficha.id ? vivo.datos.recorrido : null
+  const unidad = useMemo(() => {
+    if (!ficha) return null
+    if (!recorridoVivo?.length) return ficha
+    return conPosicionFresca({ ...ficha, recorrido: recorridoVivo }, recorridoVivo.at(-1))
+  }, [ficha, recorridoVivo])
 
   // El expediente no trae coordenadas; el recorrido sí. El último punto es
   // donde está la unidad, y es lo que el mapa necesita para pintarla.
@@ -126,9 +161,9 @@ export default function MiUnidad() {
     vehiculos.estado === 'cargando' ||
     (asignacion != null && vehiculos.estado !== 'error' && unidad?.id !== asignacion.vehiculoId)
   const error = asignaciones.error ?? vehiculos.error
-  const abiertas = (odts.datos ?? []).filter((o) => o.estado === 'abierta' || o.estado === 'en_revision')
+  const abiertas = (unidad?.odts ?? []).filter((o) => o.estado === 'abierta' || o.estado === 'en_revision')
   const hoy = f.hoyISO()
-  const inspeccionHoy = (inspecciones.datos ?? []).find((i) => String(i.fecha ?? '').slice(0, 10) === hoy)
+  const inspeccionHoy = (unidad?.inspecciones ?? []).find((i) => String(i.fecha ?? '').slice(0, 10) === hoy)
   const reportando = unidad?.conexion === 'reportando'
   const kmHoy = useMemo(() => kmDeHoy(unidad?.recorrido, hoy), [unidad?.recorrido, hoy])
   const posicion = enMapa[0] ? `${enMapa[0].lat.toFixed(4)}, ${enMapa[0].lng.toFixed(4)}` : null

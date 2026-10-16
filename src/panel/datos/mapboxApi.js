@@ -7,19 +7,31 @@
 //     punto con el tráfico de ahora, y por dónde.
 //   - Isochrone: hasta dónde llega una unidad en 10, 20 o 30 minutos.
 // Cada una tiene 100.000 peticiones gratis al mes. Los resultados se
-// guardan en memoria para no repetir la misma pregunta en cada refresco.
+// guardan en memoria (las últimas 50) para no repetir la misma pregunta en cada refresco.
 // ============================================================
 
 const TOKEN = String(import.meta.env?.VITE_MAPBOX_TOKEN || '').trim()
 const BASE = 'https://api.mapbox.com'
+// Caché con tope (la menos usada sale primero): sin tope crecía toda la sesión con
+// cada cola y cada ruta, y el panel se queda abierto el día entero.
+const TOPE_CACHE = 50
 const cache = new Map()
 
 function recordar(clave, calcular) {
-  if (!cache.has(clave)) {
-    const p = calcular().catch((e) => { cache.delete(clave); throw e })
-    cache.set(clave, p)
+  if (cache.has(clave)) {
+    // Un Map recuerda el orden de entrada: volver a meterla la pone de última en salir.
+    const guardada = cache.get(clave)
+    cache.delete(clave)
+    cache.set(clave, guardada)
+    return guardada
   }
-  return cache.get(clave)
+  const p = calcular().catch((e) => {
+    if (cache.get(clave) === p) cache.delete(clave)
+    throw e
+  })
+  cache.set(clave, p)
+  while (cache.size > TOPE_CACHE) cache.delete(cache.keys().next().value)
+  return p
 }
 
 async function pedirJson(url, señal) {

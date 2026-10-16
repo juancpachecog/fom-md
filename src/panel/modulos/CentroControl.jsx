@@ -55,13 +55,18 @@ export default function CentroControl() {
     [q, areaId, estadoMarcha],
     15000
   )
-  // El expediente se sigue pidiendo por UNA sola razón: trae el recorrido del
-  // día, que el mapa dibuja como trayecto. La ficha de la unidad ya no se
-  // arma aquí — flota sobre el mapa y se alimenta de la lista.
+  // La ficha solo necesita de más el IMEI del equipo, que la flota no trae: se saca del inventario
+  // de equipos GPS (un solo pedido) al elegir la unidad. Antes se pedía el expediente entero (~8
+  // pedidos, todas las páginas de ODT). Lo vivo (posición, velocidad, señal) ya llega con la
+  // flota, y el trazo reciente con `cola`.
   const detalle = useDatos(
-    () => (seleccionado ? repo.vehiculos.obtener(seleccionado) : Promise.resolve(null)),
-    [seleccionado],
-    15000
+    () => (seleccionado
+      ? repo.admin.gps.listar().catch(() => []).then((equipos) => {
+          const e = equipos.find((g) => g.vehiculoId === seleccionado)
+          return { id: seleccionado, gps: e ? { modelo: e.modelo ?? 'Equipo GPS', imei: e.imei, linea: e.linea, verificado: e.verificado, conectado: e.conectado } : null }
+        })
+      : Promise.resolve(null)),
+    [seleccionado]
   )
 
   // Sin pedir el recorrido: los últimos minutos de camino de la unidad elegida, para saber de
@@ -114,7 +119,8 @@ export default function CentroControl() {
 
   const unidadLista = lista.find(v => v.id === seleccionado)
   const unidadDetalle = detalle.datos?.id === seleccionado ? detalle.datos : null
-  const unidad = unidadLista ? { ...unidadDetalle, ...unidadLista, recorrido: unidadDetalle?.recorrido } : null
+  // La lista va encima: sus datos son de hace menos de 15 s; los del expediente, de cuando se eligió.
+  const unidad = unidadLista ? { ...unidadDetalle, ...unidadLista } : null
   const estadosVisibles = [...new Map(lista.map(v => { const e = estadoUnidad(v); return [e.clave, e] })).values()]
 
   return (
@@ -162,7 +168,7 @@ export default function CentroControl() {
         {!viendoRecorrido && colaActual && cola.estado === 'ok' && colaPuntos.length < 2 && <p className="control-detail-note" role="status">{cola.datos.puntos.length > 1 ? 'Sin movimiento registrado en el tramo reciente.' : 'No hay suficientes posiciones para dibujar el recorrido reciente.'} Puedes consultar el día completo en «Ver recorrido».</p>}
         {viendoRecorrido && <PanelRecorrido analisis={analisis} horas={horas} alCambiarHoras={setHoras} cargando={dia.estado === 'cargando'} truncado={dia.datos?.truncado} alEnfocar={(p) => setFoco({ ...p, clave: Date.now() })} viajeActivo={viajeActivo} alElegirViaje={setViajeActivo} />}
         {viendoRecorrido && dia.estado === 'error' && <p className="control-detail-note">No se pudo cargar el recorrido. <button onClick={dia.recargar}>Reintentar</button></p>}
-        {detalle.estado === 'error' && <p className="control-detail-note">No se pudo cargar el recorrido. <button onClick={detalle.recargar}>Reintentar</button></p>}
+        {detalle.estado === 'error' && <p className="control-detail-note">No se pudo cargar la ficha de la unidad. <button onClick={detalle.recargar}>Reintentar</button></p>}
       </aside>}
       {estadosVisibles.length > 0 && <div className="fleet-map-legend" aria-label="Estados de los vehículos">{estadosVisibles.map(e => <span className={e.color} key={e.clave}><i />{e.texto}</span>)}</div>}
       <div className="control-live"><i />Actualización cada 15 s<span>Selecciona una unidad en el mapa</span></div>

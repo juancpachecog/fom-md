@@ -2,9 +2,14 @@
 // PREFERENCIAS DEL MAPA (Mapbox)
 // ------------------------------------------------------------
 // Lo que cada quien elige en el panel «Capas» del mapa: luz, vista
-// (calles o satélite), 3D, relieve, tráfico, lugares y lluvia. Se guarda en
-// el navegador para que al volver el mapa esté como lo dejó. No viaja al
-// servidor: es gusto personal, no dato de la flota.
+// (calles o satélite), tráfico, lugares y lluvia. Se guarda en el navegador
+// para que al volver el mapa esté como lo dejó. No viaja al servidor: es
+// gusto personal, no dato de la flota.
+//
+// Sin 3D (pedido del dueño, 16 oct 2026): ni edificios, ni relieve, ni cámara
+// inclinada, ni niebla de estrellas. Es lo que más pesa y en una flota no
+// aporta. Las claves siguen aquí siempre en falso para que el panel «Capas»
+// no se rompa mientras quita sus interruptores.
 // ============================================================
 
 const CLAVE = 'fom.mapa.prefs'
@@ -18,19 +23,22 @@ export const PREFS_POR_DEFECTO = Object.freeze({
   // fom | default | faded | monochrome (solo en calles). «fom» es el estilo
   // de Mapbox con los colores de noche del panel; «default» es el original.
   tema: 'fom',
-  // Edificios, árboles y monumentos en 3D (se notan al inclinar la cámara).
-  edificios3d: true,
-  // Relieve del terreno (montañas con volumen).
+  // 3D apagado siempre (ver `sin3d`).
+  edificios3d: false,
   relieve: false,
-  // Cámara inclinada (vista 3D) o cenital (plana).
   vista3d: false,
   // Tráfico en vivo sobre las vías.
   trafico: false,
-  // Nombres de negocios y lugares.
-  lugares: true,
+  // Nombres de negocios y lugares. Apagado de entrada: llenan el mapa y lo hacen más pesado.
+  lugares: false,
   // Efecto de lluvia (solo decorativo).
   lluvia: false,
 })
+
+/** Las preferencias sin nada de 3D, vengan de donde vengan (lo guardado o un interruptor viejo). */
+export function sin3d(prefs) {
+  return { ...prefs, edificios3d: false, relieve: false, vista3d: false }
+}
 
 export function leerPrefs() {
   try {
@@ -40,7 +48,10 @@ export function leerPrefs() {
     if (!guardado || typeof guardado !== 'object') return { ...PREFS_POR_DEFECTO }
     // Antes de la versión 2, «default» era el tema con los colores de FOM.
     if (!guardado.v && guardado.tema === 'default') guardado.tema = 'fom'
-    return { ...PREFS_POR_DEFECTO, ...guardado }
+    // Versión 3 (mapa más ligero): quien ya tenía preferencias pasa a «sin lugares»;
+    // si los quiere, los vuelve a encender en «Capas». El 3D se apaga siempre.
+    if ((guardado.v ?? 0) < 3) guardado.lugares = PREFS_POR_DEFECTO.lugares
+    return sin3d({ ...PREFS_POR_DEFECTO, ...guardado })
   } catch {
     return { ...PREFS_POR_DEFECTO }
   }
@@ -48,7 +59,7 @@ export function leerPrefs() {
 
 export function guardarPrefs(prefs) {
   try {
-    localStorage.setItem(CLAVE, JSON.stringify({ ...prefs, v: 2 }))
+    localStorage.setItem(CLAVE, JSON.stringify({ ...sin3d(prefs), v: 3 }))
   } catch {
     /* navegador sin almacenamiento: queda en memoria */
   }
@@ -124,25 +135,20 @@ export function configDe(prefs, fecha = new Date()) {
     showRoadLabels: true,
     showTransitLabels: false,
     showPointOfInterestLabels: prefs.lugares,
-    showPedestrianRoads: true,
+    // Veredas y caminos peatonales: no aportan a una flota y suman geometría.
+    showPedestrianRoads: false,
+    // Sin 3D: edificios, árboles y monumentos planos (las claves que el estilo no tenga se ignoran).
+    show3dObjects: false,
+    show3dBuildings: false,
+    show3dTrees: false,
+    show3dLandmarks: false,
+    show3dFacades: false,
   }
   if (prefs.vista === 'satelite') return { ...base, showRoadsAndTransit: true }
   return {
     ...base,
     theme: prefs.tema === 'fom' ? 'default' : prefs.tema,
-    show3dObjects: prefs.edificios3d,
-    showLandmarkIcons: true,
+    showLandmarkIcons: false,
     densityPointOfInterestLabels: 2,
   }
-}
-
-/** Niebla y cielo según la luz: de noche con estrellas, de día un horizonte claro. */
-export function nieblaDe(luz) {
-  if (luz === 'night') {
-    return { range: [-1, 2], 'horizon-blend': 0.25, color: '#15203a', 'high-color': '#0b1226', 'space-color': '#050912', 'star-intensity': 0.7 }
-  }
-  if (luz === 'dusk' || luz === 'dawn') {
-    return { range: [-1, 2], 'horizon-blend': 0.3, color: '#5b4a6b', 'high-color': '#2a2f55', 'space-color': '#0b1026', 'star-intensity': 0.25 }
-  }
-  return { range: [-1, 2], 'horizon-blend': 0.3, color: '#dfe9f3', 'high-color': '#9ec6ea', 'space-color': '#cfe6fb', 'star-intensity': 0 }
 }

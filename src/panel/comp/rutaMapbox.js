@@ -31,8 +31,14 @@ const linea = (puntos) => ({ type: 'LineString', coordinates: puntos.map((p) => 
 // Un viaje pegado a las calles (Map Matching) trae `trazo` ya en [lng, lat]; si no, se une punto a punto.
 const trazoDe = (viaje) => (viaje.trazo?.length > 1 ? { type: 'LineString', coordinates: viaje.trazo } : linea(viaje.puntos))
 
+const coleccionDe = (viajes) => ({
+  type: 'FeatureCollection',
+  features: viajes.map((viaje) => ({ type: 'Feature', properties: { numero: viaje.numero }, geometry: trazoDe(viaje) })),
+})
+
 /**
- * Pinta viajes y paradas y devuelve cómo quitarlos y cómo resaltar uno.
+ * Pinta viajes y paradas y devuelve cómo quitarlos, cómo resaltar uno y cómo
+ * cambiarles el trazo sin volver a crear capas (`actualizar`).
  * Cada viaje es una línea visible y otra casi invisible, más ancha, que recibe el cursor.
  */
 export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = '#349bfa', alElegirViaje }) {
@@ -44,14 +50,8 @@ export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = '#349b
   let popupAbierto = false
   let popupActual = null
 
-  const coleccion = {
-    type: 'FeatureCollection',
-    features: viajes.map((viaje) => {
-      limites.push(...viaje.puntos.map((p) => [p.lng, p.lat]))
-      return { type: 'Feature', properties: { numero: viaje.numero }, geometry: trazoDe(viaje) }
-    }),
-  }
-  mapa.addSource(ID, { type: 'geojson', data: coleccion })
+  for (const viaje of viajes) limites.push(...viaje.puntos.map((p) => [p.lng, p.lat]))
+  mapa.addSource(ID, { type: 'geojson', data: coleccionDe(viajes) })
   mapa.addLayer({
     id: `${ID}-linea`,
     type: 'line',
@@ -160,6 +160,18 @@ export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = '#349b
     }
   }
 
+  /**
+   * Los mismos viajes con otro trazo (por ejemplo, ya pegados a las calles): solo cambia
+   * la línea y los puntos de la sonda; las capas y los pines de inicio, fin y paradas se quedan.
+   */
+  const actualizar = (nuevos = []) => {
+    const fuente = mapa.getSource(ID)
+    if (!fuente) return
+    fuente.setData(coleccionDe(nuevos))
+    viajePorNumero.clear()
+    for (const v of nuevos) viajePorNumero.set(v.numero, v)
+  }
+
   const quitar = () => {
     mapa.off('mousemove', `${ID}-zona`, alMover)
     mapa.off('mouseleave', `${ID}-zona`, alSalir)
@@ -171,13 +183,18 @@ export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = '#349b
     if (mapa.getSource(ID)) mapa.removeSource(ID)
   }
 
-  return { quitar, limites, resaltar }
+  return { quitar, limites, resaltar, actualizar }
 }
 
-/** La cola reciente: una línea punteada y tenue, con un punto donde empieza. */
+const datosCola = (puntos, trazo) => ({ type: 'Feature', properties: {}, geometry: trazo?.length > 1 ? { type: 'LineString', coordinates: trazo } : linea(puntos) })
+
+/**
+ * La cola reciente: una línea punteada y tenue, con un punto donde empieza.
+ * `actualizar(puntos, trazo)` la mueve en cada refresco sin quitar ni volver a crear la capa.
+ */
 export function pintarCola(gl, mapa, puntos, color = '#349bfa', trazo = null) {
   const ID = `cola-${Date.now().toString(36)}`
-  mapa.addSource(ID, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: trazo?.length > 1 ? { type: 'LineString', coordinates: trazo } : linea(puntos) } })
+  mapa.addSource(ID, { type: 'geojson', data: datosCola(puntos, trazo) })
   mapa.addLayer({
     id: `${ID}-linea`,
     type: 'line',
@@ -193,6 +210,13 @@ export function pintarCola(gl, mapa, puntos, color = '#349bfa', trazo = null) {
   el.style.setProperty('--color', color)
   const marca = new gl.Marker({ element: el, anchor: 'center' }).setLngLat([primero.lng, primero.lat]).addTo(mapa)
   return {
+    actualizar: (nuevos, nuevoTrazo = null) => {
+      const fuente = mapa.getSource(ID)
+      if (!fuente || !nuevos?.length) return
+      fuente.setData(datosCola(nuevos, nuevoTrazo))
+      marca.setLngLat([nuevos[0].lng, nuevos[0].lat])
+      el.title = `Hace unos minutos · ${f.hora(nuevos[0].hora)}`
+    },
     quitar: () => {
       marca.remove()
       if (mapa.getLayer(`${ID}-linea`)) mapa.removeLayer(`${ID}-linea`)
