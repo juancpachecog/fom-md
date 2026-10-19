@@ -46,9 +46,12 @@ export function crearCostosApi(consultar, empresaActual) {
       const id = elegida || (await leer(`${CONSOLA}/auth/session`))?.user?.tenantId
       if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id || '')) throw new Error(ERROR)
       const base = `${CONSOLA}/tenants/${id}`
-      const empresa = await leer(base)
-      if (empresa?.tenant?.id !== id) throw new Error(ERROR)
-      const rango = rangoCostos(dias, empresa.tenant.timezone, ahora)
+      // La consola no publica GET /tenants/:id. La propia lectura de gastos
+      // entrega la zona del ente: una sonda de un día no se suma al reporte.
+      const diaSonda = ahora.toISOString().slice(0, 10)
+      const sonda = await leer(`${base}/fleet-expenses?${new URLSearchParams({ from: diaSonda, to: diaSonda, limit: '1', offset: '0' })}`)
+      if (sonda?.range?.from !== diaSonda || sonda.range.to !== diaSonda) throw new Error(ERROR)
+      const rango = rangoCostos(dias, sonda.range.timezone, ahora)
       const vistos = new Set(), monedas = new Map()
       let offset = 0, total = null
       for (let pagina = 0; pagina < 50; pagina++) {

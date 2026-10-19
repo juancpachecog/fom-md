@@ -15,6 +15,10 @@ function fuente(filas = [], { elegir = () => empresa, pagina, fallar } = {}) {
     const url = new URL(ruta, 'https://ejemplo.test')
     if (!url.pathname.endsWith('/fleet-expenses')) return { tenant: { id: url.pathname.split('/').at(-1), timezone: 'America/Caracas' } }
     if (fallar) throw new Error('HTTP 503')
+    if (url.searchParams.get('limit') === '1') return {
+      items: [], page: { offset: 0, limit: 1, count: 0, total: 0 },
+      range: { from: url.searchParams.get('from'), to: url.searchParams.get('to'), timezone: 'America/Caracas' },
+    }
     const offset = Number(url.searchParams.get('offset'))
     const items = filas.slice(offset, offset + 200)
     const respuesta = { items, page: { offset, limit: 200, count: items.length, total: filas.length }, range: rango }
@@ -49,7 +53,7 @@ test('recorre más de una página y suma centavos por categoría y moneda', asyn
   const r = await repo.resumen({ ahora })
   assert.deepEqual(r.porMoneda.map(g => [g.moneda, g.total, g.movimientos]), [['EUR', '3.23', 1], ['USD', '20.10', 201]])
   assert.deepEqual(r.porMoneda[1].porCategoria, [{ categoria: 'fuel', monto: '20.10' }])
-  const urls = llamadas.filter(c => c.ruta.includes('fleet-expenses')).map(c => new URL(c.ruta, 'https://ejemplo.test'))
+  const urls = llamadas.filter(c => c.ruta.includes('fleet-expenses') && c.ruta.includes('limit=200')).map(c => new URL(c.ruta, 'https://ejemplo.test'))
   assert.deepEqual(urls.map(u => u.searchParams.get('offset')), ['0', '200'])
   assert.ok(urls.every(u => u.pathname.includes(`/tenants/${empresa}/`) && u.searchParams.get('from') === rango.from))
   assert.ok(llamadas.every(c => c.opciones.empresaContexto === null && !c.opciones.metodo && !c.opciones.cuerpo))
