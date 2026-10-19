@@ -1,4 +1,5 @@
 import { listarTodasOdts } from './listar-odts'
+import { crearCostosApi } from './costos-api.js'
 // ============================================================
 // REPOSITORIO REAL — traduce la API de fom-core a las formas del panel
 // ------------------------------------------------------------
@@ -12,7 +13,7 @@ import { listarTodasOdts } from './listar-odts'
 // "0 km/h" cuando en realidad no sabe la velocidad miente, y nadie se entera.
 // ============================================================
 
-import { api, empresaGestionActualId } from './api'
+import { api, pedir, empresaGestionActualId } from './api'
 import { asignarPrincipal } from './asignarConductor'
 import { normalizarCodigoPlan, validarCodigoPlan } from './codigoPlan'
 import { hoyISO } from './formato'
@@ -296,6 +297,7 @@ function puntosDe(filas) {
 }
 
 export const repoApi = {
+  costos: crearCostosApi(pedir, empresaGestionActualId),
   /**
    * Score de manejo del conductor en sesión. El servidor aún no lo entrega (pendiente en #631/Issue de manejo):
    * devuelve null y la tarjeta lo dice, en vez de inventar un número. Cuando exista, debe devolver

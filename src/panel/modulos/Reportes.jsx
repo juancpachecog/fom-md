@@ -10,6 +10,7 @@ import { etiqueta } from '../datos/catalogos'
 import { Icono } from '../Iconos'
 import { calcularReporte, crearCsv, numeroValido } from './reportes-datos'
 import './reportes.css'
+import CostosReales from './CostosReales'
 
 const VISTAS = [['resumen', 'Resumen'], ['operacion', 'Operación'], ['mantenimiento', 'Mantenimiento'], ['seguridad', 'Seguridad'], ['costos', 'Costos'], ['unidades', 'Unidades'], ['conductores', 'Conductores']]
 const FUENTES = ['Vehículos', 'Órdenes de trabajo', 'Conductores', 'Costos', 'Eventos de alerta', 'Resumen']
@@ -66,6 +67,7 @@ function FuenteAusente({ nombre, d, recargar }) {
 function Costos({ d, dias, recargar, c, disponible }) {
   if (d.costos == null) return <><FuenteAusente nombre="Costos" d={d} recargar={recargar} /><Panel titulo="El costo de mantenimiento sí tiene su propio registro" detalle="Se registra al cerrar cada orden de trabajo." accion={<Link className="pnl-btn primario" to="/panel/mantenimiento">Ver mantenimiento</Link>}><div className="rp-costo"><strong>{disponible('Órdenes de trabajo') ? f.moneda(c.costoOdts) : 'No disponible'}</strong><span>ODT cerradas del área y período seleccionados</span></div><p className="rp-nota">No se interpreta la ausencia de costos de operación como un gasto de $0.</p></Panel></>
   const costos = d.costos
+  if (costos.porMoneda) return <CostosReales costos={costos} />
   return <><Banda items={[
     ['Costo del período', f.moneda(costos.total), 'reporte'], ['Costo por kilómetro', numeroValido(costos.costoPorKm) ? `$${Number(costos.costoPorKm).toLocaleString('es', { maximumFractionDigits: 3 })}` : 'Sin dato', 'mapa'], ['Movimientos', f.numero(costos.movimientos), 'documento'],
   ]} nota={`${periodo(dias)} · Toda la empresa. Esta fuente no se filtra por área.`} /><Panel titulo="Costos por categoría" detalle="Toda la empresa, durante el período seleccionado.">{costos.porCategoria?.length ? <BarrasH datos={costos.porCategoria.map(x => ({ etiqueta: CATEGORIAS[x.categoria] || x.categoria, valor: x.monto }))} formato={f.moneda} /> : <Vacio icono="reporte" titulo="Sin movimientos registrados" texto="La fuente respondió sin costos por categoría para este período." />}</Panel></>
@@ -127,7 +129,7 @@ export default function Reportes() {
   const carga = useDatos(async () => {
     const faltantes = []
     const tolerar = async (nombre, consultar, vacio) => {
-      try { return await consultar() } catch (error) { faltantes.push({ nombre, motivo: nombre === 'Costos' ? 'Los costos de operación aún no están disponibles. Consulta el costo registrado en las órdenes cerradas.' : `No se pudo consultar ${nombre.toLocaleLowerCase('es')}. Reintenta para actualizar esta información.` }); return vacio }
+      try { return await consultar() } catch (error) { faltantes.push({ nombre, motivo: nombre === 'Costos' ? 'No se pudo completar la consulta de gastos. Reintenta; los costos de mantenimiento se conservan por separado.' : `No se pudo consultar ${nombre.toLocaleLowerCase('es')}. Reintenta para actualizar esta información.` }); return vacio }
     }
     const [resumen, vehiculos, conductores, odts, costos, eventos] = await Promise.all([
       tolerar('Resumen', () => repo.resumen(), null), tolerar('Vehículos', () => repo.vehiculos.listar({ areaId }), []),

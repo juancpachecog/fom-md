@@ -94,6 +94,40 @@ test('contratos verificados: vínculos, identificadores, ciclos, fechas y errore
   } finally { globalThis.fetch = original }
 })
 
+test('Costos conectado usa sesión, empresa y gastos reales; no semilla ni escrituras', async () => {
+  const repo = await repositorioConectado()
+  const original = globalThis.fetch
+  const llamadas = []
+  const id = '11111111-1111-4111-8111-111111111111'
+  try {
+    globalThis.fetch = async (ruta, opciones = {}) => {
+      llamadas.push({ ruta, opciones })
+      const u = new URL(ruta, 'https://ejemplo.test')
+      let data
+      if (u.pathname.endsWith('/auth/session')) data = { user: { tenantId: id } }
+      else if (u.pathname.endsWith(`/tenants/${id}`)) data = { tenant: { id, timezone: 'UTC' } }
+      else if (u.pathname.endsWith('/fleet-expenses')) data = {
+        items: [{ id: 'g1', amount: '7.25', currency: 'EUR', category: 'fuel', expenseDate: u.searchParams.get('to') }],
+        page: { offset: 0, limit: 200, count: 1, total: 1 },
+        range: { from: u.searchParams.get('from'), to: u.searchParams.get('to'), timezone: 'UTC' },
+      }
+      else throw new Error('Ruta inesperada')
+      return new Response(JSON.stringify(data), { status: 200 })
+    }
+    const r = await repo.costos.resumen()
+    assert.equal(r.movimientos, 1)
+    assert.equal(r.porMoneda[0].total, '7.25')
+    assert.equal(r.porMoneda[0].moneda, 'EUR')
+    assert.equal(r.costoPorKm, null)
+    assert.equal(llamadas.length, 3)
+    assert.ok(llamadas.every(c => c.opciones.method === 'GET' && !c.opciones.body))
+    await assert.rejects(repo.costos.crear({}), /no está integrada/)
+    assert.equal(llamadas.length, 3)
+    globalThis.fetch = async () => new Response('{}', { status: 503 })
+    await assert.rejects(repo.costos.resumen())
+  } finally { globalThis.fetch = original }
+})
+
 test('toda acción que invoca el panel existe en el repositorio conectado', async () => {
   const repo = await repositorioConectado()
   const acciones = accionesInvocadas()

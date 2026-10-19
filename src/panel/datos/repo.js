@@ -27,7 +27,7 @@ import repoSemilla, { alCambiarDatos, reiniciarDatos } from './repoSemilla'
 /** ¿Qué módulos están leyendo de la base real? Útil para avisarlo en pantalla. */
 export const FUENTE_REAL = HAY_API
   ? ['vehiculos', 'recorrido', 'resumen', 'areas', 'conductores',
-     'odts', 'inspecciones', 'documentos', 'alertas', 'reglas']
+     'odts', 'inspecciones', 'documentos', 'alertas', 'reglas', 'costos']
   : []
 
 /** ¿La consola está conectada a la base de datos de producción? */
@@ -76,8 +76,8 @@ const FALTA_GPS_CAMPO =
   'asociarlo a una unidad sí se hace desde aquí.'
 
 const FALTA_COSTOS =
-  'Cargar costos todavía no existe en el servidor como módulo propio: hoy ' +
-  'el costo se registra al cerrar la orden de trabajo que lo generó.'
+  'La carga y edición de gastos no está integrada en este panel. ' +
+  'El reporte consulta los gastos registrados en el servidor.'
 
 /**
  * Igual que la anterior pero DICIENDO QUÉ FALTA.
@@ -150,8 +150,7 @@ const repo = HAY_API
         obtener: repoApi.gente.obtener,
         actualizarPerfil: repoApi.gente.actualizarPerfil,
       },
-      costos: conRespaldoParcial(repoSemilla.costos, {}, {
-        resumen: FALTA_COSTOS,
+      costos: conRespaldoParcial(repoSemilla.costos, repoApi.costos, {
         registrar: FALTA_COSTOS,
         actualizar: FALTA_COSTOS,
         crear: FALTA_COSTOS,
