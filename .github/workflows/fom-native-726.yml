@@ -1,0 +1,44 @@
+name: FOM native accounts and GPS
+on:
+  pull_request:
+    paths: ['control-flotas-main/**', '.github/workflows/fom-native-726.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fom-native-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: control-flotas-main
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_OFFLINE: '1'
+      EXPO_PUBLIC_FOM_API_BASE_URL: https://fom.example.invalid
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /control-flotas-main/
+            /.github/workflows/fom-native-726.yml
+            !**/.env
+            !**/.env.*
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: control-flotas-main/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint:fom
+      - run: npm run test:fom
+      - run: npx expo export --platform all --output-dir .fom-preview
+      - run: node scripts/verify-fom-boundary.cjs
