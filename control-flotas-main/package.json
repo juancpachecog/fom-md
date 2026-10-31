@@ -7,6 +7,7 @@
     "@supabase/supabase-js": "^2.110.2",
     "expo": "54.0.35",
     "expo-constants": "~18.0.13",
+    "expo-crypto": "~15.0.9",
     "expo-file-system": "~19.0.23",
     "expo-font": "~14.0.12",
     "expo-image": "~3.0.11",
@@ -16,6 +17,7 @@
     "expo-media-library": "~18.2.1",
     "expo-print": "~15.0.8",
     "expo-router": "~6.0.24",
+    "expo-secure-store": "~15.0.8",
     "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
@@ -40,6 +42,9 @@
     "typescript": "~5.9.2"
   },
   "scripts": {
+    "test:fom": "node scripts/test-fom.cjs",
+    "typecheck": "tsc --noEmit",
+    "lint:fom": "eslint src/fom src/fom-app",
     "start": "expo start",
     "tunnel": "expo start --tunnel",
     "reset-project": "node ./scripts/reset-project.js",
