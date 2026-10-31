@@ -44,3 +44,7 @@ example
 /android
 .claude/skills/
 skills-lock.json
+
+.fom-test-build/
+.fom-preview/
+.fom-preview*/

@@ -24,7 +24,8 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
+      ["expo-router", { "root": "./src/fom-app" }],
+      "expo-secure-store",
       [
         "expo-splash-screen",
         {
