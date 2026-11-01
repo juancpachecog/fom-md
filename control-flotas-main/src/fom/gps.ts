@@ -12,13 +12,14 @@ export interface Profile extends ProfileSummary { functions: Definition[]; resou
 export interface Mapping { semanticKey: string; definitionVersion: number; instance: number; source: 'native' | 'io'; channel: string;
   inputUnit: string; polarity: string; scale: number; offset: number; resourceKey?: string; mode?: string }
 export interface Choice { selected: boolean; mapping: Mapping }
+export interface Observation { quality: string; booleanValue: boolean | null; numericValue: number | null; enumValue: string | null;
+  receivedAt: string; observedAt?: string | null; historicalOnly?: boolean; timeEvidenceCurrent?: boolean | null; commissioningEligible?: boolean }
 export interface SavedFunction extends Definition, Choice { functionId: string; instance: number; configurationStatus: string;
   enabled: boolean; verification: string; verificationSource: string; freshness: string;
-  lastObservation: { quality: string; booleanValue: boolean | null; numericValue: number | null; enumValue: string | null; receivedAt: string } | null }
+  freshnessBasis?: 'received_at' | 'observed_at' | 'unknown'; lastObservation: Observation | null }
 export interface Configuration { assignmentId: string; isCurrent: boolean; installationVersion: number; profileId: string | null;
   profileVersion: number | null; items: SavedFunction[] }
-export interface Sample { observationId: string; quality: string; receivedAt: string; observedAt: string | null;
-  valueKind: string; booleanValue: boolean | null; numericValue: number | null; enumValue: string | null }
+export interface Sample extends Observation { observationId: string; observedAt: string | null; valueKind: string }
 export interface ReportBody { result: 'pass' | 'fail'; inspectionAttested: boolean; reasonCode: string | null; observationIds: string[] }
 export const profileKey = (p: ProfileSummary) => `${p.profileId}/${p.profileVersion}`;
 export const sameDeclaredManufacturer = (profile: ProfileSummary, manufacturer: string | null) =>
@@ -31,6 +32,30 @@ export const functionKey = (m: Pick<Mapping, 'semanticKey' | 'definitionVersion'
 export function displayValue(v: { quality: string; booleanValue: boolean | null; numericValue: number | null; enumValue: string | null }): string {
   if (v.quality !== 'valid') return 'Sin valor utilizable';
   return String(v.booleanValue ?? v.numericValue ?? v.enumValue ?? 'Desconocido');
+}
+const neutralObservation = (v: Observation) => v.observedAt != null || v.historicalOnly !== undefined
+  || v.timeEvidenceCurrent !== undefined || v.commissioningEligible !== undefined;
+/** The API decides eligibility; the report endpoint revalidates it at submission. */
+export function sampleCanSupportTest(v: Sample): boolean {
+  return !neutralObservation(v) || (v.historicalOnly === false && v.timeEvidenceCurrent === true && v.commissioningEligible === true);
+}
+export function selectedTestSamples(samples: Sample[], selected: string[]): string[] {
+  return [...new Set(selected)].filter(id => samples.some(v => v.observationId === id && sampleCanSupportTest(v))).sort();
+}
+const utcTime = (v: string | null | undefined) => v && Number.isFinite(Date.parse(v)) ? new Date(v).toISOString() : 'no resuelto';
+export function observationTime(v: Observation): string {
+  const received = `Recepción: ${utcTime(v.receivedAt)}`;
+  if (!neutralObservation(v)) return received;
+  const evidence = v.timeEvidenceCurrent === true ? 'Prueba UTC vigente' : v.timeEvidenceCurrent === false
+    ? 'Prueba UTC retirada o sin calificar' : 'Sin prueba UTC';
+  return `Evento UTC: ${utcTime(v.observedAt)} · ${received} · ${evidence}${v.historicalOnly === true ? ' · Histórico' : ''}`;
+}
+export function latestObservationDescription(item: Pick<SavedFunction, 'lastObservation' | 'freshness' | 'freshnessBasis'>): string {
+  const v = item.lastObservation;
+  if (!v) return 'Sin observación comprobada. No se sustituye por cero ni apagado.';
+  const neutral = neutralObservation(v);
+  const current = item.freshness === 'fresh' && (!neutral || (item.freshnessBasis === 'observed_at' && v.timeEvidenceCurrent === true && v.historicalOnly === false));
+  return `Último dato: ${displayValue(v)} · ${observationTime(v)} · ${current ? 'reciente' : 'no confirma el estado actual'}`;
 }
 export function addChoice(profile: Profile, definition: Definition, current: Choice[]): Choice {
   if (current.length >= 32 || definition.direction === 'command' || definition.hardwareSupport === 'unsupported') throw new FomError(400, 'function_unavailable');

@@ -5,6 +5,7 @@ import { useFom } from './provider';
 import { FomError } from './session';
 import { Button, Copy, Field, Page, message } from './ui';
 import { addChoice, definitiveRejection, displayValue, functionKey, GpsOperation, profileKey, sameDeclaredManufacturer, resourceOptions,
+  latestObservationDescription, observationTime, sampleCanSupportTest, selectedTestSamples,
   type Choice, type Configuration, type Definition, type Device, type Mapping, type Page as ApiPage,
   type Profile, type ProfileSummary, type ReportBody, type Sample, type SavedFunction } from './gps';
 
@@ -137,8 +138,7 @@ function Installation({ assignmentId, heading, back, manufacturer }: { assignmen
       <Copy>{item.semanticKey} · instancia {item.instance}</Copy>
       <Copy>Configuración: {item.configurationStatus} · habilitada: {item.enabled ? 'sí' : 'no'} · prueba: {item.verification}
         {item.verificationSource === 'operator_report' ? ' (resultado declarado por gestor)' : ''}</Copy>
-      <Copy>{item.lastObservation ? `Último dato: ${displayValue(item.lastObservation)} · ${item.freshness === 'fresh' ? 'reciente' : 'histórico: no confirma el estado actual'}`
-        : 'Sin observación comprobada. No se sustituye por cero ni apagado.'}</Copy>
+      <Copy>{latestObservationDescription(item)}</Copy>
       <History assignmentId={assignmentId} item={item} canReport={saved.isCurrent} blocked={busy || pending || (reporting !== null && reporting !== item.functionId)}
         onPending={value => setReporting(value ? item.functionId : null)} onRecorded={() => { void reload(); }} />
     </View>)}
@@ -192,8 +192,9 @@ function History({ assignmentId, item, canReport, blocked, onPending, onRecorded
   async function report() {
     if (flight.current || blocked || !canReport) return;
     if (!operation.current) {
-      if (result === 'pass' && (!attested || selected.length === 0)) { setError('Confirme la inspección y seleccione muestras válidas de esta función.'); return; }
-      const body: ReportBody = { result, inspectionAttested: attested, reasonCode: result === 'pass' ? null : reason, observationIds: [...selected].sort() };
+      const observationIds = selectedTestSamples(samples?.items ?? [], selected);
+      if (result === 'pass' && (!attested || observationIds.length === 0)) { setError('Confirme la inspección y seleccione muestras aptas de esta función.'); return; }
+      const body: ReportBody = { result, inspectionAttested: attested, reasonCode: result === 'pass' ? null : reason, observationIds };
       try { operation.current = new GpsOperation(assignmentId, 'report', body, () => Crypto.randomUUID(), item.functionId); }
       catch (e) { setError(message(e)); return; }
       setPending(true); onPending(true);
@@ -214,9 +215,10 @@ function History({ assignmentId, item, canReport, blocked, onPending, onRecorded
       <Button label="Día siguiente" variant="secondary" disabled={locked || Date.parse(range.to) + day > Date.now()} onPress={() => shift(1)} /></>}
     {samples && <><Copy>{samples.page.total} observaciones. Ausencia de datos no confirma cero ni apagado.</Copy>
       {samples.items.map(sample => <View key={sample.observationId} style={{ gap: 8 }}>
-        <Copy>{new Date(sample.receivedAt).toLocaleString()} · {displayValue(sample)} · {quality[sample.quality] ?? 'Desconocido'}</Copy>
-        {canReport && <Toggle label={`Seleccionar muestra de ${new Date(sample.receivedAt).toLocaleString()}`} value={selected.includes(sample.observationId)}
-          disabled={locked || (!selected.includes(sample.observationId) && selected.length >= 8)}
+        <Copy>{observationTime(sample)} · {displayValue(sample)} · {quality[sample.quality] ?? 'Desconocido'}</Copy>
+        {!sampleCanSupportTest(sample) && <Copy>No apta como evidencia de esta prueba. Consulte muestras vigentes y los permisos de la instalación.</Copy>}
+        {canReport && <Toggle label={`Seleccionar muestra de ${new Date(sample.receivedAt).toLocaleString()}`} value={sampleCanSupportTest(sample) && selected.includes(sample.observationId)}
+          disabled={locked || !sampleCanSupportTest(sample) || (!selected.includes(sample.observationId) && selected.length >= 8)}
           onChange={checked => setSelected(rows => checked ? [...rows, sample.observationId] : rows.filter(id => id !== sample.observationId))} />}
       </View>)}
       <Pager page={samples.page} busy={locked} change={offset => { if (range) void history(range, offset); }} />

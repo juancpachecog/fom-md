@@ -60,6 +60,19 @@ Durante incertidumbre se mantienen clave/cuerpo; tras recibo se reintenta sólo
 GET. Se confirma el registro exacto aparte antes de mostrar éxito. Una prueba
 posterior deliberada tiene una clave nueva, incluso con el mismo resultado.
 
+### Observaciones Meitrack — #727
+
+El cliente conserva el evento UTC y la recepción como tiempos distintos, junto
+con la evidencia temporal y la clasificación histórica entregadas por la API.
+Un valor retenido con evidencia retirada o frescura desconocida no confirma el
+estado actual. Para seleccionar muestras neutrales se exigen explícitamente
+`historicalOnly=false`, `timeEvidenceCurrent=true` y `commissioningEligible=true`.
+La selección se filtra de nuevo al crear una operación; una operación incierta
+conserva su cuerpo y clave originales. El servidor revalida permisos, vigencia,
+instalación y muestras en la transacción del reporte. El formato anterior Coban
+mantiene su validación de recepción por el servidor. No se activa hardware,
+habilitación de funciones ni comandos mediante esta presentación.
+
 ## Verificación
 
 ```sh
