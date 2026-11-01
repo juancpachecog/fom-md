@@ -1,11 +1,42 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { addChoice, displayValue, GpsOperation, sameDeclaredManufacturer } = require('../.fom-test-build/gps.js');
+const { addChoice, displayValue, GpsOperation, sameDeclaredManufacturer, sampleCanSupportTest, selectedTestSamples,
+  observationTime, latestObservationDescription } = require('../.fom-test-build/gps.js');
 const uuid = i => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
 const assignment = uuid(1); const functionId = '1-1';
 const body = { result: 'fail', inspectionAttested: false, reasonCode: 'no_signal', observationIds: [] };
 const receipt = { assignmentId: assignment, functionId, reportId: uuid(2), recordedAt: '2026-10-31T20:00:00Z', result: 'fail' };
 const stored = { ...receipt, ...body, source: 'operator_report' };
+test('Meitrack samples require explicit current evidence and operator eligibility; legacy samples retain server validation', () => {
+  const legacy = { observationId: uuid(20), observedAt: null, receivedAt: '2026-11-01T08:00:03Z', quality: 'valid', booleanValue: false };
+  const current = { ...legacy, observationId: uuid(21), observedAt: '2026-11-01T08:00:00Z', historicalOnly: false,
+    timeEvidenceCurrent: true, commissioningEligible: true };
+  assert.equal(sampleCanSupportTest(legacy), true);
+  assert.equal(sampleCanSupportTest(current), true);
+  const rejected = [{ historicalOnly: true }, { timeEvidenceCurrent: false }, { timeEvidenceCurrent: null },
+    { commissioningEligible: false }, { commissioningEligible: undefined }, { historicalOnly: undefined }, { timeEvidenceCurrent: undefined }]
+    .map((delta, i) => ({ ...current, ...delta, observationId: uuid(30 + i) }));
+  for (const v of rejected) assert.equal(sampleCanSupportTest(v), false);
+  assert.equal(sampleCanSupportTest({ ...legacy, commissioningEligible: false }), false);
+  // A stale selection cannot enter a new operation, even for a failed inspection.
+  const all = [legacy, current, ...rejected];
+  assert.deepEqual(selectedTestSamples(all, [...all.map(v => v.observationId), uuid(999), current.observationId]), [legacy.observationId, current.observationId]);
+});
+test('event and reception clocks remain distinct; revoked evidence retains the original value and timestamp', () => {
+  const v = { receivedAt: '2026-11-01T08:00:03Z', observedAt: '2026-11-01T08:00:00Z', quality: 'valid',
+    booleanValue: false, historicalOnly: false, timeEvidenceCurrent: true };
+  const item = { lastObservation: v, freshness: 'fresh', freshnessBasis: 'observed_at' };
+  assert.match(observationTime(v), /Evento UTC: 2026-11-01T08:00:00.000Z.*Recepción: 2026-11-01T08:00:03.000Z/);
+  assert.match(latestObservationDescription(item), /false.*reciente$/);
+  for (const delta of [{ freshness: 'unknown' }, { freshnessBasis: 'received_at' },
+    { lastObservation: { ...v, timeEvidenceCurrent: false } }, { lastObservation: { ...v, historicalOnly: true } }]) {
+    assert.match(latestObservationDescription({ ...item, ...delta }), /false.*no confirma el estado actual$/);
+  }
+  assert.match(observationTime({ ...v, timeEvidenceCurrent: false }), /08:00:00.000Z.*Prueba UTC retirada/);
+  assert.match(observationTime({ ...v, observedAt: 'invalid', receivedAt: 'invalid', timeEvidenceCurrent: null }), /Evento UTC: no resuelto.*Recepción: no resuelto.*Sin prueba UTC/);
+  assert.match(latestObservationDescription({ lastObservation: { quality: 'valid', numericValue: 0, receivedAt: v.receivedAt }, freshness: 'fresh' }), /0.*reciente$/);
+  assert.match(latestObservationDescription({ lastObservation: null, freshness: 'unknown' }), /No se sustituye por cero/);
+});
 test('a profile from another manufacturer or unknown metadata is not offered as this device profile', () => {
   const profile = { manufacturer: 'Coban' };
   assert.equal(sameDeclaredManufacturer(profile, ' cobAN '), true);
