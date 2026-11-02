@@ -191,7 +191,7 @@ export default function AdminUsuarios() {
  * las tiene la app: mismas funciones, mismos permisos (`accionesDeCuenta`).
  * `alCambiar` se llama tras cada cambio para releer lo que se ve.
  */
-function useAccionesCuenta({ actor, alCambiar }) {
+export function useAccionesCuenta({ actor, alCambiar }) {
   const [moviendo, setMoviendo] = useState(null)
   const [claveDe, setClaveDe] = useState(null) // {nombre, clave} tras restablecer
   const [aviso, setAviso] = useState('')
