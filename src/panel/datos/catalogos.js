@@ -200,8 +200,8 @@ export const DESEMPLEADOS_ID = 'desempleados-ca'
 /** Roles que se pueden asignar desde el panel. `admin` nunca se asigna. */
 export const ROLES_ASIGNABLES = ['conductor', 'supervisor_company', 'supervisor_personal', 'usuario_personal']
 
-/** Clave por defecto al crear un usuario, igual que la Edge Function. */
-export const CLAVE_POR_DEFECTO = 'Flotas2026..'
+/** Clave de mentira que el modo demo muestra al crear o restablecer una cuenta. No es de ninguna cuenta real. */
+export const CLAVE_POR_DEFECTO = 'Demo-Solo-Ejemplo-1'
 
 /** Jerarquía de mando: cada quien solo gestiona a los de rango MENOR, nunca a sí mismo. */
 export const RANGO = {
