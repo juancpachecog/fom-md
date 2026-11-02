@@ -22,6 +22,7 @@ import { transmitiendo } from './sinSenal.js'
 import { coleccionDePersona, indiceDePersona } from './perfilUsuario'
 import { cuerpoCredencial, credencialesVigentes } from './credencialesPersona'
 import { cambiosGps } from './metadatosGps'
+import { MEITRACK, cuerpoAltaMeitrack } from './gpsMeitrack'
 import { buscarEquipoGps, empresaPropia, mensajeInstalarGps } from './instalarGps'
 import { empresaDeReinicio, mensajeReiniciarClave } from './reiniciarClave'
 import { LIMITE_EVENTOS, comoEventoManejo, diasServidor } from './eventosManejo'
@@ -1272,6 +1273,27 @@ export const repoApi = {
         ...metadatos,
       })
       return true
+    },
+    /**
+     * Alta del Meitrack T399L (T-211): rutas `meitrack-setup` de fom-core. `registrar` solo
+     * guarda en el inventario (sin vehículo ni instalación) y el servidor exige antes una señal de
+     * prueba recibida y que no exista ya el alta.
+     */
+    meitrack: {
+      async ventana(imei) {
+        const r = await api.meitrackVentana({ imei, firmware: MEITRACK.firmware })
+        return r?.setup ?? null
+      },
+      /** La respuesta cruda del servidor; `resumenRecepcion` la lee. */
+      recepcion: (imei) => api.meitrackRecepcion({ imei, firmware: MEITRACK.firmware }),
+      async alta(datos) {
+        const r = await api.meitrackAlta(cuerpoAltaMeitrack(datos))
+        return r?.registration ?? { state: 'unavailable', id: null }
+      },
+      async registrar(datos) {
+        const r = await api.meitrackRegistrar(cuerpoAltaMeitrack(datos))
+        return { id: r?.gpsDevice?.id ?? r?.device?.id ?? r?.id ?? null }
+      },
     },
   },
 

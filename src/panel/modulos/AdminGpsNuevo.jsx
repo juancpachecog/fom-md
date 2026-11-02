@@ -6,6 +6,8 @@ import { useSesion } from '../useSesion'
 import { Cabeza, Detectado, IcoGps, Pastilla, RAIZ_GPS, useAhora } from '../comp/GpsPiezas'
 import { ComandosSms, PruebaSenal } from './AdminGpsProbar'
 import { cambiosGps } from '../datos/metadatosGps'
+import { esMeitrack } from '../datos/gpsMeitrack'
+import AdminGpsMeitrack from './AdminGpsMeitrack'
 import {
   CATALOGO_GPS, ESTADOS_SIM, haceCuanto, validarEquipo, validarIccid, validarImei, validarLinea,
 } from '../datos/gps'
@@ -19,6 +21,8 @@ import './admin-gps.css'
 //   3 · Configurar y probar: al entrar se registra el equipo
 //       (POST gps-devices) y se muestran los comandos y la prueba de señal.
 // Registrar e instalar son pasos aparte: el equipo puede esperar en la gaveta.
+// El Meitrack T399L (T-211) tiene su propio asistente de 4 pasos (AdminGpsMeitrack): otro puerto,
+// otros comandos y un alta que el servidor solo acepta tras recibir su señal.
 // ============================================================
 
 const OPERADORES = [
@@ -128,6 +132,17 @@ export default function AdminGpsNuevo() {
     fabricante: datos.marca,
     linea: datos.telefono.trim(),
     vehiculoId: null,
+  }
+
+  if (esMeitrack(datos.marca, datos.modelo)) {
+    return (
+      <AdminGpsMeitrack
+        marca={datos.marca}
+        modelo={datos.modelo}
+        imeiInicial={datos.imei}
+        alElegirModelo={(marca, modelo, imei) => setDatos((d) => ({ ...d, marca, modelo, imei: imei ?? d.imei }))}
+      />
+    )
   }
 
   return (

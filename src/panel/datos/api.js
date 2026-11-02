@@ -372,6 +372,18 @@ export const api = {
 
   registrarEquipoGps: (cuerpo) =>
     pedir(`${CONSOLA}/gps-devices`, { metodo: 'POST', cuerpo }),
+  // Alta del Meitrack T399L (T-211). El POST de siempre lo rechaza; estas rutas son de la rama
+  // agent/issue-727-panel-setup-api de fom-core y pueden no estar publicadas todavía (404 «Cannot POST»).
+  // Son del administrador FOM y de la ventana de pruebas: van siempre por la ruta propia, nunca por
+  // la de otra empresa (`empresaContexto: null`).
+  meitrackVentana: (cuerpo) =>
+    pedir(`${CONSOLA}/meitrack-setup/readiness`, { metodo: 'POST', cuerpo, empresaContexto: null }),
+  meitrackRecepcion: (cuerpo) =>
+    pedir(`${CONSOLA}/meitrack-setup/capture`, { metodo: 'POST', cuerpo, empresaContexto: null }),
+  meitrackAlta: (cuerpo) =>
+    pedir(`${CONSOLA}/meitrack-setup/registration`, { metodo: 'POST', cuerpo, empresaContexto: null }),
+  meitrackRegistrar: (cuerpo) =>
+    pedir(`${CONSOLA}/meitrack-setup/register`, { metodo: 'POST', cuerpo, empresaContexto: null }),
   actualizarEquipoGps: (equipoId, cuerpo) =>
     pedir(`${CONSOLA}/gps-devices/${equipoId}`, { metodo: 'PATCH', cuerpo }),
   // `empresaId`: sin dato, la ruta normal (la de la empresa en gestión, si hay); un id, la ruta

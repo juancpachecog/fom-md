@@ -11,11 +11,15 @@ import { tiempoSinSenal, transmitiendo } from './sinSenal.js'
 
 /**
  * Marcas y modelos que el receptor FOM sabe leer. El modelo elige el
- * protocolo; hoy el receptor solo habla Coban GPS103 (catálogo de gps-web).
+ * protocolo. El Coban GPS103 entra por el puerto 5001; el Meitrack T399L (T-211) tiene su propio
+ * receptor en el 5002 y su propio asistente de alta (gpsMeitrack.js).
  */
 export const CATALOGO_GPS = {
   Coban: {
     'GPS-403': { protocolo: 'coban-gps103', protocoloNombre: 'Coban GPS103', transporte: 'tcp' },
+  },
+  Meitrack: {
+    T399L: { protocolo: 'meitrack-t399', protocoloNombre: 'Meitrack T399', transporte: 'tcp' },
   },
 }
 
