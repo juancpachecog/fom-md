@@ -15,7 +15,7 @@ import { build } from 'vite'
 
 const raiz = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/u, '$1')
 const ruta = (r) => join(raiz, r).replace(/\\/g, '/')
-const leer = (r) => readFileSync(join(raiz, r), 'utf8')
+const leer = (r) => readFileSync(join(raiz, r), 'utf8').replace(/\r\n/gu, '\n')
 
 function almacenEnMemoria() {
   const datos = new Map()

@@ -1,0 +1,10 @@
+.meitrack-panel { display: grid; gap: 16px; padding: 24px; background: var(--pnl-card, #fff); border-radius: 16px; }
+.meitrack-panel .config-stack { display: grid; gap: 12px; }
+.meitrack-panel .field { display: grid; gap: 6px; }
+.meitrack-panel input:not([type=checkbox]), .meitrack-panel textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #b8c4ce; border-radius: 8px; color: inherit; background: transparent; }
+.meitrack-panel textarea { min-height: 90px; }
+.meitrack-panel .command-card { display: flex; align-items: start; gap: 12px; flex-wrap: wrap; padding: 12px; border: 1px solid #cbd5df; border-radius: 10px; }
+.meitrack-panel .command-card > div { flex: 1; min-width: 200px; display: grid; gap: 6px; }
+.meitrack-panel code { overflow-wrap: anywhere; }
+.meitrack-panel button { padding: 8px 12px; cursor: pointer; }
+.meitrack-panel button:disabled { cursor: default; opacity: .5; }
