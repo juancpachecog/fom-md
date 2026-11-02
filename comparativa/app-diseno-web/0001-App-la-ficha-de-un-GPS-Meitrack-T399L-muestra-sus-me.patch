@@ -1,0 +1,251 @@
+From 9f0f45ca1ce191b4d45ad1e23f9ceb8cefc101b5 Mon Sep 17 00:00:00 2001
+From: marcodpa <marcodpa@users.noreply.github.com>
+Date: Mon, 2 Nov 2026 08:49:10 -0400
+Subject: [PATCH] =?UTF-8?q?App:=20la=20ficha=20de=20un=20GPS=20Meitrack=20?=
+ =?UTF-8?q?T399L=20muestra=20sus=20mensajes=20SMS=20(E91,=20E04,=20DB4,=20?=
+ =?UTF-8?q?restauraci=C3=B3n=20y=20conexi=C3=B3n)=20y=20el=20puerto=205002?=
+ =?UTF-8?q?=20en=20lugar=20del=20=C2=ABcheck=C2=BB=20del=20Coban=20(T-213)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/app/gps-detalle.tsx         | 53 +++++++++++++++++++++++++++++----
+ src/components/gps-meitrack.tsx | 21 ++++++++-----
+ src/lib/gps-meitrack.ts         | 14 +++++++++
+ 3 files changed, 75 insertions(+), 13 deletions(-)
+
+diff --git a/src/app/gps-detalle.tsx b/src/app/gps-detalle.tsx
+index ce12d7a..78ceb64 100644
+--- a/src/app/gps-detalle.tsx
++++ b/src/app/gps-detalle.tsx
+@@ -7,6 +7,7 @@ import { esMultiempresa, useAuth } from '@/auth';
+ import { Button } from '@/components/button';
+ import { Card } from '@/components/card';
+ import { ErrorState } from '@/components/error-state';
++import { MeitrackConfigurar } from '@/components/gps-meitrack';
+ import { AvisoServidor, DatoGps, IconoGps, PastillaSenalGps } from '@/components/gps-piezas';
+ import { Pastilla } from '@/components/pastilla';
+ import { PastillaFiltro } from '@/components/pastilla-filtro';
+@@ -30,6 +31,7 @@ import {
+   textoSenalGps,
+   tramaEnLlano,
+ } from '@/lib/gps-alta';
++import { esClaveMeitrack, esEquipoMeitrack, PUERTO_MEITRACK } from '@/lib/gps-meitrack';
+ import { fechaHoraReporte } from '@/lib/sin-senal';
+ import { validarIccid } from '@/lib/validate';
+ import { identidadDeUnidad } from '@/lib/vehiculos';
+@@ -123,6 +125,8 @@ export default function GpsDetalleScreen() {
+   const [guardando, setGuardando] = useState(false);
+   const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
+   const [avisoSms, setAvisoSms] = useState<string | null>(null);
++  // Clave SMS de 4 dígitos del Meitrack: solo arma los mensajes, no se guarda (T-213).
++  const [claveMt, setClaveMt] = useState('');
+ 
+   const ahora = useSegundero();
+   // La última señal: la de las tramas si ya llegaron (más fresca), si no la del equipo.
+@@ -135,6 +139,7 @@ export default function GpsDetalleScreen() {
+   if (!esMultiempresa(user)) return <Redirect href="/" />;
+ 
+   const instalado = !!equipo?.vehicleId;
++  const meitrack = esEquipoMeitrack(equipo);
+   const unidad = equipo?.vehicleId
+     ? identidadDeUnidad({ numero: equipo.vehicleCode, placa: equipo.vehiclePlate }) || 'Unidad'
+     : 'En inventario';
+@@ -323,11 +328,17 @@ export default function GpsDetalleScreen() {
+                           <ThemedText>
+                             {`2. Revisa saldo y datos de la línea${equipo.linea ? ` ${equipo.linea}` : ''}.`}
+                           </ThemedText>
+-                          <ThemedText>3. Envía «check» por SMS: debe decir GPRS ON.</ThemedText>
+-                          <Button label="Enviar «check» por SMS" icon="mensaje" onPress={() => void enviarCheck()} />
+-                          <ThemedText variant="caption" color="textMuted">
+-                            {`Va con la clave de fábrica (${CLAVE_FABRICA}); si el equipo tiene otra, cámbiala antes de enviar.`}
+-                          </ThemedText>
++                          {meitrack ? (
++                            <ThemedText>{`3. Consulta «DB4» por SMS: debe decir TCP, la IP del receptor y PORT1:${PUERTO_MEITRACK}. Los mensajes están más abajo.`}</ThemedText>
++                          ) : (
++                            <>
++                              <ThemedText>3. Envía «check» por SMS: debe decir GPRS ON.</ThemedText>
++                              <Button label="Enviar «check» por SMS" icon="mensaje" onPress={() => void enviarCheck()} />
++                              <ThemedText variant="caption" color="textMuted">
++                                {`Va con la clave de fábrica (${CLAVE_FABRICA}); si el equipo tiene otra, cámbiala antes de enviar.`}
++                              </ThemedText>
++                            </>
++                          )}
+                           {avisoSms ? (
+                             <ThemedText variant="caption" color="danger">
+                               {avisoSms}
+@@ -338,6 +349,37 @@ export default function GpsDetalleScreen() {
+                     </Card>
+                   )}
+ 
++                  {/* Meitrack: sus mensajes (E91, E04, DB4, restauración y conexión), no los del Coban. */}
++                  {meitrack ? (
++                    <>
++                      <Card style={{ gap: spacing.xs }}>
++                        <TextField
++                          label="Clave SMS actual del equipo · 4 dígitos"
++                          nombre="gpsClaveMt"
++                          value={claveMt}
++                          onChangeText={(t) => setClaveMt(t.replace(/\D/gu, ''))}
++                          secureTextEntry
++                          autoComplete="off"
++                          keyboardType="number-pad"
++                          maxLength={4}
++                          error={claveMt && !esClaveMeitrack(claveMt) ? 'Son 4 números.' : undefined}
++                        />
++                        <ThemedText variant="caption" color="textMuted">
++                          {`Solo arma los mensajes. No se guarda. Este equipo se conecta por TCP al puerto ${PUERTO_MEITRACK}.`}
++                        </ThemedText>
++                      </Card>
++                      <MeitrackConfigurar
++                        soloMensajes
++                        imei={equipo.imei}
++                        linea={equipo.linea}
++                        apn={equipo.apn}
++                        clave={claveMt}
++                        ahora={ahora}
++                        enFoco={enFoco}
++                      />
++                    </>
++                  ) : null}
++
+                   {/* La prueba de señal, otra vez: solo con el equipo en una unidad. */}
+                   {instalado ? (
+                     <Card style={{ gap: spacing.md }}>
+@@ -540,6 +582,7 @@ export default function GpsDetalleScreen() {
+                       <DatoGps label="IMEI" valor={equipo.imei} mono />
+                       <DatoGps label="Protocolo" valor={equipo.protocolo} />
+                       <DatoGps label="Transporte" valor={equipo.transporte.toUpperCase()} />
++                      {meitrack ? <DatoGps label="Receptor FOM" valor={`TCP · puerto ${PUERTO_MEITRACK}`} /> : null}
+                       <DatoGps label="Unidad" valor={unidad} />
+                       {equipo.deposito ? <DatoGps label="Depósito" valor={equipo.deposito} /> : null}
+                     </Card>
+diff --git a/src/components/gps-meitrack.tsx b/src/components/gps-meitrack.tsx
+index cec6ebb..5aa1765 100644
+--- a/src/components/gps-meitrack.tsx
++++ b/src/components/gps-meitrack.tsx
+@@ -126,6 +126,7 @@ export function MeitrackConfigurar({
+   ahora,
+   enFoco,
+   onEstado,
++  soloMensajes = false,
+ }: {
+   imei: string;
+   linea: string;
+@@ -133,7 +134,9 @@ export function MeitrackConfigurar({
+   clave: string;
+   ahora: number;
+   enFoco: RefObject<boolean>;
+-  onEstado: (e: EstadoMeitrack) => void;
++  onEstado?: (e: EstadoMeitrack) => void;
++  /** Ficha de un equipo ya registrado (T-213): solo los mensajes, sin ventana ni prueba de señal del alta. */
++  soloMensajes?: boolean;
+ }) {
+   const { spacing, colors, radii } = useTheme();
+   const [anunciadosTxt, setAnunciadosTxt] = useState('');
+@@ -156,7 +159,7 @@ export function MeitrackConfigurar({
+ 
+   // La ventana y la señal: se vuelve a preguntar mientras la pantalla está a la vista.
+   useEffect(() => {
+-    if (!/^\d{15}$/u.test(imei)) return;
++    if (soloMensajes || !/^\d{15}$/u.test(imei)) return;
+     let vivo = true;
+     let reloj: ReturnType<typeof setTimeout> | undefined;
+     const vuelta = async () => {
+@@ -188,7 +191,7 @@ export function MeitrackConfigurar({
+       vivo = false;
+       if (reloj) clearTimeout(reloj);
+     };
+-  }, [imei, enFoco]);
++  }, [imei, enFoco, soloMensajes]);
+ 
+   const claveOk = esClaveMeitrack(clave);
+   const llave = JSON.stringify([base, clave, apn, sinUsuario]);
+@@ -197,7 +200,7 @@ export function MeitrackConfigurar({
+   const restauracion = smsRestauracion(clave, base, sinUsuario);
+ 
+   /** Sin ruta no se puede saber si hay ventana: se deja preparar el mensaje, con el aviso a la vista. */
+-  const ventanaLista = ruta === 'sin-ruta' || ventanaUsable(ventana?.datos ?? null, ventana ? Math.max(0, ahora - ventana.en) : Infinity);
++  const ventanaLista = soloMensajes || ruta === 'sin-ruta' || ventanaUsable(ventana?.datos ?? null, ventana ? Math.max(0, ahora - ventana.en) : Infinity);
+   const conexion =
+     senal?.recibida || !ventanaLista
+       ? null
+@@ -206,7 +209,7 @@ export function MeitrackConfigurar({
+   const configurado = lecturaConfigurada(despuesTxt, base, imei, apn, destino);
+   const listo = senal?.recibida === true && configurado && sinUsuario;
+   useEffect(() => {
+-    onEstado({ listo, sinRuta: ruta === 'sin-ruta' });
++    onEstado?.({ listo, sinRuta: ruta === 'sin-ruta' });
+   }, [listo, ruta, onEstado]);
+ 
+   async function copiar(texto: string | null) {
+@@ -225,7 +228,7 @@ export function MeitrackConfigurar({
+   async function abrir(texto: string | null) {
+     if (!texto) return;
+     if (!linea.trim()) {
+-      setAviso('Falta el número de la línea del equipo (paso 2).');
++      setAviso(soloMensajes ? 'Este equipo no tiene línea registrada.' : 'Falta el número de la línea del equipo (paso 2).');
+       return;
+     }
+     setAviso((await abrirSms(linea, texto)) ? null : 'No pudimos abrir Mensajes en este teléfono.');
+@@ -246,6 +249,7 @@ export function MeitrackConfigurar({
+ 
+   return (
+     <>
++      {soloMensajes ? null : (
+       <Card style={{ gap: spacing.md }}>
+         <View style={[styles.filaCentro, { gap: spacing.md }]}>
+           <IconoGps icono="gps" tono={senal?.recibida ? 'success' : 'textSecondary'} tamano={56} />
+@@ -295,6 +299,7 @@ export function MeitrackConfigurar({
+           Un «OK» del equipo por mensaje no prueba que FOM lo esté oyendo: lo prueba la señal de arriba.
+         </ThemedText>
+       </Card>
++      )}
+ 
+       <Card style={{ gap: spacing.md }}>
+         <View style={styles.filaCentro}>
+@@ -308,7 +313,7 @@ export function MeitrackConfigurar({
+         </ThemedText>
+         {!claveOk ? (
+           <ThemedText variant="caption" color="danger">
+-            Falta la clave SMS de 4 dígitos del equipo (paso 1).
++            {soloMensajes ? 'Escribe arriba la clave SMS de 4 dígitos del equipo.' : 'Falta la clave SMS de 4 dígitos del equipo (paso 1).'}
+           </ThemedText>
+         ) : null}
+ 
+@@ -442,7 +447,7 @@ export function MeitrackConfigurar({
+         ) : null}
+         {!esApnMeitrack(apn) ? (
+           <ThemedText variant="caption" color="danger">
+-            El APN del paso 2 tiene que ser solo letras, números, puntos y guiones.
++            {soloMensajes ? 'El APN del equipo' : 'El APN del paso 2'} tiene que ser solo letras, números, puntos y guiones.
+           </ThemedText>
+         ) : null}
+       </Card>
+diff --git a/src/lib/gps-meitrack.ts b/src/lib/gps-meitrack.ts
+index 6b5bf14..290783e 100644
+--- a/src/lib/gps-meitrack.ts
++++ b/src/lib/gps-meitrack.ts
+@@ -329,3 +329,17 @@ export async function registrarUnaVez(opts: {
+   }
+   return { estado: 'confirmado', id: hallado.id };
+ }
++
++/**
++ * ¿Este equipo ya registrado es un Meitrack T399L? Basta una pista: marca, modelo o protocolo
++ * (T-213). Así la ficha no le da los comandos ni el puerto del Coban.
++ */
++export function esEquipoMeitrack(e: { fabricante?: string; modelo?: string; protocolo?: string } | null | undefined): boolean {
++  if (!e) return false;
++  const bajo = (v?: string) => (v ?? '').trim().toLowerCase();
++  return (
++    bajo(e.fabricante) === FABRICANTE_MEITRACK.toLowerCase() ||
++    bajo(e.modelo).includes(MODELO_MEITRACK.toLowerCase()) ||
++    bajo(e.protocolo) === PROTOCOLO_MEITRACK
++  );
++}
+-- 
+2.55.0.windows.3
+
