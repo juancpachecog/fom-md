@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { pedir } from '../datos/api'
+import { MeitrackInstallationSetup } from '../meitrack/MeitrackInstallationSetup'
+import { registerInventory, sha256 } from '../meitrack/registration'
 import { useLocation, useNavigate } from 'react-router-dom'
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
@@ -48,9 +51,12 @@ export default function AdminGpsNuevo() {
   const [equipo, setEquipo] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const [errorAlta, setErrorAlta] = useState('')
+  const [meitrackReceived, setMeitrackReceived] = useState(false)
+  const inFlight = useRef(false)
   const detectados = useDatos(() => repo.admin.gps.sinEmparejar(), [], 30_000)
 
   const modelo = CATALOGO_GPS[datos.marca]?.[datos.modelo] ?? null
+  const meitrack = datos.marca === 'Meitrack' && datos.modelo === 'T399L'
   const poner = (campo, valor) => {
     setDatos((d) => ({ ...d, [campo]: valor }))
     setErrores((e) => ({ ...e, [campo]: undefined }))
@@ -65,6 +71,7 @@ export default function AdminGpsNuevo() {
 
   const siguiente1 = () => {
     const e = validarEquipo(datos)
+    if (meitrack && (datos.firmware.trim() !== 'T399L-V254' || datos.transporte !== 'tcp')) e.firmware = 'Esta preparación requiere firmware observado T399L-V254 y transporte TCP.'
     setErrores(e)
     if (Object.keys(e).length === 0) setPaso(2)
   }
@@ -85,6 +92,7 @@ export default function AdminGpsNuevo() {
     const e = validarLinea(datos)
     setErrores(e)
     if (Object.keys(e).length > 0) return
+    if (meitrack) { setPaso(3); return }
     setGuardando(true)
     setErrorAlta('')
     try {
@@ -115,9 +123,27 @@ export default function AdminGpsNuevo() {
     }
   }
 
+  const registrarMeitrack = async () => {
+    if (inFlight.current || equipo || !meitrackReceived) return
+    inFlight.current = true
+    setGuardando(true)
+    setErrorAlta('')
+    try {
+      const payload = { imei: validarImei(datos.imei).valor, model: datos.modelo, manufacturer: datos.marca,
+        protocolFamily: 'meitrack-t399', ...metadatos(),
+        ...(datos.serie.trim() ? { serialNumber: datos.serie.trim() } : {}) }
+      if (!navigator.locks?.request) throw Error('Este navegador no permite proteger el intento entre pestañas. Use un navegador compatible; el alta permanece bloqueada.')
+      const unitHash = await sha256(payload.imei)
+      const id = await navigator.locks.request(`fom-727-registration:${unitHash}`, () => registerInventory(payload, { storage: localStorage, digest: sha256,
+        request: (path, cuerpo) => pedir(`/api/v1/console/meitrack-setup/${path}`, { metodo: 'POST', cuerpo, empresaContexto: null }) }))
+      setEquipo({ id, ...metadatos() })
+    } catch (err) { setErrorAlta(err.message) }
+    finally { inFlight.current = false; setGuardando(false) }
+  }
+
   const salir = () => navegar(equipo ? `${RAIZ_GPS}/${equipo.id}` : RAIZ_GPS)
   const bajada = paso === 3
-    ? 'Envía los comandos por SMS a la línea del equipo y espera su primera señal.'
+    ? meitrack ? 'Conserva la recuperación, configura por SMS y comprueba la recepción antes del alta. No activa el GPS.' : 'Envía los comandos por SMS a la línea del equipo y espera su primera señal.'
     : 'Registra el equipo en el inventario. Instalarlo en una unidad es un paso aparte.'
 
   // La vista del equipo para los comandos y la prueba: lo escrito aquí, con el id del registro.
@@ -187,7 +213,7 @@ export default function AdminGpsNuevo() {
                     <button key={t} type="button" className="gp-chip alto" aria-pressed={datos.transporte === t} onClick={() => poner('transporte', t)}>{t.toUpperCase()}</button>
                   ))}
                 </div>
-                <span className="gp-hint">{(modelo?.transporte ?? 'tcp').toUpperCase()} es el de fábrica del {datos.modelo}.</span>
+                <span className="gp-hint">{meitrack ? 'Esta preparación admite TCP; no acredita el estado de fábrica del equipo.' : `${(modelo?.transporte ?? 'tcp').toUpperCase()} es el de fábrica del ${datos.modelo}.`}</span>
               </div>
               <Campo id="n-imei" etiqueta="IMEI *" todo error={errores.imei} ayuda={equipo ? 'Ya registrado: el IMEI no se corrige.' : '15 dígitos, único en FOM. Si no lo tienes, elige uno de «Detectados sin registrar».'}>
                 <div className={`gp-field${errores.imei ? ' mal' : imeiDeSenal ? ' ok' : ''}${equipo ? ' ro' : ''}`}>
@@ -202,7 +228,7 @@ export default function AdminGpsNuevo() {
                 <div className="gp-field"><input id="n-fw" placeholder="Opcional" maxLength={100} value={datos.firmware} onChange={(e) => poner('firmware', e.target.value)} /></div>
               </Campo>
               <Campo id="n-clave" etiqueta="Clave SMS del equipo" todo ayuda="Solo arma los comandos del paso 3. No se guarda ni se envía al servidor.">
-                <div className="gp-field"><input id="n-clave" type="password" autoComplete="new-password" placeholder="De fábrica: 123456" value={clave} onChange={(e) => setClave(e.target.value)} /></div>
+                <div className="gp-field"><input id="n-clave" type="password" autoComplete="new-password" placeholder={meitrack ? 'Contraseña actual de cuatro dígitos' : 'De fábrica: 123456'} value={clave} onChange={(e) => setClave(e.target.value)} /></div>
               </Campo>
             </div>
             <div className="gp-pie">
@@ -276,7 +302,7 @@ export default function AdminGpsNuevo() {
             <div className="gp-pie entre">
               <button type="button" className="gp-btn2" onClick={() => setPaso(1)} disabled={guardando}><IcoGps nombre="anterior" />Anterior</button>
               <button type="button" className="gp-btn" onClick={siguiente2} disabled={guardando}>
-                {guardando ? 'Registrando…' : equipo ? 'Siguiente: Configurar y probar' : 'Registrar y configurar'}<IcoGps nombre="siguiente" />
+                {guardando ? 'Registrando…' : meitrack || equipo ? 'Siguiente: Configurar y probar' : 'Registrar y configurar'}<IcoGps nombre="siguiente" />
               </button>
             </div>
           </section>
@@ -295,12 +321,22 @@ export default function AdminGpsNuevo() {
               <Pastilla tono="info">{datos.transporte.toUpperCase()}</Pastilla>
               {equipo && <Pastilla tono="ok">Registrado</Pastilla>}
             </div>
-            <span className="gp-hint">Al seguir, el equipo queda registrado en el inventario y pasas a configurarlo y probarlo.</span>
+              <span className="gp-hint">{meitrack ? 'Al seguir, preparas la configuración. El alta espera la recepción comprobada y no activa el GPS.' : 'Al seguir, el equipo queda registrado en el inventario y pasas a configurarlo y probarlo.'}</span>
           </section>
         </div>
       )}
 
-      {paso === 3 && equipoVista && (
+      {paso === 3 && meitrack && (
+        <>
+          <MeitrackInstallationSetup key={JSON.stringify([datos.imei, datos.firmware, datos.apn])}
+            password={clave} imei={validarImei(datos.imei).valor} firmware={datos.firmware.trim()} apn={datos.apn.trim()}
+            onReady={() => {}} onCapture={setMeitrackReceived} onPasswordChange={setClave} />
+          {errorAlta && <p className="gp-aviso error" role="alert">{errorAlta}</p>}
+          {equipo ? <p className="gp-aviso" role="status">Registro comprobado en inventario. La instalación, el reloj y las funciones siguen pendientes; el GPS no está activado.</p>
+            : <button type="button" className="gp-btn" disabled={guardando || !meitrackReceived} onClick={registrarMeitrack}>{guardando ? 'Comprobando registro…' : 'Registrar sin activar'}</button>}
+        </>
+      )}
+      {paso === 3 && !meitrack && equipoVista && (
         <>
           <div className="gp-aviso" role="status"><IcoGps nombre="check" />Equipo registrado en el inventario. Ya puedes configurarlo y probarlo.</div>
           <div className="gp-grid l400">
