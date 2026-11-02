@@ -1,0 +1,71 @@
+From 46c4ae4809407a698fa0a595fda2c2f38aa48491 Mon Sep 17 00:00:00 2001
+From: marcodpa <marcodpa@users.noreply.github.com>
+Date: Mon, 2 Nov 2026 14:05:20 -0400
+Subject: [PATCH] =?UTF-8?q?App:=20=C2=ABInstalar=20en=20una=20unidad=C2=BB?=
+ =?UTF-8?q?=20ofrece=20=C2=ABCrear=20unidad=20aqu=C3=AD=C2=BB=20cuando=20l?=
+ =?UTF-8?q?a=20empresa=20no=20tiene=20unidades=20libres;=20abre=20el=20alt?=
+ =?UTF-8?q?a=20de=20unidad=20fijada=20a=20esa=20empresa,=20sin=20que=20el?=
+ =?UTF-8?q?=20administrador=20entre=20a=20ella=20(T-215)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/components/gps-instalar-form.tsx | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/src/components/gps-instalar-form.tsx b/src/components/gps-instalar-form.tsx
+index 576a93a..c4cd5d8 100644
+--- a/src/components/gps-instalar-form.tsx
++++ b/src/components/gps-instalar-form.tsx
+@@ -1,3 +1,4 @@
++import { useRouter } from 'expo-router';
+ import { useMemo, useState, type ReactNode } from 'react';
+ import { StyleSheet, View } from 'react-native';
+ 
+@@ -53,6 +54,10 @@ function instante(fecha: string): string {
+  * `onInstalar` nulo = la app todavía no puede instalar ESTE equipo (el
+  * servidor no publica la ruta para la app): el formulario se ve igual y el
+  * botón dice por qué no.
++ *
++ * Sin unidades libres en la empresa, «Crear unidad aquí» abre el alta de unidad ya fijada a ESA
++ * empresa (T-215): el administrador no entra a la empresa. Un equipo del inventario todavía no se
++ * puede instalar desde la app (mobile no publica la ruta); el alta sí instala un equipo nuevo.
+  */
+ export function InstalarEnUnidadForm({
+   equipo,
+@@ -68,6 +73,7 @@ export function InstalarEnUnidadForm({
+   error?: string | null;
+ }) {
+   const { spacing, colors, radii, borderWidths } = useTheme();
++  const router = useRouter();
+ 
+   const [empresaId, setEmpresaId] = useState<string | null>(empresaInicial ?? null);
+   const companyId = empresaId ?? enteActivoFom();
+@@ -177,9 +183,19 @@ export function InstalarEnUnidadForm({
+           No pudimos cargar las unidades de esta empresa.
+         </ThemedText>
+       ) : visibles.length === 0 ? (
+-        <ThemedText variant="caption" color="textSecondary">
+-          {unidades.length === 0 ? 'Esta empresa no tiene unidades.' : 'Ninguna unidad sin GPS coincide.'}
+-        </ThemedText>
++        <View style={{ gap: spacing.sm }}>
++          <ThemedText variant="caption" color="textSecondary">
++            {unidades.length === 0 ? 'Esta empresa no tiene unidades.' : 'Ninguna unidad sin GPS coincide.'}
++          </ThemedText>
++          {companyId && libres.length === 0 ? (
++            // T-215: el administrador crea la unidad en ESTA empresa sin entrar a ella.
++            <Button
++              label="Crear unidad aquí"
++              variant="secondary"
++              onPress={() => router.navigate({ pathname: '/crear-vehiculo', params: { companyId } })}
++            />
++          ) : null}
++        </View>
+       ) : (
+         <View style={{ gap: spacing.sm }} accessibilityRole="radiogroup">
+           {visibles.map((u) => {
+-- 
+2.55.0.windows.3
+
