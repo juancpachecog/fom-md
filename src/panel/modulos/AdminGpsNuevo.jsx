@@ -49,6 +49,7 @@ export default function AdminGpsNuevo() {
   const [meitrackReceived, setMeitrackReceived] = useState(false)
   const [imeiSms, setImeiSms] = useState('')
   const [seleccionado, setSeleccionado] = useState(null)
+  const [guideLocked, setGuideLocked] = useState(false)
   const inFlight = useRef(false)
   const detectados = useDatos(() => repo.admin.gps.sinEmparejar(), [], 30_000)
 
@@ -161,6 +162,31 @@ export default function AdminGpsNuevo() {
     linea: datos.telefono.trim(),
     vehiculoId: null,
   }
+
+  if (meitrack) return <div className="gp">
+    <Cabeza ruta={[["Administración FOM"], ["Inventario GPS", RAIZ_GPS], ["Nuevo GPS"]]}
+      titulo="Nuevo GPS · Meitrack" bajada="Configura tu equipo paso a paso. No se registra ni se activa al avanzar." />
+    <section className="gp-card">
+      <label htmlFor="guided-brand">Modelo del equipo</label>
+      <select id="guided-brand" value={datos.marca} disabled={guideLocked || !!equipo} onChange={e => { poner('marca', e.target.value); poner('modelo', Object.keys(CATALOGO_GPS[e.target.value] ?? {})[0] ?? '') }}>
+        {Object.keys(CATALOGO_GPS).map(brand => <option key={brand}>{brand}</option>)}
+      </select>
+      <span className="gp-hint">Meitrack T399L · la guía identifica la versión por SMS.</span>
+    </section>
+    <MeitrackInstallationSetup password={clave} imei={imeiPreparacion} firmware={datos.firmware.trim()} apn={datos.apn.trim()}
+      knownImei={!validarImei(datos.imei).error ? validarImei(datos.imei).valor : ''} onPasswordChange={setClave} onReady={() => {}} onCapture={setMeitrackReceived}
+      onIdentityChange={value => { setImeiSms(value.imei); setDatos(d => ({ ...d, imei: validarImei(d.imei).error ? '' : d.imei, firmware: value.firmware, transporte: 'tcp' })); setSeleccionado(null); setMeitrackReceived(false) }}
+      lineData={datos} onLineChange={(key, value) => {
+        poner(key, value)
+        if (key === 'operador' && !datos.apn.trim()) {
+          const apn = OPERADORES.find(([name]) => name.toLowerCase() === value.trim().toLowerCase())?.[1]
+          if (apn) poner('apn', apn)
+        }
+      }} onLockChange={setGuideLocked}
+      onSelect={() => { if (identidad && meitrackReceived) setSeleccionado(identidad) }} selected={!!identidad && seleccionado === identidad}
+      canRegister={puedeRegistrar} onRegister={registrarMeitrack} registered={!!equipo} registering={guardando} registrationError={errorAlta} />
+    {equipo && <button type="button" className="gp-btn" onClick={salir}>Ir al equipo registrado</button>}
+  </div>
 
   return (
     <div className="gp">
@@ -329,18 +355,8 @@ export default function AdminGpsNuevo() {
             <div className="gp-field"><input id="n-imei-sms" inputMode="numeric" autoComplete="off" value={imeiSms} readOnly={!!equipo} onChange={e => { setImeiSms(e.target.value); setSeleccionado(null) }} /></div>
           </Campo>
           {imeiSms && !identidad && <p role="alert">El IMEI consultado no es válido o no coincide con el indicado al principio. No selecciones otro dispositivo para continuar.</p>}
-          {meitrack && <Campo id="n-fw-observed" etiqueta="Firmware observado por SMS" ayuda="Consulta E91 en la preparación de abajo. La conexión sólo se habilita para T399L-V254.">
-            <div className="gp-field"><input id="n-fw-observed" value={datos.firmware} readOnly={!!equipo} onChange={e => poner('firmware', e.target.value)} /></div>
-          </Campo>}
+
         </section>
-      )}
-      {paso === 3 && meitrack && (
-        <>
-          <MeitrackInstallationSetup key={JSON.stringify([imeiPreparacion, datos.firmware, datos.apn])}
-            password={clave} imei={imeiPreparacion} firmware={datos.firmware.trim()} apn={datos.apn.trim()}
-            onReady={() => {}} onCapture={setMeitrackReceived} onPasswordChange={setClave} />
-          {equipo && <p className="gp-aviso" role="status">Registro comprobado en inventario. La instalación, el reloj y las funciones siguen pendientes; el GPS no está activado.</p>}
-        </>
       )}
       {paso === 3 && !meitrack && (
         <>
@@ -358,23 +374,17 @@ export default function AdminGpsNuevo() {
         <section className="gp-card gp-col" aria-labelledby="det-final">
           <h2 className="gp-st" id="det-final">Detectados sin registrar · confirmar al final</h2>
           <p>Compara el IMEI de la respuesta SMS. Selecciona la identidad coincidente con recepción comprobada y el mismo transporte.</p>
-          {meitrack ? <>
-            <p>Esta lista usa exclusivamente la captura Meitrack de esta ventana; una señal Coban no sirve para este equipo.</p>
-            {meitrackReceived && identidad ? <div className="gp-det">
-              <span className="gp-mono">{identidad}</span>
-              <p>Trama Meitrack conservada e identidad comprobada. Destino, APN y TCP coinciden con DB4.</p>
-              <button type="button" className="gp-btn2" onClick={() => setSeleccionado(identidad)}>{seleccionado === identidad ? 'Coincidencia seleccionada' : 'Seleccionar este dispositivo'}</button>
-            </div> : <p role="status">Pendiente de configuración, respuesta DB4 y recepción Meitrack comprobada.</p>}
-          </> : <>
+          <>
+
             {detectados.estado === 'error' && <p role="alert">{detectados.error?.message}</p>}
             {(detectados.datos ?? []).length === 0 && <p>No hay dispositivos sin registrar detectados todavía. Envía los comandos y actualiza la lista.</p>}
             {(detectados.datos ?? []).map(d => <Detectado key={d.imei} d={d} ahora={ahora} elegido={seleccionado === d.imei} detallado>
               <button type="button" className="gp-btn2 chico" disabled={!coincideDetectado(d, { inicial: datos.imei, sms: imeiSms, transporte: datos.transporte, ahora })} onClick={() => usarImei(d)}>{seleccionado === d.imei ? 'Coincidencia seleccionada' : 'Seleccionar este dispositivo'}</button>
             </Detectado>)}
             <button type="button" className="gp-btn2" onClick={() => detectados.recargar()}>Actualizar lista</button>
-          </>}
+          </>
           {errorAlta && <p role="alert">{errorAlta}</p>}
-          <button type="button" className="gp-btn" disabled={guardando || !puedeRegistrar} onClick={meitrack ? registrarMeitrack : registrarCoban}>{guardando ? 'Comprobando registro…' : 'Registrar sin activar'}</button>
+          <button type="button" className="gp-btn" disabled={guardando || !puedeRegistrar} onClick={registrarCoban}>{guardando ? 'Comprobando registro…' : 'Registrar sin activar'}</button>
         </section>
       )}
     </div>
