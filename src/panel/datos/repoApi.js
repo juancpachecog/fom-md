@@ -23,7 +23,7 @@ import { coleccionDePersona, indiceDePersona } from './perfilUsuario'
 import { cuerpoCredencial, credencialesVigentes } from './credencialesPersona'
 import { cambiosGps } from './metadatosGps'
 import { MEITRACK, cuerpoAltaMeitrack } from './gpsMeitrack'
-import { buscarEquipoGps, empresaPropia, mensajeInstalarGps } from './instalarGps'
+import { buscarEquipoGps, empresaDeInstalacion, empresaPropia, equiposParaNuevaUnidad, mensajeInstalarGps } from './instalarGps'
 import { empresaDeReinicio, mensajeReiniciarClave } from './reiniciarClave'
 import { LIMITE_EVENTOS, comoEventoManejo, diasServidor } from './eventosManejo'
 import { cloudinaryConfigurado, subirImagen } from './cloudinary'
@@ -1137,6 +1137,16 @@ export const repoApi = {
         .map(comoEquipoGps)
         .filter((g) => !t || [g.imei, g.modelo, g.linea, g.vehiculoNombre].some((v) => String(v ?? '').toLowerCase().includes(t)))
     },
+    /**
+     * Equipos que «Nueva unidad» puede instalar (T-214): libres y de la empresa donde se crea la
+     * unidad (la que el administrador «entró», o la propia). Los que nunca reportaron salen al
+     * final marcados «sin señal todavía». Si la lectura falla, el error se propaga: no es lo
+     * mismo que «no hay equipos libres».
+     */
+    async disponibles() {
+      const propia = empresaPropia(sesionActual())
+      return equiposParaNuevaUnidad(await repoApi.gpsEscritura.listar({}), { destino: empresaGestionActualId() ?? propia, propia })
+    },
     /** Un equipo, con su instalación vigente (`GET gps-devices/:id`). */
     async obtener(equipoId) {
       // Si el detalle da 404 pero el equipo está en el inventario, se toma de la lista (T-208).
@@ -1427,7 +1437,20 @@ export const repoApi = {
       const id = r?.vehicleId ?? r?.vehicle?.id ?? null
       if (!id) throw new Error('El servidor no devolvió el identificador del vehículo creado. Revisa la flota antes de reintentar.')
       if (id && areaId) await api.actualizarVehiculo(id, { areaId })
-      if (gpsId) await api.instalarEquipoGps(gpsId, { vehicleId: id })
+      if (gpsId) {
+        // La unidad nació en la empresa en gestión; el equipo se instala por la ruta de esa misma
+        // empresa (la propia viaja como null), igual que en «Instalar en una unidad» (T-208/T-214).
+        const propia = empresaPropia(sesionActual())
+        const destino = empresaGestionActualId() ?? propia
+        // Sin saber cuál es la propia, la empresa en gestión manda (nunca caer en la ruta de otra).
+        const ruta = propia ? empresaDeInstalacion(destino, propia) : destino
+        try {
+          await api.instalarEquipoGps(gpsId, { vehicleId: id }, ruta)
+        } catch (e) {
+          // La unidad ya existe: se dice, para que no se cree otra al reintentar.
+          throw new Error(`La unidad se creó, pero no se pudo instalar el GPS. ${mensajeInstalarGps(e, { otraEmpresa: Boolean(ruta) })} Instálalo después desde Administración FOM → GPS.`)
+        }
+      }
       return { id }
     },
 

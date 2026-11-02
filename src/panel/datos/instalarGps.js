@@ -1,3 +1,7 @@
+import { FILTROS_INVENTARIO } from './gps.js'
+
+const LIBRES = FILTROS_INVENTARIO.find((f) => f.clave === 'libres')
+
 // Reglas de «Instalar en una unidad» (T-208), sin pantalla ni red para poder probarlas.
 //
 // Lo que dice el servidor (fom-core, console-gps-inventory.controller y
@@ -48,4 +52,30 @@ export function mensajeInstalarGps(error, { otraEmpresa = false, nombrePropia = 
       : 'El servidor no encontró el equipo o la unidad. Recarga la pantalla e inténtalo de nuevo.'
   }
   return error?.message || 'No se pudo instalar el equipo. Inténtalo de nuevo.'
+}
+
+/**
+ * Los equipos que «Nueva unidad» puede ofrecer (T-214).
+ *
+ * Solo los libres (los de «Sin instalar» del inventario: sin unidad y ni inactivos ni archivados)
+ * y solo los de la empresa donde se crea la unidad: el servidor instala equipo y unidad dentro
+ * de la misma empresa. Un equipo sin `empresaId` es del inventario propio (la lista sin empresa
+ * por equipo es la de la empresa de la cuenta).
+ *
+ * «Verificado» con datos reales = el receptor ya lo oyó alguna vez (`verificado`). El servidor
+ * deja instalar cualquier equipo del inventario, así que el que nunca reportó NO se esconde:
+ * sale al final con `sinSenal: true` y «(sin señal todavía)» en el nombre. Primero van los que
+ * hablaron más recientemente.
+ */
+export function equiposParaNuevaUnidad(equipos, { destino = null, propia = null } = {}) {
+  const meta = destino || propia || null
+  const ms = (g) => { const t = Date.parse(g.ultimaConexion ?? ''); return Number.isFinite(t) ? t : 0 }
+  return (equipos ?? [])
+    .filter((g) => LIBRES.pasa(g))
+    .filter((g) => !meta || (g.empresaId ?? propia ?? meta) === meta)
+    .map((g) => {
+      const sinSenal = !g.verificado
+      return { ...g, sinSenal, modelo: sinSenal ? `${g.modelo || 'GPS'} (sin señal todavía)` : g.modelo }
+    })
+    .sort((a, b) => Number(a.sinSenal) - Number(b.sinSenal) || ms(b) - ms(a))
 }
