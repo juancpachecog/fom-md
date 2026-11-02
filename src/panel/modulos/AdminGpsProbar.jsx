@@ -9,7 +9,9 @@ import {
   PUERTO_RECEPTOR, armarComandos, comprobacionesPrueba, coordenadasTexto, haceCuanto, huellaCorta,
   lecturaTrama, nombreEquipo, nombreProtocolo,
 } from '../datos/gps'
+import { esEquipoMeitrack } from '../datos/gpsMeitrack'
 import * as f from '../datos/formato'
+import { ComandosMeitrackFicha } from './AdminGpsMeitrack'
 import './admin-gps.css'
 
 // ============================================================
@@ -27,8 +29,12 @@ import './admin-gps.css'
 // pero tampoco se escribe en el código). Sin ella el comando muestra «[IP del receptor]».
 const IP_RECEPTOR = import.meta.env?.VITE_GPS_RECEPTOR || ''
 
-/** Tarjeta de los cinco comandos SMS. */
-export function ComandosSms({ equipo, clave, alCambiarClave }) {
+/** Tarjeta de los comandos SMS: los cinco del Coban o, si el equipo es un Meitrack, los suyos (T-213). */
+export function ComandosSms(props) {
+  return esEquipoMeitrack(props.equipo) ? <ComandosMeitrackFicha equipo={props.equipo} /> : <ComandosSmsCoban {...props} />
+}
+
+function ComandosSmsCoban({ equipo, clave, alCambiarClave }) {
   const [copiado, setCopiado] = useState(null)
   const [fallo, setFallo] = useState('')
   const comandos = armarComandos({ clave, apn: equipo.apn ?? '', ip: IP_RECEPTOR, puerto: PUERTO_RECEPTOR, transporte: equipo.transport ?? 'tcp' })

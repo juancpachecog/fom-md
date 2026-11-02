@@ -7,9 +7,10 @@ import { Cargando, ErrorCarga, Modal, Vacio } from '../comp/ui'
 import { Cabeza, IcoGps, Pastilla, RAIZ_GPS, useAhora } from '../comp/GpsPiezas'
 import { CAMPOS_GPS, cambiosGps } from '../datos/metadatosGps'
 import {
-  ESTADOS_SIM, PUERTO_RECEPTOR, PUNTOS_CLAVE, calidadRecepcion, coordenadasTexto, estadoEquipo,
+  ESTADOS_SIM, PUNTOS_CLAVE, calidadRecepcion, coordenadasTexto, estadoEquipo,
   haceCuanto, intervaloTexto, lecturaTrama, nombreEquipo, nombreProtocolo, senalDe, unirTramasConPosiciones,
 } from '../datos/gps'
+import { esEquipoMeitrack, puertoDelEquipo } from '../datos/gpsMeitrack'
 import { masNuevoPrimero } from '../datos/orden'
 import * as f from '../datos/formato'
 import './admin-gps.css'
@@ -116,6 +117,8 @@ function cuandoFue(iso, ahora) {
 
 function Diagnostico({ g, tele, posiciones, ultimaPos, capacidades, ahora }) {
   const senal = senalDe(g, ahora)
+  const meitrack = esEquipoMeitrack(g)
+  const puerto = puertoDelEquipo(g)
   const est = estadoEquipo(g.estado)
   const mensajes = tele.datos?.mensajes ?? []
   const calidad = calidadRecepcion(mensajes)
@@ -150,7 +153,9 @@ function Diagnostico({ g, tele, posiciones, ultimaPos, capacidades, ahora }) {
                       ? <li>¿La unidad está apagada o sin batería? El equipo se alimenta de ella.</li>
                       : <li>¿El equipo está conectado a corriente? Sin instalar, necesita su fuente para transmitir.</li>}
                     <li>{linea ? `Revisa saldo y datos de la línea ${linea}.` : 'Registra la línea SIM del equipo en «Datos del equipo» y revisa que tenga saldo y datos.'}</li>
-                    <li>Envía <span className="gp-mono cmdx">check{PUNTOS_CLAVE}</span> por SMS: debe decir GPRS ON y PORT {PUERTO_RECEPTOR}.</li>
+                    {meitrack
+                      ? <li>Envía <span className="gp-mono cmdx">{PUNTOS_CLAVE},DB4</span> por SMS: debe decir TCP, la IP del receptor y PORT1:{puerto}. Los mensajes completos están en «Probar señal».</li>
+                      : <li>Envía <span className="gp-mono cmdx">check{PUNTOS_CLAVE}</span> por SMS: debe decir GPRS ON y PORT {puerto}.</li>}
                   </ol>
                 </>
               )}
@@ -193,6 +198,7 @@ function Diagnostico({ g, tele, posiciones, ultimaPos, capacidades, ahora }) {
           <h2 className="gp-st" id="gp-datos">Datos del equipo</h2>
           <dl className="gp-kv">
             <div><dt>Protocolo</dt><dd>{nombreProtocolo(g.protocolo)}{g.transport ? ` · ${String(g.transport).toUpperCase()}` : ''}</dd></div>
+            {meitrack && <div><dt>Receptor FOM</dt><dd>TCP · puerto {puerto}</dd></div>}
             <div><dt>Serie · firmware</dt><dd>{[g.serie, g.firmwareVersion].filter(Boolean).join(' · ') || 'Sin registrar'}</dd></div>
             <div><dt>Línea SIM</dt><dd>{g.linea ? `${g.linea}${g.carrier ? ` · ${g.carrier}` : ''}` : 'Sin línea'}</dd></div>
             <div><dt>ICCID</dt><dd className="gp-mono">{g.iccid || 'Sin registrar'}</dd></div>

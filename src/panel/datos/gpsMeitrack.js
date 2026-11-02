@@ -11,7 +11,7 @@
 // 5002 por TCP, y antes de apuntar el equipo se guarda su configuración
 // para poder devolverla.
 // ============================================================
-import { PUNTOS_CLAVE } from './gps.js'
+import { PUERTO_RECEPTOR, PUNTOS_CLAVE } from './gps.js'
 
 export const MEITRACK = {
   marca: 'Meitrack',
@@ -25,6 +25,22 @@ export const MEITRACK = {
 export const AVISO_RUTA_AUSENTE = 'El registro de Meitrack todavía no está en el servidor publicado.'
 
 export const esMeitrack = (marca, modelo) => marca === MEITRACK.marca && modelo === MEITRACK.modelo
+
+/**
+ * ¿Este equipo ya registrado es un Meitrack T399L? Basta una pista: marca, modelo, protocolo o puerto 5002
+ * (T-213). Lo usan la ficha y «Probar» para no darle al Meitrack los comandos ni el puerto del Coban.
+ */
+export function esEquipoMeitrack(g) {
+  if (!g) return false
+  const bajo = (v) => String(v ?? '').trim().toLowerCase()
+  return bajo(g.fabricante ?? g.manufacturer) === 'meitrack'
+    || bajo(g.modelo ?? g.model).includes('t399l')
+    || bajo(g.protocolo ?? g.protocolFamily) === MEITRACK.protocolo
+    || [g.puerto, g.port].some((p) => Number(p) === MEITRACK.puerto)
+}
+
+/** Puerto del receptor FOM al que debe apuntar este equipo: 5002 el Meitrack, 5001 el resto. */
+export const puertoDelEquipo = (g) => (esEquipoMeitrack(g) ? MEITRACK.puerto : PUERTO_RECEPTOR)
 
 /** Contraseña SMS del equipo: cuatro dígitos. No hay clave de fábrica que suponer. */
 export function validarClaveMeitrack(texto) {

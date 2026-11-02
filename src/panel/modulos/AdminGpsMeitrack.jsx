@@ -4,7 +4,7 @@ import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { Cabeza, IcoGps, Pastilla, RAIZ_GPS, useAhora } from '../comp/GpsPiezas'
 import {
-  CATALOGO_GPS, haceCuanto, huellaCorta, validarImei, validarLinea,
+  CATALOGO_GPS, haceCuanto, huellaCorta, nombreEquipo, validarImei, validarLinea,
 } from '../datos/gps'
 import {
   AVISO_RUTA_AUSENTE, MEITRACK, armarComandosMeitrack, cuerpoAltaMeitrack, db4Configurado, lecturaDb4,
@@ -236,12 +236,127 @@ function PasoEquipo({ marca, modelo, datos, errores, poner, alElegirModelo, alSe
   )
 }
 
+// --- Piezas compartidas con la ficha del equipo (T-213) ----------------------
+
+/** Copiar un mensaje al portapapeles y avisar en llano. FOM nunca envía el SMS. */
+function useCopiarSms() {
+  const [copiado, setCopiado] = useState(null)
+  const [aviso, setAviso] = useState('')
+  const copiar = async (c) => {
+    setAviso('')
+    try {
+      await navigator.clipboard.writeText(c.texto)
+      setCopiado(c.n)
+      setAviso('Mensaje copiado. Mándalo a la línea del equipo desde tu teléfono; FOM no lo envía.')
+      setTimeout(() => setCopiado((x) => (x === c.n ? null : x)), 2000)
+    } catch {
+      setAviso('No se pudo copiar. Escribe el mensaje a mano en el SMS, con tu contraseña en lugar de los puntos. FOM no lo envió.')
+    }
+  }
+  return { copiado, aviso, copiar }
+}
+
+/** Los seis mensajes con los campos donde se pega lo que responde el equipo. Los usan el alta y la ficha. */
+function ListaComandosMeitrack({ comandos, sms, ponerSms, anunciadosLista, base, llave, copiado, copiar }) {
+  const campoPegado = (id, etiqueta, valor, clave, ayuda, mal) => (
+    <div className="gp-f todo" style={{ paddingLeft: 46 }}>
+      <label htmlFor={id}>{etiqueta}</label>
+      <div className={`gp-field${mal ? ' mal' : ''}`}>
+        <input id={id} className="gp-mono" autoComplete="off" spellCheck={false} maxLength={clave === 'db4' || clave === 'db4Despues' ? 1024 : 2048} value={valor} onChange={(e) => ponerSms(clave, e.target.value)} aria-invalid={Boolean(mal)} />
+      </div>
+      {mal ? <span className="gp-error" role="alert">{mal}</span> : <span className="gp-hint">{ayuda}</span>}
+    </div>
+  )
+  const guardada = sms.guardada === llave
+  return (
+    <>
+      {comandos.map((c) => (
+        <div key={c.n}>
+          <div className="gp-cmd">
+            <span className="n">{c.n}</span>
+            <div className="tx">
+              <b>{c.titulo}</b>
+              <code style={c.falta ? { color: 'var(--e-texto-3, #8c97a7)', whiteSpace: 'normal' } : undefined}>{c.falta ? `Pendiente: ${c.falta}` : c.visible}</code>
+              <span className="gp-hint">{c.respuesta}</span>
+            </div>
+            <button type="button" className="gp-btn2" disabled={Boolean(c.falta)} aria-label={`Copiar mensaje ${Number(c.n)}`} onClick={() => copiar(c)}>
+              <IcoGps nombre={copiado === c.n ? 'check' : 'copiar'} />{copiado === c.n ? 'Copiado' : 'Copiar'}
+            </button>
+          </div>
+          {c.n === '02' && campoPegado('mt-e04', 'Códigos que respondió E04', sms.e04, 'e04', 'Ejemplo: A00,A21,DB4,DA6,E91. Solo los códigos, sin IMEI.', anunciadosLista === null ? 'Escribe solo códigos de 3 caracteres separados por comas; no pegues la respuesta completa.' : '')}
+          {c.n === '03' && campoPegado('mt-db4', 'Respuesta de DB4 (antes de configurar)', sms.db4, 'db4', 'Debe decir CLOSE. Se queda en esta pantalla y se borra al cambiar de equipo.', sms.db4.trim() && !base ? 'Esa respuesta no es la de este equipo en CLOSE. Revisa que sea el IMEI correcto y que la hayas pegado completa.' : '')}
+          {c.n === '04' && (
+            <div style={{ paddingLeft: 46, display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 8 }}>
+              <label className="gp-chk"><input type="checkbox" checked={sms.sinAuth} onChange={(e) => ponerSms('sinAuth', e.target.checked)} />Confirmo que el APN guardado en el equipo no usa usuario ni contraseña.</label>
+              <label className="gp-chk"><input type="checkbox" disabled={Boolean(c.falta)} checked={guardada} onChange={(e) => ponerSms('guardada', e.target.checked ? llave : null)} />Conservé el mensaje de restauración en mi teléfono.</label>
+            </div>
+          )}
+          {c.n === '06' && campoPegado('mt-db4b', 'Respuesta de DB4 (después de configurar)', sms.db4Despues, 'db4Despues', 'Para comprobar el destino, el APN y el tipo TCP.', '')}
+        </div>
+      ))}
+    </>
+  )
+}
+
+/**
+ * Los mismos mensajes del alta para un Meitrack que ya está registrado (ficha y «Probar»).
+ * No hay ventana de recepción que esperar: el equipo ya existe. La contraseña SMS solo vive aquí.
+ */
+export function ComandosMeitrackFicha({ equipo }) {
+  const [sms, setSms] = useState(SMS_INICIAL)
+  const { copiado, aviso, copiar } = useCopiarSms()
+  const ponerSms = (campo, valor) => setSms((s) => ({ ...s, [campo]: valor }))
+  const imei = validarImei(equipo.imei).valor
+  const apn = equipo.apn ?? ''
+  const anunciadosLista = listaComandos(sms.e04)
+  const base = lecturaDb4(sms.db4, imei)
+  const claveError = sms.clave ? validarClaveMeitrack(sms.clave).error : ''
+  const llave = JSON.stringify([base?.celdas, sms.clave, apn, sms.sinAuth])
+  const comandos = armarComandosMeitrack({
+    clave: sms.clave, anunciados: anunciadosLista ?? [], base, sinUsuarioNiClave: sms.sinAuth,
+    restauracionGuardada: sms.guardada === llave, apn, ip: IP_RECEPTOR, ventana: true,
+  })
+  const configurado = db4Configurado(sms.db4Despues, base, imei, apn, { ip: IP_RECEPTOR, puerto: MEITRACK.puerto })
+  const linea = equipo.linea || equipo.simPhone
+  return (
+    <section className="gp-card" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '22px 24px 10px' }} aria-labelledby="mt-cmd-t">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 6, flexWrap: 'wrap' }}>
+        <div className="gp-titulo">
+          <p className="gp-k">Comandos SMS</p>
+          <h2 className="gp-st" id="mt-cmd-t">Configura el equipo por SMS</h2>
+          <span className="gp-lbl">
+            {linea ? `Manda cada mensaje a ${linea}${equipo.carrier ? ` (${equipo.carrier})` : ''}, en orden. Copiar no envía nada.` : 'Manda cada mensaje a la línea del equipo, en orden. Copiar no envía nada.'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <Pastilla tono="info">{nombreEquipo(equipo)}</Pastilla>
+          <Pastilla tono="info">TCP · puerto {MEITRACK.puerto}</Pastilla>
+        </div>
+      </div>
+      <div className="gp-f" style={{ marginBottom: 8 }}>
+        <label htmlFor="mt-clave">Contraseña SMS actual del equipo</label>
+        <div className={`gp-field${claveError ? ' mal' : ''}`}><input id="mt-clave" type="password" inputMode="numeric" maxLength={4} autoComplete="new-password" placeholder="4 dígitos" value={sms.clave} onChange={(e) => ponerSms('clave', e.target.value)} aria-invalid={Boolean(claveError)} /></div>
+        {claveError ? <span className="gp-error" role="alert">{claveError}</span> : <span className="gp-hint">Solo arma los mensajes. No se guarda ni se envía al servidor.</span>}
+      </div>
+      <ListaComandosMeitrack comandos={comandos} sms={sms} ponerSms={ponerSms} anunciadosLista={anunciadosLista} base={base} llave={llave} copiado={copiado} copiar={copiar} />
+      {sms.db4Despues.trim() && (
+        <div className={`gp-chk${configurado ? '' : ' no'}`} role="status" style={{ paddingLeft: 46 }}>
+          <span className="c">{configurado && <IcoGps nombre="check" />}</span>
+          {configurado ? 'DB4 confirma el destino, el APN y TCP; lo demás sigue igual.' : 'DB4 todavía no muestra el destino, el APN y TCP previstos.'}
+        </div>
+      )}
+      {aviso && <p className="gp-hint" role="status">{aviso}</p>}
+      {!receptorValido(IP_RECEPTOR) && <span className="gp-hint" style={{ paddingTop: 6 }}>Falta la IP del receptor en la configuración del sitio: sin ella el mensaje 05 queda bloqueado.</span>}
+      <span className="gp-hint" style={{ padding: '10px 0 6px', borderTop: '1px solid var(--e-borde, #262e39)' }}>Los puntos son la contraseña SMS: se pone al copiar y no se guarda. Los mensajes 04 y 05 cambian el destino del equipo: guarda antes la restauración.</span>
+    </section>
+  )
+}
+
 // --- Paso 2 ------------------------------------------------------------
 
 function PasoComandos({ datos, imei, sms, ponerSms, ausente, alAusente, alVolver, alSeguir }) {
   const ahora = useAhora(1000)
-  const [copiado, setCopiado] = useState(null)
-  const [aviso, setAviso] = useState('')
+  const { copiado, aviso, copiar } = useCopiarSms()
 
   // La ventana de recepción que el servidor tiene abierta para este equipo: se mira cada 5 s.
   const ventana = useDatos(
@@ -270,28 +385,6 @@ function PasoComandos({ datos, imei, sms, ponerSms, ausente, alAusente, alVolver
   })
   const configurado = db4Configurado(sms.db4Despues, base, imei, datos.apn, { ip, puerto: MEITRACK.puerto })
 
-  const copiar = async (c) => {
-    setAviso('')
-    try {
-      await navigator.clipboard.writeText(c.texto)
-      setCopiado(c.n)
-      setAviso('Mensaje copiado. Mándalo a la línea del equipo desde tu teléfono; FOM no lo envía.')
-      setTimeout(() => setCopiado((x) => (x === c.n ? null : x)), 2000)
-    } catch {
-      setAviso('No se pudo copiar. Escribe el mensaje a mano en el SMS, con tu contraseña en lugar de los puntos. FOM no lo envió.')
-    }
-  }
-
-  const campoPegado = (id, etiqueta, valor, clave, ayuda, mal) => (
-    <div className="gp-f todo" style={{ paddingLeft: 46 }}>
-      <label htmlFor={id}>{etiqueta}</label>
-      <div className={`gp-field${mal ? ' mal' : ''}`}>
-        <input id={id} className="gp-mono" autoComplete="off" spellCheck={false} maxLength={clave === 'db4' || clave === 'db4Despues' ? 1024 : 2048} value={valor} onChange={(e) => ponerSms(clave, e.target.value)} aria-invalid={Boolean(mal)} />
-      </div>
-      {mal ? <span className="gp-error" role="alert">{mal}</span> : <span className="gp-hint">{ayuda}</span>}
-    </div>
-  )
-
   return (
     <div className="gp-grid l400">
       <section className="gp-card" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '22px 24px 10px' }} aria-labelledby="mt-cmd-t">
@@ -307,30 +400,7 @@ function PasoComandos({ datos, imei, sms, ponerSms, ausente, alAusente, alVolver
           {claveError ? <span className="gp-error" role="alert">{claveError}</span> : <span className="gp-hint">Solo arma los mensajes. No se guarda ni se envía al servidor.</span>}
         </div>
 
-        {comandos.map((c) => (
-          <div key={c.n}>
-            <div className="gp-cmd">
-              <span className="n">{c.n}</span>
-              <div className="tx">
-                <b>{c.titulo}</b>
-                <code style={c.falta ? { color: 'var(--e-texto-3, #8c97a7)', whiteSpace: 'normal' } : undefined}>{c.falta ? `Pendiente: ${c.falta}` : c.visible}</code>
-                <span className="gp-hint">{c.respuesta}</span>
-              </div>
-              <button type="button" className="gp-btn2" disabled={Boolean(c.falta)} aria-label={`Copiar mensaje ${Number(c.n)}`} onClick={() => copiar(c)}>
-                <IcoGps nombre={copiado === c.n ? 'check' : 'copiar'} />{copiado === c.n ? 'Copiado' : 'Copiar'}
-              </button>
-            </div>
-            {c.n === '02' && campoPegado('mt-e04', 'Códigos que respondió E04', sms.e04, 'e04', 'Ejemplo: A00,A21,DB4,DA6,E91. Solo los códigos, sin IMEI.', anunciadosLista === null ? 'Escribe solo códigos de 3 caracteres separados por comas; no pegues la respuesta completa.' : '')}
-            {c.n === '03' && campoPegado('mt-db4', 'Respuesta de DB4 (antes de configurar)', sms.db4, 'db4', 'Debe decir CLOSE. Se queda en esta pantalla y se borra al cambiar de equipo.', sms.db4.trim() && !base ? 'Esa respuesta no es la de este equipo en CLOSE. Revisa que sea el IMEI correcto y que la hayas pegado completa.' : '')}
-            {c.n === '04' && (
-              <div style={{ paddingLeft: 46, display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 8 }}>
-                <label className="gp-chk"><input type="checkbox" checked={sms.sinAuth} onChange={(e) => ponerSms('sinAuth', e.target.checked)} />Confirmo que el APN guardado en el equipo no usa usuario ni contraseña.</label>
-                <label className="gp-chk"><input type="checkbox" disabled={Boolean(c.falta)} checked={guardada} onChange={(e) => ponerSms('guardada', e.target.checked ? llave : null)} />Conservé el mensaje de restauración en mi teléfono.</label>
-              </div>
-            )}
-            {c.n === '06' && campoPegado('mt-db4b', 'Respuesta de DB4 (después de configurar)', sms.db4Despues, 'db4Despues', 'Para comprobar el destino, el APN y el tipo TCP.', '')}
-          </div>
-        ))}
+        <ListaComandosMeitrack comandos={comandos} sms={sms} ponerSms={ponerSms} anunciadosLista={anunciadosLista} base={base} llave={llave} copiado={copiado} copiar={copiar} />
         {sms.db4Despues.trim() && (
           <div className={`gp-chk${configurado ? '' : ' no'}`} role="status" style={{ paddingLeft: 46 }}>
             <span className="c">{configurado && <IcoGps nombre="check" />}</span>
