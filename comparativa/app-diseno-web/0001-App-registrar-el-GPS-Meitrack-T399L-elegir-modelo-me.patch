@@ -1,0 +1,1395 @@
+From 32c64fe7926f8769954be754421e1611f6ed16aa Mon Sep 17 00:00:00 2001
+From: marcodpa <marcodpa@users.noreply.github.com>
+Date: Mon, 2 Nov 2026 08:28:21 -0400
+Subject: [PATCH] =?UTF-8?q?App:=20registrar=20el=20GPS=20Meitrack=20T399L?=
+ =?UTF-8?q?=20(elegir=20modelo,=20mensajes=20SMS=20de=20Juan=20con=20copia?=
+ =?UTF-8?q?r,=20puerto=205002,=20espera=20de=20se=C3=B1al=20y=20registro);?=
+ =?UTF-8?q?=20sin=20ruta=20m=C3=B3vil=20publicada=20muestra=20el=20aviso?=
+ =?UTF-8?q?=20(T-212)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/app/gps-nuevo.tsx           | 148 ++++++---
+ src/components/gps-meitrack.tsx | 544 ++++++++++++++++++++++++++++++++
+ src/lib/gps-alta.ts             |  16 +-
+ src/lib/gps-meitrack.ts         | 331 +++++++++++++++++++
+ src/services/fomMeitrack.ts     | 161 ++++++++++
+ 5 files changed, 1153 insertions(+), 47 deletions(-)
+ create mode 100644 src/components/gps-meitrack.tsx
+ create mode 100644 src/lib/gps-meitrack.ts
+ create mode 100644 src/services/fomMeitrack.ts
+
+diff --git a/src/app/gps-nuevo.tsx b/src/app/gps-nuevo.tsx
+index 26456bd..7a8fb93 100644
+--- a/src/app/gps-nuevo.tsx
++++ b/src/app/gps-nuevo.tsx
+@@ -6,9 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
+ import { esMultiempresa, useAuth } from '@/auth';
+ import { Button } from '@/components/button';
+ import { Card } from '@/components/card';
++import { MeitrackConfigurar, MeitrackRegistrar, type EstadoMeitrack } from '@/components/gps-meitrack';
+ import { BotonRedondoGps, IconoGps, PasosGps, PastillaSenalGps, TituloGps } from '@/components/gps-piezas';
+ import { InstalarEnUnidadForm, type DatosInstalacion } from '@/components/gps-instalar-form';
+-import { OptionPickerModal, PickerField } from '@/components/option-picker';
+ import { Pastilla } from '@/components/pastilla';
+ import { ScreenHeader } from '@/components/screen-header';
+ import { ScrollVisible, type ScrollVisibleHandle } from '@/components/scroll-visible';
+@@ -24,17 +24,18 @@ import {
+   CLAVE_FABRICA,
+   comandosSms,
+   conSenal,
++  esMeitrack,
+   ESTADOS_SIM,
+   finImei,
+   haceSenal,
+   horaSegundos,
+-  MARCAS_GPS,
+-  modelosDe,
++  MODELOS_GPS,
+   OPERADORAS,
+   protocoloDe,
+   type EstadoSim,
+ } from '@/lib/gps-alta';
+ import { confirmar } from '@/lib/confirmar';
++import { esClaveMeitrack } from '@/lib/gps-meitrack';
+ import { validarIccid, validarImei } from '@/lib/validate';
+ import { IMEI_LARGO, LARGO_MAX } from '@/services';
+ import {
+@@ -48,6 +49,9 @@ import { useTheme } from '@/theme';
+ 
+ const PASOS = ['Equipo', 'Línea SIM', 'Configurar y probar'];
+ 
++/** Mientras el paso de configurar no diga nada, el Meitrack no está listo para registrarse. */
++const MEITRACK_SIN_LISTO: EstadoMeitrack = { listo: false, sinRuta: false };
++
+ /** Cada cuánto se vuelve a mirar si llegó la señal del equipo (como la consola). */
+ const CADA_MS = 10_000;
+ 
+@@ -74,8 +78,8 @@ export default function GpsNuevoScreen() {
+   const [paso, setPaso] = useState(0);
+ 
+   // Paso 1 · Equipo.
+-  const [marca, setMarca] = useState(MARCAS_GPS[0] ?? '');
+-  const [modelo, setModelo] = useState(modelosDe(MARCAS_GPS[0] ?? '')[0] ?? '');
++  const [marca, setMarca] = useState(MODELOS_GPS[0]?.marca ?? '');
++  const [modelo, setModelo] = useState(MODELOS_GPS[0]?.modelo ?? '');
+   const [transporte, setTransporte] = useState<'tcp' | 'udp'>('tcp');
+   const [imei, setImei] = useState('');
+   const [imeiDeSenal, setImeiDeSenal] = useState(false);
+@@ -83,7 +87,6 @@ export default function GpsNuevoScreen() {
+   const [firmware, setFirmware] = useState('');
+   // Solo arma los comandos: ni se guarda ni viaja al servidor.
+   const [clave, setClave] = useState(CLAVE_FABRICA);
+-  const [picker, setPicker] = useState<'marca' | 'modelo' | null>(null);
+ 
+   // Paso 2 · Línea SIM.
+   const [linea, setLinea] = useState('');
+@@ -99,6 +102,9 @@ export default function GpsNuevoScreen() {
+   const [avisoSms, setAvisoSms] = useState<string | null>(null);
+ 
+   const protocolo = protocoloDe(marca, modelo);
++  // El Meitrack T399L se registra por otro camino: sus propios mensajes, el puerto 5002 y el inventario.
++  const meitrack = esMeitrack(marca, modelo);
++  const [estadoMeitrack, setEstadoMeitrack] = useState<EstadoMeitrack>(MEITRACK_SIN_LISTO);
+   const imeiLimpio = imei.replace(/\D/gu, '');
+ 
+   // La bandeja de detectados: la del paso 1, y la que vigila la señal en el 3.
+@@ -166,6 +172,7 @@ export default function GpsNuevoScreen() {
+       gpsMarca: marca ? null : 'Elige la marca.',
+       gpsModelo: modelo ? null : 'Elige el modelo.',
+       gpsImei: validarImei(imei),
++      gpsClave: meitrack && !esClaveMeitrack(clave) ? 'Escribe la clave SMS de 4 dígitos del equipo.' : null,
+     };
+     setErrores(e);
+     const hay = Object.values(e).some(Boolean);
+@@ -190,10 +197,24 @@ export default function GpsNuevoScreen() {
+     setImei(d.imei);
+     setImeiDeSenal(true);
+     setVigilado(null);
+-    setTransporte(d.transporte);
++    if (!meitrack) setTransporte(d.transporte);
+     setErrores((e) => ({ ...e, gpsImei: null }));
+   }
+ 
++  /** Cambiar de modelo cambia la clave de fábrica, el transporte y el camino del alta. */
++  function elegirModelo(etiqueta: string) {
++    const m = MODELOS_GPS.find((x) => x.etiqueta === etiqueta);
++    if (!m) return;
++    setMarca(m.marca);
++    setModelo(m.modelo);
++    // El Meitrack no trae clave de fábrica conocida y solo habla por TCP.
++    setClave(esMeitrack(m.marca, m.modelo) ? '' : CLAVE_FABRICA);
++    setTransporte('tcp');
++    setVigilado(null);
++    setEstadoMeitrack(MEITRACK_SIN_LISTO);
++    setErrores({});
++  }
++
+   function descartar() {
+     confirmar({
+       titulo: 'Descartar el alta',
+@@ -260,7 +281,7 @@ export default function GpsNuevoScreen() {
+     setOcupado(false);
+   }
+ 
+-  const titulo = paso === 3 ? 'Instalar GPS' : 'Nuevo GPS';
++  const titulo = paso === 3 ? (meitrack ? 'Registrar GPS' : 'Instalar GPS') : 'Nuevo GPS';
+   const senal = vigilado && conSenal(vigilado.vistoEn, ahora);
+   const comandos = comandosSms(clave, apn, transporte);
+ 
+@@ -353,8 +374,16 @@ export default function GpsNuevoScreen() {
+               ) : null}
+ 
+               <Card style={{ gap: spacing.md }}>
+-                <PickerField label="Marca *" value={marca || 'Elegir…'} onPress={() => setPicker('marca')} />
+-                <PickerField label="Modelo *" value={modelo || 'Elegir…'} onPress={() => setPicker('modelo')} />
++                <View style={{ gap: spacing.xs }}>
++                  <ThemedText variant="overline" color="textMuted">
++                    Modelo *
++                  </ThemedText>
++                  <SegmentedControl
++                    options={MODELOS_GPS.map((m) => ({ value: m.etiqueta, label: m.etiqueta }))}
++                    value={`${marca} ${modelo}`}
++                    onChange={elegirModelo}
++                  />
++                </View>
+                 <View style={{ gap: spacing.xs }}>
+                   <ThemedText variant="overline" color="textMuted">
+                     Protocolo
+@@ -374,14 +403,20 @@ export default function GpsNuevoScreen() {
+                   <ThemedText variant="overline" color="textMuted">
+                     Transporte
+                   </ThemedText>
+-                  <SegmentedControl
+-                    options={[
+-                      { value: 'tcp', label: 'TCP' },
+-                      { value: 'udp', label: 'UDP' },
+-                    ]}
+-                    value={transporte}
+-                    onChange={setTransporte}
+-                  />
++                  {meitrack ? (
++                    <ThemedText variant="caption" color="textMuted">
++                      Este modelo siempre transmite por TCP, al puerto 5002.
++                    </ThemedText>
++                  ) : (
++                    <SegmentedControl
++                      options={[
++                        { value: 'tcp', label: 'TCP' },
++                        { value: 'udp', label: 'UDP' },
++                      ]}
++                      value={transporte}
++                      onChange={setTransporte}
++                    />
++                  )}
+                 </View>
+                 <View style={{ gap: spacing.xs }}>
+                   <TextField
+@@ -407,15 +442,20 @@ export default function GpsNuevoScreen() {
+                   ) : null}
+                 </View>
+                 <TextField label="Número de serie" value={serie} onChangeText={setSerie} placeholder="Opcional" maxLength={100} />
+-                <TextField label="Firmware" value={firmware} onChangeText={setFirmware} placeholder="Opcional" maxLength={100} />
++                {meitrack ? null : (
++                  <TextField label="Firmware" value={firmware} onChangeText={setFirmware} placeholder="Opcional" maxLength={100} />
++                )}
+                 <View style={{ gap: spacing.xs }}>
+                   <TextField
+-                    label="Clave SMS del equipo"
++                    label={meitrack ? 'Clave SMS actual del equipo · 4 dígitos *' : 'Clave SMS del equipo'}
++                    nombre="gpsClave"
+                     value={clave}
+-                    onChangeText={setClave}
++                    onChangeText={meitrack ? (t) => setClave(t.replace(/\D/gu, '')) : setClave}
+                     secureTextEntry
+                     autoComplete="off"
+-                    maxLength={20}
++                    keyboardType={meitrack ? 'number-pad' : undefined}
++                    maxLength={meitrack ? 4 : 20}
++                    error={errores.gpsClave ?? undefined}
+                   />
+                   <ThemedText variant="caption" color="textMuted">
+                     Solo arma los comandos del paso 3. No se guarda.
+@@ -505,7 +545,25 @@ export default function GpsNuevoScreen() {
+           ) : null}
+ 
+           {/* ── PASO 3 · CONFIGURAR Y PROBAR ── */}
+-          {paso === 2 ? (
++          {paso === 2 && meitrack ? (
++            <>
++              <TituloGps titulo="Configurar y probar" bajada="Manda los mensajes a la línea del equipo y espera su señal." />
++              <MeitrackConfigurar
++                key={imeiLimpio}
++                imei={imeiLimpio}
++                linea={linea}
++                apn={apn}
++                clave={clave}
++                ahora={ahora}
++                enFoco={enFoco}
++                onEstado={setEstadoMeitrack}
++              />
++              <Button label="Siguiente: registrar" icon="chevron" onPress={() => irA(3)} />
++              <Button label="Anterior" variant="secondary" onPress={() => irA(1)} />
++            </>
++          ) : null}
++
++          {paso === 2 && !meitrack ? (
+             <>
+               <TituloGps titulo="Configurar y probar" bajada="Manda los comandos a la línea del equipo y espera su señal." />
+ 
+@@ -600,7 +658,28 @@ export default function GpsNuevoScreen() {
+           ) : null}
+ 
+           {/* ── INSTALAR EN UNA UNIDAD ── */}
+-          {paso === 3 ? (
++          {paso === 3 && meitrack ? (
++            <>
++              <TituloGps titulo="Registrar el equipo" bajada="Queda en el inventario de FOM; instalarlo en una unidad es otro paso." />
++              <MeitrackRegistrar
++                alta={{
++                  imei: imeiLimpio,
++                  linea,
++                  iccid: iccid.replace(/\D/gu, ''),
++                  operadora,
++                  apn,
++                  serie,
++                  estadoSim,
++                  planSim: plan,
++                }}
++                estado={estadoMeitrack}
++                onRegistrado={(id) => router.replace(`/gps-detalle?id=${encodeURIComponent(id)}` as Href)}
++              />
++              <Button label="Anterior" variant="secondary" onPress={() => irA(2)} />
++            </>
++          ) : null}
++
++          {paso === 3 && !meitrack ? (
+             <>
+               <TituloGps titulo="Instalar en una unidad" bajada="Cada unidad lleva un solo GPS." />
+               <InstalarEnUnidadForm
+@@ -629,27 +708,6 @@ export default function GpsNuevoScreen() {
+           ) : null}
+         </ScrollVisible>
+ 
+-        <OptionPickerModal
+-          visible={picker === 'marca'}
+-          title="Marca del equipo"
+-          options={MARCAS_GPS.map((m) => ({ id: m, label: m }))}
+-          selectedIds={marca ? [marca] : []}
+-          onChange={(ids) => {
+-            const m = ids[0];
+-            if (!m) return;
+-            setMarca(m);
+-            setModelo(modelosDe(m)[0] ?? '');
+-          }}
+-          onClose={() => setPicker(null)}
+-        />
+-        <OptionPickerModal
+-          visible={picker === 'modelo'}
+-          title="Modelo"
+-          options={modelosDe(marca).map((m) => ({ id: m, label: m, helper: protocoloDe(marca, m) }))}
+-          selectedIds={modelo ? [modelo] : []}
+-          onChange={(ids) => ids[0] && setModelo(ids[0])}
+-          onClose={() => setPicker(null)}
+-        />
+       </SafeAreaView>
+     </ThemedView>
+   );
+diff --git a/src/components/gps-meitrack.tsx b/src/components/gps-meitrack.tsx
+new file mode 100644
+index 0000000..cec6ebb
+--- /dev/null
++++ b/src/components/gps-meitrack.tsx
+@@ -0,0 +1,544 @@
++import * as Clipboard from 'expo-clipboard';
++import { type RefObject, useEffect, useMemo, useState } from 'react';
++import { StyleSheet, View } from 'react-native';
++
++import { Button } from '@/components/button';
++import { Card } from '@/components/card';
++import { Checkbox } from '@/components/checkbox';
++import { AvisoServidor, BotonRedondoGps, IconoGps } from '@/components/gps-piezas';
++import { Pastilla } from '@/components/pastilla';
++import { TextField } from '@/components/text-field';
++import { ThemedText } from '@/components/themed-text';
++import { abrirSms, haceSenal, horaSegundos, RECEPTOR_HOST } from '@/lib/gps-alta';
++import {
++  consultaSms,
++  esApnMeitrack,
++  esClaveMeitrack,
++  FIRMWARE_MEITRACK,
++  leerAnunciados,
++  leerDb4,
++  lecturaConfigurada,
++  PUERTO_MEITRACK,
++  smsConexion,
++  smsRestauracion,
++  tapar,
++  ventanaUsable,
++  type LecturaDb4,
++  type PreparacionMeitrack,
++  type SenalMeitrack,
++} from '@/lib/gps-meitrack';
++import {
++  AVISO_SIN_RUTA,
++  consultarSenalMeitrack,
++  consultarVentanaMeitrack,
++  registrarMeitrack,
++  type AltaMeitrack,
++} from '@/services/fomMeitrack';
++import { useTheme } from '@/theme';
++
++/** Cada cuánto se pregunta por la ventana de recepción: debe ser menos que su vigencia (10 s). */
++const CADA_MS = 5_000;
++
++/** Lo que el paso de registrar necesita saber del paso anterior. */
++export interface EstadoMeitrack {
++  /** Llegó la señal y la lectura posterior confirma el destino. */
++  listo: boolean;
++  /** El servidor todavía no publica las rutas para la app. */
++  sinRuta: boolean;
++}
++
++/** Una casilla con su frase. */
++function Casilla({ marcada, onPress, texto, deshabilitada }: { marcada: boolean; onPress: () => void; texto: string; deshabilitada?: boolean }) {
++  return (
++    <View style={[styles.filaCasilla, deshabilitada && styles.apagado]}>
++      <Checkbox checked={marcada} onPress={deshabilitada ? () => undefined : onPress} label={texto} />
++      <ThemedText variant="caption" color="textSecondary" style={styles.flex}>
++        {texto}
++      </ThemedText>
++    </View>
++  );
++}
++
++/** Un mensaje SMS listo: lo que dice, con la clave tapada, y los botones de copiar y abrir Mensajes. */
++function Comando({
++  numero,
++  titulo,
++  sms,
++  pendiente,
++  nota,
++  onCopiar,
++  onAbrir,
++}: {
++  numero: number;
++  titulo: string;
++  sms: string | null;
++  pendiente: string;
++  nota: string;
++  onCopiar: () => void;
++  onAbrir: () => void;
++}) {
++  const { colors, radii, borderWidths } = useTheme();
++  return (
++    <View style={[styles.comando, { borderTopWidth: borderWidths.hairline, borderTopColor: colors.border }]}>
++      <View style={[styles.numero, { borderRadius: radii.sm, backgroundColor: colors.surfaceSunken }]}>
++        <ThemedText variant="mono" style={styles.negrita}>
++          {String(numero).padStart(2, '0')}
++        </ThemedText>
++      </View>
++      <View style={[styles.flex, { gap: 6 }]}>
++        <ThemedText style={styles.negrita}>{titulo}</ThemedText>
++        <View
++          style={[
++            styles.codigo,
++            { borderRadius: radii.sm, borderColor: colors.border, borderWidth: borderWidths.thin, backgroundColor: colors.surfaceSunken },
++          ]}>
++          <ThemedText variant="mono" color={sms ? 'text' : 'textMuted'}>
++            {sms ? tapar(sms) : pendiente}
++          </ThemedText>
++        </View>
++        <ThemedText variant="caption" color="textSecondary">
++          {nota}
++        </ThemedText>
++      </View>
++      <View style={styles.botones}>
++        <BotonRedondoGps icono="copiar" etiqueta={`Copiar «${titulo}»`} onPress={onCopiar} disabled={!sms} />
++        <BotonRedondoGps icono="mensaje" etiqueta={`Abrir Mensajes con «${titulo}»`} onPress={onAbrir} disabled={!sms} />
++      </View>
++    </View>
++  );
++}
++
++/**
++ * Paso «Configurar y probar» del Meitrack T399L.
++ *
++ * Sigue el camino de la consola de Juan: preguntar al equipo qué entiende,
++ * guardar cómo estaba (DB4), tener lista la restauración y SOLO ENTONCES
++ * apuntarlo al receptor de FOM (IP de la configuración, puerto 5002). Después
++ * se espera su señal. Copiar un mensaje no lo envía y nada de esto activa el GPS.
++ *
++ * Las lecturas del equipo viven solo en esta pantalla: no se guardan ni viajan.
++ */
++export function MeitrackConfigurar({
++  imei,
++  linea,
++  apn,
++  clave,
++  ahora,
++  enFoco,
++  onEstado,
++}: {
++  imei: string;
++  linea: string;
++  apn: string;
++  clave: string;
++  ahora: number;
++  enFoco: RefObject<boolean>;
++  onEstado: (e: EstadoMeitrack) => void;
++}) {
++  const { spacing, colors, radii } = useTheme();
++  const [anunciadosTxt, setAnunciadosTxt] = useState('');
++  const [baseTxt, setBaseTxt] = useState('');
++  const [base, setBase] = useState<LecturaDb4 | null>(null);
++  const [despuesTxt, setDespuesTxt] = useState('');
++  const [sinUsuario, setSinUsuario] = useState(false);
++  const [guardada, setGuardada] = useState<string | null>(null);
++  const [aviso, setAviso] = useState<string | null>(null);
++
++  // 'desconocida' mientras no ha contestado; 'sin-ruta' si el servidor aún no la publica.
++  const [ruta, setRuta] = useState<'desconocida' | 'ok' | 'sin-ruta'>('desconocida');
++  const [ventana, setVentana] = useState<{ datos: PreparacionMeitrack; en: number } | null>(null);
++  const [senal, setSenal] = useState<SenalMeitrack | null>(null);
++  const [fallo, setFallo] = useState<string | null>(null);
++
++  const destino = useMemo(() => ({ host: RECEPTOR_HOST, port: PUERTO_MEITRACK }), []);
++  const anunciados = leerAnunciados(anunciadosTxt);
++  const lista = anunciados ?? [];
++
++  // La ventana y la señal: se vuelve a preguntar mientras la pantalla está a la vista.
++  useEffect(() => {
++    if (!/^\d{15}$/u.test(imei)) return;
++    let vivo = true;
++    let reloj: ReturnType<typeof setTimeout> | undefined;
++    const vuelta = async () => {
++      let seguir = true;
++      if (enFoco.current) {
++        const v = await consultarVentanaMeitrack(imei);
++        if (!vivo) return;
++        if (v.tipo === 'sin-ruta') {
++          setRuta('sin-ruta');
++          seguir = false;
++        } else if (v.tipo === 'error') {
++          setFallo(v.mensaje);
++          setVentana(null);
++        } else {
++          setRuta('ok');
++          setFallo(null);
++          setVentana({ datos: v.datos, en: Date.now() });
++          if (v.datos.window) {
++            const s = await consultarSenalMeitrack(imei, v.datos.window.reference);
++            if (!vivo) return;
++            if (s.tipo === 'ok' && s.datos.recibida) setSenal(s.datos);
++          }
++        }
++      }
++      if (vivo && seguir) reloj = setTimeout(() => void vuelta(), CADA_MS);
++    };
++    void vuelta();
++    return () => {
++      vivo = false;
++      if (reloj) clearTimeout(reloj);
++    };
++  }, [imei, enFoco]);
++
++  const claveOk = esClaveMeitrack(clave);
++  const llave = JSON.stringify([base, clave, apn, sinUsuario]);
++  const restauracionGuardada = guardada === llave;
++  const lecturaInicial = baseTxt ? leerDb4(baseTxt, imei, 'CLOSE') : null;
++  const restauracion = smsRestauracion(clave, base, sinUsuario);
++
++  /** Sin ruta no se puede saber si hay ventana: se deja preparar el mensaje, con el aviso a la vista. */
++  const ventanaLista = ruta === 'sin-ruta' || ventanaUsable(ventana?.datos ?? null, ventana ? Math.max(0, ahora - ventana.en) : Infinity);
++  const conexion =
++    senal?.recibida || !ventanaLista
++      ? null
++      : smsConexion({ clave, base, apn, sinUsuario, restauracionGuardada, anunciados: lista, destino });
++
++  const configurado = lecturaConfigurada(despuesTxt, base, imei, apn, destino);
++  const listo = senal?.recibida === true && configurado && sinUsuario;
++  useEffect(() => {
++    onEstado({ listo, sinRuta: ruta === 'sin-ruta' });
++  }, [listo, ruta, onEstado]);
++
++  async function copiar(texto: string | null) {
++    if (!texto) {
++      setAviso('Todavía falta algo antes de copiar este mensaje.');
++      return;
++    }
++    try {
++      await Clipboard.setStringAsync(texto);
++      setAviso('Mensaje copiado. Mándalo desde Mensajes a la línea del equipo; FOM no lo envía.');
++    } catch {
++      setAviso('No se pudo copiar. El mensaje no se ha enviado.');
++    }
++  }
++
++  async function abrir(texto: string | null) {
++    if (!texto) return;
++    if (!linea.trim()) {
++      setAviso('Falta el número de la línea del equipo (paso 2).');
++      return;
++    }
++    setAviso((await abrirSms(linea, texto)) ? null : 'No pudimos abrir Mensajes en este teléfono.');
++  }
++
++  function descartarLecturas() {
++    setBase(null);
++    setBaseTxt('');
++    setDespuesTxt('');
++    setGuardada(null);
++  }
++
++  const consultas = [
++    { cmd: 'E91', titulo: 'Consultar la versión', nota: `Debe decir ${FIRMWARE_MEITRACK}. Otra versión no está comprobada: avisa a un técnico.` },
++    { cmd: 'E04', titulo: 'Consultar qué comandos entiende', nota: 'Copia abajo solo los códigos que siguen a E04, sin el IMEI.' },
++    { cmd: 'DB4', titulo: 'Consultar cómo está configurado', nota: 'Guarda la respuesta tal cual: es la referencia para volver atrás.' },
++  ] as const;
++
++  return (
++    <>
++      <Card style={{ gap: spacing.md }}>
++        <View style={[styles.filaCentro, { gap: spacing.md }]}>
++          <IconoGps icono="gps" tono={senal?.recibida ? 'success' : 'textSecondary'} tamano={56} />
++          <View style={[styles.flex, { gap: 6 }]}>
++            <View style={styles.filaSuelta}>
++              {senal?.recibida ? (
++                <Pastilla tono="success" label="Señal recibida" conPunto />
++              ) : (
++                <Pastilla tono="textSecondary" label="Esperando señal…" conPunto />
++              )}
++            </View>
++            <ThemedText style={styles.cardTitulo}>Prueba de señal</ThemedText>
++          </View>
++        </View>
++
++        {ruta === 'sin-ruta' ? (
++          <AvisoServidor titulo="La señal de este modelo todavía no se puede comprobar desde la app" texto={AVISO_SIN_RUTA} />
++        ) : senal?.recibida ? (
++          <View style={[styles.evidencia, { borderRadius: radii.md, backgroundColor: colors.surfaceSunken }]}>
++            {[...senal.mensajes]
++              .sort((a, b) => Date.parse(b.recibidoEn) - Date.parse(a.recibidoEn))
++              .map((m) => (
++                <ThemedText key={m.id} style={styles.negrita}>
++                  {`${horaSegundos(m.recibidoEn)} · ${m.bytes} bytes · ${m.registros} ${m.registros === 1 ? 'registro' : 'registros'} · ${haceSenal(m.recibidoEn, ahora)}`}
++                </ThemedText>
++              ))}
++            <ThemedText variant="caption" color="textSecondary">
++              El IMEI coincide. Esto todavía no activa el GPS.
++            </ThemedText>
++          </View>
++        ) : ruta === 'desconocida' ? (
++          <ThemedText variant="caption" color="textMuted">
++            Consultando a FOM…
++          </ThemedText>
++        ) : ventanaLista ? (
++          <ThemedText variant="caption" color="textSecondary">
++            {ventana?.datos.window
++              ? `Ventana abierta hasta las ${horaSegundos(ventana.datos.window.expiresAt)} · ${ventana.datos.window.remainingConnections} conexiones. Miramos cada 5 s.`
++              : 'Miramos cada 5 s.'}
++          </ThemedText>
++        ) : (
++          <ThemedText variant="caption" color="textSecondary">
++            {fallo ?? 'La ventana para recibir este equipo todavía no está abierta o ya venció. El mensaje de conexión sigue bloqueado.'}
++          </ThemedText>
++        )}
++        <ThemedText variant="caption" color="textMuted">
++          Un «OK» del equipo por mensaje no prueba que FOM lo esté oyendo: lo prueba la señal de arriba.
++        </ThemedText>
++      </Card>
++
++      <Card style={{ gap: spacing.md }}>
++        <View style={styles.filaCentro}>
++          <ThemedText style={[styles.flex, styles.cardTitulo]}>Mensajes del Meitrack T399L</ThemedText>
++          <ThemedText variant="caption" color="textSecondary">
++            {linea ? `a ${linea}` : ''}
++          </ThemedText>
++        </View>
++        <ThemedText variant="caption" color="textSecondary">
++          Copiar un mensaje no lo envía: pégalo en Mensajes y mándalo a la línea del equipo. La clave no se guarda.
++        </ThemedText>
++        {!claveOk ? (
++          <ThemedText variant="caption" color="danger">
++            Falta la clave SMS de 4 dígitos del equipo (paso 1).
++          </ThemedText>
++        ) : null}
++
++        {consultas.map((c, i) => (
++          <Comando
++            key={c.cmd}
++            numero={i + 1}
++            titulo={c.titulo}
++            sms={consultaSms(clave, c.cmd, lista)}
++            pendiente={claveOk ? `Pendiente: el equipo debe anunciar ${c.cmd} en E04` : 'Pendiente: clave SMS de 4 dígitos'}
++            nota={c.nota}
++            onCopiar={() => void copiar(consultaSms(clave, c.cmd, lista))}
++            onAbrir={() => void abrir(consultaSms(clave, c.cmd, lista))}
++          />
++        ))}
++
++        <TextField
++          label="Comandos que anunció el equipo (respuesta a E04)"
++          value={anunciadosTxt}
++          onChangeText={(t) => {
++            setAnunciadosTxt(t);
++            setGuardada(null);
++          }}
++          placeholder="A21,DB4,E91"
++          autoCapitalize="characters"
++          autoCorrect={false}
++          maxLength={2048}
++        />
++        {anunciados === null ? (
++          <ThemedText variant="caption" color="danger">
++            Pega solo los códigos de tres caracteres separados por comas, sin el IMEI ni la respuesta completa.
++          </ThemedText>
++        ) : (
++          <ThemedText variant="caption" color="textMuted">
++            Se necesitan A21 y DB4. Se borra al salir de esta pantalla.
++          </ThemedText>
++        )}
++
++        <TextField
++          label="Respuesta DB4 inicial"
++          value={baseTxt}
++          onChangeText={setBaseTxt}
++          editable={!base}
++          multiline
++          autoCapitalize="none"
++          autoCorrect={false}
++          maxLength={1024}
++          placeholder="Pega aquí el mensaje que contesta el equipo"
++        />
++        {baseTxt && !lecturaInicial && !base ? (
++          <ThemedText variant="caption" color="danger">
++            Esa lectura no es de este equipo o no tiene el formato esperado (versión {FIRMWARE_MEITRACK}, con el GPRS cerrado). No se guardó.
++          </ThemedText>
++        ) : null}
++        {base ? (
++          <>
++            <ThemedText variant="caption" color="success">
++              Referencia guardada. Una lectura posterior no la reemplaza.
++            </ThemedText>
++            <Button label="Descartar las lecturas" variant="secondary" onPress={descartarLecturas} />
++          </>
++        ) : (
++          <Button
++            label="Guardar lectura inicial"
++            variant="secondary"
++            disabled={!lecturaInicial}
++            onPress={() => {
++              if (lecturaInicial) setBase(lecturaInicial);
++            }}
++          />
++        )}
++
++        <Casilla
++          marcada={sinUsuario}
++          onPress={() => setSinUsuario((v) => !v)}
++          texto="Confirmo que el plan de datos y el APN de este equipo no llevan usuario ni contraseña."
++        />
++
++        <Comando
++          numero={4}
++          titulo="Guardar primero la restauración"
++          sms={restauracion}
++          pendiente="Pendiente: clave, lectura inicial y la confirmación de arriba"
++          nota="Devuelve el equipo a como estaba, con el GPRS cerrado. Guarda este mensaje en tu teléfono antes de seguir."
++          onCopiar={() => void copiar(restauracion)}
++          onAbrir={() => void abrir(restauracion)}
++        />
++        <Casilla
++          marcada={restauracionGuardada}
++          deshabilitada={!restauracion}
++          onPress={() => setGuardada(restauracionGuardada ? null : llave)}
++          texto="Guardé el mensaje de restauración en mi teléfono."
++        />
++
++        {ruta === 'sin-ruta' ? (
++          <ThemedText variant="caption" color="warning">
++            No podemos confirmar con FOM que el receptor esté recibiendo ahora. Confírmalo con el equipo técnico de FOM antes de mandar el mensaje de conexión.
++          </ThemedText>
++        ) : null}
++        <Comando
++          numero={5}
++          titulo={`Apuntar al receptor de FOM (${RECEPTOR_HOST}:${PUERTO_MEITRACK})`}
++          sms={conexion}
++          pendiente={senal?.recibida ? 'La señal ya llegó: no repitas este mensaje' : 'Pendiente: pasos anteriores y la ventana de recepción'}
++          nota="Después del OK del equipo, consulta DB4 otra vez y pégalo abajo. No cambia reloj, intervalos, entradas ni salidas."
++          onCopiar={() => void copiar(conexion)}
++          onAbrir={() => void abrir(conexion)}
++        />
++
++        <TextField
++          label="Respuesta DB4 de después"
++          value={despuesTxt}
++          onChangeText={setDespuesTxt}
++          editable={!!base}
++          multiline
++          autoCapitalize="none"
++          autoCorrect={false}
++          maxLength={1024}
++          placeholder="Pega aquí la lectura posterior"
++        />
++        <ThemedText variant="caption" color={configurado ? 'success' : 'textMuted'}>
++          {configurado
++            ? 'DB4 confirma el destino, el APN y el tipo TCP previstos; lo demás sigue igual.'
++            : 'Pega la lectura DB4 de después para comprobar destino, APN y tipo TCP.'}
++        </ThemedText>
++
++        {aviso ? (
++          <ThemedText variant="caption" color="textSecondary">
++            {aviso}
++          </ThemedText>
++        ) : null}
++        {!esApnMeitrack(apn) ? (
++          <ThemedText variant="caption" color="danger">
++            El APN del paso 2 tiene que ser solo letras, números, puntos y guiones.
++          </ThemedText>
++        ) : null}
++      </Card>
++    </>
++  );
++}
++
++/**
++ * Paso «Registrar» del Meitrack T399L: lo deja en el inventario. No lo instala
++ * en una unidad ni lo activa; eso se hace después con la señal ya comprobada.
++ */
++export function MeitrackRegistrar({
++  alta,
++  estado,
++  onRegistrado,
++}: {
++  alta: AltaMeitrack;
++  estado: EstadoMeitrack;
++  onRegistrado: (id: string) => void;
++}) {
++  const { spacing } = useTheme();
++  const [ocupado, setOcupado] = useState(false);
++  const [error, setError] = useState<string | null>(null);
++  const [sinRutaAlRegistrar, setSinRutaAlRegistrar] = useState(false);
++  // Un intento ya hecho nunca vuelve a escribir: solo se vuelve a comprobar.
++  const [intento, setIntento] = useState<{ intentado: boolean; id: string | null }>({ intentado: false, id: null });
++
++  const sinRuta = estado.sinRuta || sinRutaAlRegistrar;
++
++  async function registrar() {
++    setError(null);
++    setOcupado(true);
++    try {
++      const r = await registrarMeitrack(alta, {
++        ...intento,
++        anotar: (id) => setIntento({ intentado: true, id }),
++      });
++      if (r.tipo === 'sin-ruta') setSinRutaAlRegistrar(true);
++      else if (r.tipo === 'error') setError(r.mensaje);
++      else if ('id' in r.datos) onRegistrado(r.datos.id);
++      else {
++        setError(
++          r.datos.conflicto
++            ? 'Ya hay un registro con otros datos para ese IMEI o esa SIM. Revisa el inventario.'
++            : 'No pudimos confirmar el registro. No lo repitas: espera un momento y toca Registrar otra vez para volver a comprobar.',
++        );
++      }
++    } catch (e) {
++      setError(e instanceof Error ? e.message : 'No se pudo registrar el equipo.');
++    }
++    // Después del try/catch y no en un `finally`: el compilador de React se salta los componentes con `finally`.
++    setOcupado(false);
++  }
++
++  return (
++    <Card style={{ gap: spacing.md }}>
++      <ThemedText style={styles.cardTitulo}>Meitrack T399L</ThemedText>
++      <ThemedText variant="mono" color="textSecondary">{`IMEI ${alta.imei}`}</ThemedText>
++      <ThemedText variant="caption" color="textSecondary">
++        {`Línea ${alta.linea} · ${alta.operadora} · APN ${alta.apn}`}
++      </ThemedText>
++      <ThemedText variant="caption" color="textSecondary">
++        Se guarda en el inventario de FOM. No se instala en una unidad ni se activa: eso es un paso aparte, con la señal ya comprobada.
++      </ThemedText>
++      {sinRuta ? <AvisoServidor titulo="Todavía no está en el servidor publicado" texto={AVISO_SIN_RUTA} /> : null}
++      {!estado.listo && !sinRuta ? (
++        <ThemedText variant="caption" color="warning">
++          Antes de registrar tiene que llegar la señal del equipo y la lectura DB4 de después tiene que confirmar el destino (paso anterior).
++        </ThemedText>
++      ) : null}
++      {error ? (
++        <ThemedText variant="caption" color="danger">
++          {error}
++        </ThemedText>
++      ) : null}
++      <Button
++        label={ocupado ? 'Registrando…' : 'Registrar en el inventario'}
++        onPress={() => void registrar()}
++        loading={ocupado}
++        disabled={!estado.listo || sinRuta}
++      />
++    </Card>
++  );
++}
++
++const styles = StyleSheet.create({
++  flex: { flex: 1, minWidth: 0 },
++  filaCentro: { flexDirection: 'row', alignItems: 'center', gap: 6 },
++  filaSuelta: { flexDirection: 'row', flexWrap: 'wrap' },
++  filaCasilla: { flexDirection: 'row', alignItems: 'center', gap: 12 },
++  apagado: { opacity: 0.5 },
++  cardTitulo: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
++  negrita: { fontWeight: '700' },
++  evidencia: { padding: 12, gap: 2 },
++  comando: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12 },
++  numero: { width: 34, height: 30, alignItems: 'center', justifyContent: 'center' },
++  codigo: { paddingVertical: 8, paddingHorizontal: 10 },
++  botones: { gap: 8 },
++});
+diff --git a/src/lib/gps-alta.ts b/src/lib/gps-alta.ts
+index e68ad84..27d1aa8 100644
+--- a/src/lib/gps-alta.ts
++++ b/src/lib/gps-alta.ts
+@@ -12,19 +12,31 @@
+ 
+ import { Linking, Platform } from 'react-native';
+ 
++import { FABRICANTE_MEITRACK, MODELO_MEITRACK, PROTOCOLO_MEITRACK } from '@/lib/gps-meitrack';
+ import { msSinReportar, textoSinSenal, tiempoSinSenal, type MomentoReporte } from '@/lib/sin-senal';
+ 
+ /** Un equipo transmite si su última trama llegó en los últimos 300 s (la regla de fom-core). */
+ export const SENAL_VIGENTE_MS = 300_000;
+ 
+ /**
+- * Marca → modelo → protocolo. Hoy FOM solo decodifica el Coban GPS-403; el
+- * protocolo lo pone el modelo, nunca se escribe a mano.
++ * Marca → modelo → protocolo. FOM registra el Coban GPS-403 y, con otro
++ * camino de alta, el Meitrack T399L; el protocolo lo pone el modelo, nunca se
++ * escribe a mano.
+  */
+ export const CATALOGO_GPS: Record<string, Record<string, { protocolo: string }>> = {
+   Coban: { 'GPS-403': { protocolo: 'Coban GPS103' } },
++  [FABRICANTE_MEITRACK]: { [MODELO_MEITRACK]: { protocolo: PROTOCOLO_MEITRACK } },
+ };
+ 
++/** Los modelos que se eligen al dar de alta, en el orden en que se enseñan. */
++export const MODELOS_GPS: { marca: string; modelo: string; etiqueta: string }[] = [
++  { marca: 'Coban', modelo: 'GPS-403', etiqueta: 'Coban GPS-403' },
++  { marca: FABRICANTE_MEITRACK, modelo: MODELO_MEITRACK, etiqueta: `${FABRICANTE_MEITRACK} ${MODELO_MEITRACK}` },
++];
++
++/** El T399L no se da de alta como los Coban: tiene sus propios mensajes y su propio puerto. */
++export const esMeitrack = (marca: string, modelo: string) => marca === FABRICANTE_MEITRACK && modelo === MODELO_MEITRACK;
++
+ export const MARCAS_GPS = Object.keys(CATALOGO_GPS);
+ 
+ export function modelosDe(marca: string): string[] {
+diff --git a/src/lib/gps-meitrack.ts b/src/lib/gps-meitrack.ts
+new file mode 100644
+index 0000000..6b5bf14
+--- /dev/null
++++ b/src/lib/gps-meitrack.ts
+@@ -0,0 +1,331 @@
++/**
++ * Meitrack T399L — lo que se calcula sin preguntarle a nadie.
++ *
++ * Copia de lo que hace la consola de fom-core (`apps/gps-web/app/meitrack-*.ts`
++ * y `gps-onboarding-profile.ts`): los mismos comandos SMS, las mismas
++ * comprobaciones y la misma regla de «escribir una sola vez». Si Juan cambia
++ * un comando allá, se cambia aquí.
++ *
++ * Solo prepara mensajes: copiar uno NO lo envía, y nada de lo que hay aquí
++ * activa el GPS.
++ */
++
++/** La única versión de firmware con la que se cualificó el T399L. */
++export const FIRMWARE_MEITRACK = 'T399L-V254';
++/** El receptor del T399L escucha en otro puerto que el de los Coban. */
++export const PUERTO_MEITRACK = 5002;
++export const FABRICANTE_MEITRACK = 'Meitrack';
++export const MODELO_MEITRACK = 'T399L';
++export const PROTOCOLO_MEITRACK = 'meitrack-t399';
++
++/** Las filas de la lectura DB4, tal como llegan separadas por comas. */
++export type LecturaDb4 = readonly string[];
++
++export interface DestinoMeitrack {
++  host: string;
++  port: number;
++}
++
++const ipv4Literal = (v: string) =>
++  /^(0|[1-9]\d{0,2})(\.(0|[1-9]\d{0,2})){3}$/u.test(v) && v.split('.').every((p) => Number(p) <= 255);
++const puertoValido = (v: string) => /^[1-9]\d{0,4}$/u.test(v) && Number(v) <= 65535;
++
++export const esClaveMeitrack = (clave: string) => /^\d{4}$/u.test(clave);
++export const esApnMeitrack = (apn: string) => /^[a-zA-Z0-9][a-zA-Z0-9.-]{0,99}$/u.test(apn);
++
++/**
++ * La respuesta DB4 del equipo, validada contra su IMEI y firmware. `tipo` es
++ * cómo está el GPRS: `CLOSE` antes de configurar, `TCP` después. Devuelve las
++ * celdas o `null` si algo no coincide (no es una prueba de nada más).
++ */
++export function leerDb4(crudo: string, imei: string, tipo: 'CLOSE' | 'TCP'): LecturaDb4 | null {
++  if (typeof crudo !== 'string' || crudo.length > 1024 || !/^\d{15}$/u.test(imei)) return null;
++  const texto = crudo.trim();
++  if (/[\x00-\x1f\x7f]/u.test(texto)) return null;
++  const c = texto.split(',');
++  if (
++    c.length !== 20 ||
++    c[0] !== imei ||
++    c[1] !== 'DB4' ||
++    c[2] !== tipo ||
++    !c[3].startsWith('IP1:') ||
++    !ipv4Literal(c[3].slice(4)) ||
++    !c[4].startsWith('PORT1:') ||
++    !puertoValido(c[4].slice(6)) ||
++    !c[5].startsWith('IP2:') ||
++    !c[6].startsWith('PORT2:') ||
++    c[19] !== ''
++  ) {
++    return null;
++  }
++  const ip2 = c[5].slice(4);
++  const puerto2 = c[6].slice(6);
++  if ((ip2 === '') !== (puerto2 === '') || (ip2 !== '' && (!ipv4Literal(ip2) || !puertoValido(puerto2)))) return null;
++  if (!/^[a-zA-Z0-9.-]{0,100}$/u.test(c[8])) return null;
++  if ([7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].some((i) => !/^\d{1,20}$/u.test(c[i]))) return null;
++  return Object.freeze(c);
++}
++
++/**
++ * Los códigos que el equipo dice entender (respuesta a E04): solo códigos de
++ * tres caracteres separados por comas, sin IMEI. `null` si no tiene esa forma;
++ * `[]` si está vacío.
++ */
++export function leerAnunciados(texto: string): string[] | null {
++  if (typeof texto !== 'string' || texto.length > 2048) return null;
++  if (texto.trim() === '') return [];
++  const lista = texto.split(',').map((c) => c.trim().toUpperCase());
++  if (lista.length > 256 || lista.some((c) => !/^[A-F0-9]{3}$/u.test(c))) return null;
++  return [...new Set(lista)];
++}
++
++export type ConsultaMeitrack = 'E91' | 'E04' | 'DB4';
++
++/**
++ * Consultas de solo lectura. DB4 solo sale si el equipo la anunció en E04:
++ * saber que existe nunca autoriza escribir.
++ */
++export function consultaSms(clave: string, comando: ConsultaMeitrack, anunciados: readonly string[] = []): string | null {
++  if (!esClaveMeitrack(clave) || (comando === 'DB4' && !anunciados.includes('DB4'))) return null;
++  return `${clave},${comando}`;
++}
++
++/**
++ * Vuelve al destino y APN de la lectura inicial con el GPRS cerrado. Se guarda
++ * ANTES de apuntar el equipo al receptor de FOM.
++ */
++export function smsRestauracion(clave: string, base: LecturaDb4 | null, sinUsuario: boolean): string | null {
++  if (!esClaveMeitrack(clave) || !sinUsuario || !base) return null;
++  return `${clave},A21,0,${base[3].slice(4)},${base[4].slice(6)},${base[8]},,`;
++}
++
++/** Apunta el equipo al receptor de FOM. Necesita la restauración ya guardada. */
++export function smsConexion(opts: {
++  clave: string;
++  base: LecturaDb4 | null;
++  apn: string;
++  sinUsuario: boolean;
++  restauracionGuardada: boolean;
++  anunciados: readonly string[];
++  destino: DestinoMeitrack | null;
++}): string | null {
++  const { clave, base, apn, sinUsuario, restauracionGuardada, anunciados, destino } = opts;
++  if (
++    !smsRestauracion(clave, base, sinUsuario) ||
++    !restauracionGuardada ||
++    !anunciados.includes('A21') ||
++    !anunciados.includes('DB4') ||
++    !esApnMeitrack(apn) ||
++    !destino ||
++    !ipv4Literal(destino.host)
++  ) {
++    return null;
++  }
++  return `${clave},A21,1,${destino.host},${destino.port},${apn},,`;
++}
++
++/** La clave tapada con puntos para enseñar el mensaje sin enseñarla. */
++export function tapar(sms: string): string {
++  const coma = sms.indexOf(',');
++  return coma < 0 ? sms : `${'·'.repeat(coma)}${sms.slice(coma)}`;
++}
++
++/**
++ * ¿La lectura DB4 de DESPUÉS dice lo previsto? Tipo TCP, destino y APN nuevos,
++ * y todo lo demás igual que en la lectura inicial.
++ */
++export function lecturaConfigurada(
++  crudo: string,
++  base: LecturaDb4 | null,
++  imei: string,
++  apn: string,
++  destino: DestinoMeitrack | null,
++): boolean {
++  const actual = leerDb4(crudo, imei, 'TCP');
++  if (!actual || !base || !destino) return false;
++  const esperado = [...base];
++  esperado[2] = 'TCP';
++  esperado[3] = `IP1:${destino.host}`;
++  esperado[4] = `PORT1:${destino.port}`;
++  esperado[8] = apn;
++  return actual.every((celda, i) => celda === esperado[i]);
++}
++
++/* ───────────── lo que contesta el servidor (ventana, señal, alta) ───────────── */
++
++const claves = (v: unknown, lista: string[]): v is Record<string, unknown> =>
++  !!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === lista.length && lista.every((k) => Object.hasOwn(v, k));
++const iso = (v: unknown): v is string => typeof v === 'string' && Number.isFinite(Date.parse(v)) && new Date(v).toISOString() === v;
++
++export interface VentanaMeitrack {
++  reference: string;
++  expiresAt: string;
++  destination: DestinoMeitrack & { transport: 'tcp' };
++  remainingConnections: number;
++}
++export interface PreparacionMeitrack {
++  ready: boolean;
++  serverNow: string;
++  window: VentanaMeitrack | null;
++}
++
++/**
++ * La respuesta de «¿hay una ventana abierta para este equipo?». Estricta a
++ * propósito: si algo no cuadra con lo que fom-core promete, no hay ventana.
++ * `host` es la dirección del receptor que esta app tiene en su configuración.
++ */
++export function leerPreparacion(crudo: unknown, host: string): PreparacionMeitrack | null {
++  if (!claves(crudo, ['setup'])) return null;
++  const s = crudo.setup;
++  if (!claves(s, ['ready', 'reason', 'serverNow', 'activationAllowed', 'window']) || !iso(s.serverNow) || s.activationAllowed !== false) return null;
++  if (s.ready === false) return s.reason === 'not_ready' && s.window === null ? { ready: false, serverNow: s.serverNow, window: null } : null;
++  const w = s.window;
++  if (
++    s.ready !== true ||
++    s.reason !== null ||
++    !claves(w, ['reference', 'expiresAt', 'firmware', 'destination', 'remainingConnections', 'acknowledgementAllowed']) ||
++    typeof w.reference !== 'string' ||
++    !/^issue\/727\/[a-z0-9][a-z0-9/_.-]{0,119}$/u.test(w.reference) ||
++    !iso(w.expiresAt)
++  ) {
++    return null;
++  }
++  const falta = Date.parse(w.expiresAt) - Date.parse(s.serverNow);
++  const d = w.destination;
++  if (
++    falta <= 90_000 ||
++    falta > 3_600_000 ||
++    w.firmware !== FIRMWARE_MEITRACK ||
++    !claves(d, ['host', 'port', 'transport']) ||
++    d.host !== host ||
++    d.port !== PUERTO_MEITRACK ||
++    d.transport !== 'tcp' ||
++    typeof w.remainingConnections !== 'number' ||
++    !Number.isSafeInteger(w.remainingConnections) ||
++    w.remainingConnections < 1 ||
++    w.remainingConnections > 99 ||
++    w.acknowledgementAllowed !== false
++  ) {
++    return null;
++  }
++  return {
++    ready: true,
++    serverNow: s.serverNow,
++    window: {
++      reference: w.reference,
++      expiresAt: w.expiresAt,
++      destination: { host: d.host, port: d.port, transport: 'tcp' },
++      remainingConnections: w.remainingConnections,
++    },
++  };
++}
++
++/**
++ * ¿Se puede usar la ventana ahora? Solo si la lectura es de hace menos de 10 s
++ * y al cerrarse le quedan más de 90 s: un SMS tarda en llegar al equipo.
++ */
++export function ventanaUsable(p: PreparacionMeitrack | null, transcurridoMs: number): p is PreparacionMeitrack & { window: VentanaMeitrack } {
++  return (
++    !!p?.ready &&
++    !!p.window &&
++    Number.isFinite(transcurridoMs) &&
++    transcurridoMs >= 0 &&
++    transcurridoMs < 10_000 &&
++    Date.parse(p.window.expiresAt) - Date.parse(p.serverNow) - transcurridoMs > 90_000
++  );
++}
++
++export interface SenalMeitrack {
++  recibida: boolean;
++  mensajes: { id: string; recibidoEn: string; bytes: number; registros: number }[];
++}
++
++/** La respuesta de «¿llegó una trama de este equipo en la ventana?». */
++export function leerSenal(crudo: unknown, referencia: string): SenalMeitrack | null {
++  if (!claves(crudo, ['capture'])) return null;
++  const c = crudo.capture;
++  if (
++    !claves(c, ['reference', 'windowAvailable', 'received', 'messages', 'activationAllowed']) ||
++    c.activationAllowed !== false ||
++    c.reference !== referencia ||
++    c.windowAvailable !== true ||
++    typeof c.received !== 'boolean' ||
++    !Array.isArray(c.messages) ||
++    c.messages.length > 5 ||
++    c.received !== c.messages.length > 0
++  ) {
++    return null;
++  }
++  const vistos = new Set<string>();
++  const mensajes: SenalMeitrack['mensajes'] = [];
++  for (const m of c.messages as unknown[]) {
++    if (
++      !claves(m, ['receiptId', 'receivedAt', 'bytes', 'sha256', 'records', 'identityMatches', 'clockQualified']) ||
++      typeof m.receiptId !== 'string' ||
++      !/^[1-9]\d{0,18}$/u.test(m.receiptId) ||
++      vistos.has(m.receiptId) ||
++      !iso(m.receivedAt) ||
++      typeof m.bytes !== 'number' ||
++      !Number.isSafeInteger(m.bytes) ||
++      m.bytes < 1 ||
++      m.bytes > 16_384 ||
++      typeof m.sha256 !== 'string' ||
++      !/^[a-f0-9]{64}$/u.test(m.sha256) ||
++      typeof m.records !== 'number' ||
++      !Number.isSafeInteger(m.records) ||
++      m.records < 1 ||
++      m.records > 64 ||
++      m.identityMatches !== true ||
++      m.clockQualified !== false
++    ) {
++      return null;
++    }
++    vistos.add(m.receiptId);
++    mensajes.push({ id: m.receiptId, recibidoEn: m.receivedAt, bytes: m.bytes, registros: m.records });
++  }
++  return { recibida: c.received, mensajes };
++}
++
++export type TestigoAlta = { estado: 'unavailable' | 'absent' | 'matching' | 'conflict'; id: string | null };
++const esUuid = (v: unknown): v is string => typeof v === 'string' && /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(v);
++
++/** Lo que dice el servidor de si ya existe un alta con estos datos. */
++export function leerTestigo(crudo: unknown): TestigoAlta | null {
++  if (!claves(crudo, ['registration'])) return null;
++  const w = crudo.registration;
++  if (!claves(w, ['state', 'id', 'activationAllowed']) || w.activationAllowed !== false) return null;
++  const estado = w.state;
++  if (estado !== 'unavailable' && estado !== 'absent' && estado !== 'matching' && estado !== 'conflict') return null;
++  if (estado === 'matching' ? !esUuid(w.id) : w.id !== null) return null;
++  return { estado, id: estado === 'matching' ? (w.id as string) : null };
++}
++
++/**
++ * Registra una sola vez. Un envío dudoso (se cortó la red a medias) se resuelve
++ * solo con lecturas: un intento ya hecho nunca vuelve a escribir, y un alta que
++ * ya existe tiene que coincidir con lo enviado.
++ */
++export async function registrarUnaVez(opts: {
++  intentado: boolean;
++  idConocido: string | null;
++  consultar: () => Promise<TestigoAlta>;
++  crear: () => Promise<string | null>;
++  anotarIntento: (id: string | null) => void;
++}): Promise<{ estado: 'confirmado'; id: string } | { estado: 'pendiente' | 'conflicto'; id: null }> {
++  let hallado = await opts.consultar();
++  let conocido = opts.idConocido;
++  if (hallado.estado === 'absent' && !opts.intentado && !conocido) {
++    opts.anotarIntento(null);
++    try {
++      conocido = await opts.crear();
++    } catch {
++      // Resultado dudoso: se averigua leyendo, sin escribir otra vez.
++    }
++    if (conocido) opts.anotarIntento(conocido);
++    hallado = await opts.consultar();
++  }
++  if (hallado.estado !== 'matching' || !esUuid(hallado.id) || (conocido && conocido !== hallado.id)) {
++    return { estado: hallado.estado === 'conflict' ? 'conflicto' : 'pendiente', id: null };
++  }
++  return { estado: 'confirmado', id: hallado.id };
++}
+diff --git a/src/services/fomMeitrack.ts b/src/services/fomMeitrack.ts
+new file mode 100644
+index 0000000..336d287
+--- /dev/null
++++ b/src/services/fomMeitrack.ts
+@@ -0,0 +1,161 @@
++/**
++ * Meitrack T399L — lo que se le pregunta y se le pide al servidor.
++ *
++ * Las cuatro rutas de fom-core son las de la consola de Juan
++ * (`/api/v1/console/meitrack-setup/{readiness,capture,registration,register}`),
++ * que se entra con cookie de consola y no sirve a la app, que usa Bearer. Aquí
++ * se piden por su gemela móvil, `/api/v1/mobile/meitrack-setup/…`, que
++ * TODAVÍA NO está en el servidor publicado: mientras responda 404, cada llamada
++ * devuelve `sin-ruta` y la pantalla enseña el aviso en vez de fallar. El día
++ * que Juan la publique con ese nombre, esto empieza a funcionar sin tocar nada.
++ */
++
++import { ErrorFom, mensajeDe, pedir } from '@/lib/fom-api';
++import {
++  FABRICANTE_MEITRACK,
++  FIRMWARE_MEITRACK,
++  leerPreparacion,
++  leerSenal,
++  leerTestigo,
++  MODELO_MEITRACK,
++  PROTOCOLO_MEITRACK,
++  registrarUnaVez,
++  type PreparacionMeitrack,
++  type SenalMeitrack,
++  type TestigoAlta,
++} from '@/lib/gps-meitrack';
++import { RECEPTOR_HOST } from '@/lib/gps-alta';
++
++import { rutaDeEnte } from './fomRutas';
++
++const RUTA = '/meitrack-setup';
++
++/** Qué pasó con una llamada: respondió, no existe todavía, o falló. */
++export type Respuesta<T> = { tipo: 'ok'; datos: T } | { tipo: 'sin-ruta' } | { tipo: 'error'; mensaje: string };
++
++export const AVISO_SIN_RUTA =
++  'Registrar este modelo desde la app todavía no está en el servidor publicado de FOM. Los pasos de los mensajes ya sirven; el registro se habilita cuando el servidor lo publique.';
++
++/** Una ruta que el servidor aún no tiene: 404/405, o el 403/404 en HTML de nginx. */
++function esSinRuta(e: unknown): boolean {
++  return (
++    e instanceof ErrorFom &&
++    (e.statusCode === 404 || e.statusCode === 405 || (e.code === 'respuesta_no_json' && e.statusCode === 403))
++  );
++}
++
++/** Lo que dijo el servidor, en llano. El texto original no se enseña. */
++export function mensajeMeitrack(e: unknown): string {
++  if (e instanceof ErrorFom) {
++    if (e.statusCode === 401 || e.statusCode === 403) return 'Tu cuenta no puede registrar equipos GPS.';
++    if (e.statusCode === 409) {
++      if (/capture/i.test(e.message)) return 'FOM todavía no ha recibido la señal de este equipo. Envía los mensajes y espera a que llegue.';
++      return 'Ese IMEI o esa SIM ya están registrados, o hay un registro por confirmar. Revisa el inventario.';
++    }
++    if (e.statusCode === 400) return 'FOM no aceptó los datos del equipo. Revisa el IMEI, la línea y el APN.';
++  }
++  return mensajeDe(e);
++}
++
++/** Lecturas: no cambian nada, así que no deben borrar lo que la app ya leyó. */
++async function consultar(sufijo: string, cuerpo: unknown): Promise<Respuesta<unknown>> {
++  try {
++    const datos = await pedir(rutaDeEnte(`${RUTA}/${sufijo}`), { metodo: 'POST', cuerpo, invalidar: false });
++    return { tipo: 'ok', datos };
++  } catch (e) {
++    return esSinRuta(e) ? { tipo: 'sin-ruta' } : { tipo: 'error', mensaje: mensajeMeitrack(e) };
++  }
++}
++
++/** ¿Hay una ventana abierta para recibir a este equipo? No la abre. */
++export async function consultarVentanaMeitrack(imei: string): Promise<Respuesta<PreparacionMeitrack>> {
++  const r = await consultar('readiness', { imei, firmware: FIRMWARE_MEITRACK });
++  if (r.tipo !== 'ok') return r;
++  const datos = leerPreparacion(r.datos, RECEPTOR_HOST);
++  return datos ? { tipo: 'ok', datos } : { tipo: 'error', mensaje: 'FOM contestó algo que la app no entiende. Intenta más tarde.' };
++}
++
++/** ¿Llegó una trama de este equipo durante la ventana? No activa nada. */
++export async function consultarSenalMeitrack(imei: string, referencia: string): Promise<Respuesta<SenalMeitrack>> {
++  const r = await consultar('capture', { imei, firmware: FIRMWARE_MEITRACK });
++  if (r.tipo !== 'ok') return r;
++  const datos = leerSenal(r.datos, referencia);
++  return datos ? { tipo: 'ok', datos } : { tipo: 'error', mensaje: 'FOM contestó algo que la app no entiende. Intenta más tarde.' };
++}
++
++/** Lo que se escribe del equipo: solo inventario, sin unidad. */
++export interface AltaMeitrack {
++  imei: string;
++  linea: string;
++  iccid: string;
++  operadora: string;
++  apn: string;
++  serie?: string;
++  estadoSim?: 'active' | 'inactive' | 'suspended' | 'unknown';
++  planSim?: string;
++}
++
++function cuerpoDeAlta(a: AltaMeitrack): Record<string, string> {
++  const opcional = (clave: string, valor?: string) => (valor?.trim() ? { [clave]: valor.trim() } : {});
++  return {
++    imei: a.imei.trim(),
++    simPhone: a.linea.trim(),
++    iccid: a.iccid.trim(),
++    carrier: a.operadora.trim(),
++    apn: a.apn.trim(),
++    manufacturer: FABRICANTE_MEITRACK,
++    model: MODELO_MEITRACK,
++    protocolFamily: PROTOCOLO_MEITRACK,
++    transport: 'tcp',
++    firmwareVersion: FIRMWARE_MEITRACK,
++    ...opcional('serialNumber', a.serie),
++    ...opcional('simStatus', a.estadoSim),
++    ...opcional('simPlan', a.planSim),
++  };
++}
++
++/**
++ * Registra el T399L en el inventario, UNA vez. Primero pregunta si ya existe;
++ * si el envío queda dudoso, solo vuelve a leer. Devuelve el id del equipo.
++ */
++export async function registrarMeitrack(
++  alta: AltaMeitrack,
++  estado: { intentado: boolean; id: string | null; anotar: (id: string | null) => void },
++): Promise<Respuesta<{ id: string } | { pendiente: true; conflicto: boolean }>> {
++  const cuerpo = cuerpoDeAlta(alta);
++  // En un objeto: las funciones de abajo lo cambian y TS no sigue esos cambios en una variable suelta.
++  const visto: { sinRuta: boolean; fallo: string | null } = { sinRuta: false, fallo: null };
++  const consultarTestigo = async (): Promise<TestigoAlta> => {
++    const r = await consultar('registration', cuerpo);
++    if (r.tipo === 'sin-ruta') {
++      visto.sinRuta = true;
++      return { estado: 'unavailable', id: null };
++    }
++    if (r.tipo === 'error') {
++      visto.fallo = r.mensaje;
++      return { estado: 'unavailable', id: null };
++    }
++    return leerTestigo(r.datos) ?? { estado: 'unavailable', id: null };
++  };
++  const crear = async (): Promise<string | null> => {
++    try {
++      const creado = (await pedir(rutaDeEnte(`${RUTA}/register`), { metodo: 'POST', cuerpo })) as { id?: unknown };
++      return typeof creado?.id === 'string' ? creado.id : null;
++    } catch (e) {
++      // Un 4xx claro dice por qué; solo lo dudoso se resuelve leyendo.
++      if (e instanceof ErrorFom && e.statusCode >= 400 && e.statusCode < 500) visto.fallo = mensajeMeitrack(e);
++      throw e;
++    }
++  };
++  const r = await registrarUnaVez({
++    intentado: estado.intentado,
++    idConocido: estado.id,
++    consultar: consultarTestigo,
++    crear,
++    anotarIntento: estado.anotar,
++  });
++  if (visto.sinRuta) return { tipo: 'sin-ruta' };
++  if (r.estado === 'confirmado') return { tipo: 'ok', datos: { id: r.id } };
++  if (visto.fallo) return { tipo: 'error', mensaje: visto.fallo };
++  return { tipo: 'ok', datos: { pendiente: true, conflicto: r.estado === 'conflicto' } };
++}
+-- 
+2.55.0.windows.3
+
