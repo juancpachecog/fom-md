@@ -14,7 +14,8 @@ test('E91 identifica IMEI y versión sin pedirlos antes; número de serie no sal
 })
 test('la respuesta E04 completa queda ligada al mismo equipo y al conjunto necesario', () => {
   assert.deepEqual(readCommandsSms(`${imei},E04,DB4,DA6,A21,B36,C03,AFF,DDD`, imei), ['DB4', 'DA6', 'A21', 'B36', 'C03', 'AFF', 'DDD'])
-  for (const raw of [`${other},E04,A21,DB4,DA6`, `${imei},E04,A21,DB4`, 'A21,DB4,DA6', `${imei},E04,A21,DB4,DA6,0000,password`]) assert.equal(readCommandsSms(raw, imei), null)
+  assert.deepEqual(readCommandsSms('A21,DB4,DA6', imei), ['A21', 'DB4', 'DA6'])
+  for (const raw of [`${other},E04,A21,DB4,DA6`, `${imei},E04,A21,DB4`, `${imei},E04,A21,DB4,DA6,0000,password`]) assert.equal(readCommandsSms(raw, imei), null)
   assert.equal(readCommandsSms(`${imei},E04,A21,DB4,DA6`, ''), null)
 })
 test('DA6 conserva pendientes y estado sin convertir satélites o contadores en certificación', () => {

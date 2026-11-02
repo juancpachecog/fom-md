@@ -167,6 +167,7 @@ export function MeitrackInstallationSetup({ password, imei, firmware, apn, onRea
             {preparation === 0 && <>
                 {queryCard('E04', 'Consulta qué comandos admite este equipo. El asistente elegirá sólo los necesarios.')}
                 <label className="field"><span>Respuesta del GPS a E04</span><textarea value={commandsText} maxLength={2048} autoComplete="off" spellCheck={false} onChange={e => setCommandsText(e.target.value)} /></label>
+                <small>Si ya conservas sólo la lista de códigos separados por comas, también puedes pegarla aquí.</small>
                 {commandsText && !commandList && <p role="alert">La respuesta debe ser de este GPS y anunciar A21, DB4 y DA6. No se ha habilitado ningún cambio.</p>}
             </>}
             {preparation === 1 && <>

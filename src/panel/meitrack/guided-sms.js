@@ -16,8 +16,9 @@ export function readIdentitySms(raw, knownImei = '') {
 export function readCommandsSms(raw, imei) {
   if (!/^[0-9]{15}$/.test(imei ?? '')) return null
   const value = cells(raw, 'E04', imei)
-  if (!value || value.length < 3) return null
-  const list = parseT399CommandList(value.slice(2).join(','))
+  // Also accept the strict code-only list supported by the previous screen.
+  // A mismatching full response cannot pass that three-character-code parser.
+  const list = value && value.length >= 3 ? parseT399CommandList(value.slice(2).join(',')) : parseT399CommandList(raw)
   return list && ['A21', 'DB4', 'DA6'].every(code => list.includes(code)) ? list : null
 }
 
