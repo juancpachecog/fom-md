@@ -48,7 +48,7 @@ export function mensajeInstalarGps(error, { otraEmpresa = false, nombrePropia = 
   if (error?.estado === 409) return 'Esa unidad ya lleva un GPS, o este equipo ya está instalado en otra.'
   if (error?.estado === 404) {
     return otraEmpresa
-      ? `Este equipo está en el inventario de ${nombrePropia} y el servidor solo lo instala en unidades de esa misma empresa. Elige una unidad de ${nombrePropia}, o registra el equipo dentro de la otra empresa.`
+      ? `El servidor no aceptó instalar este equipo en una unidad de otra empresa. Es posible que el servidor publicado aún no tenga el inventario global de equipos; mientras tanto solo instala en unidades de la empresa donde está registrado el equipo (el inventario de ${nombrePropia}). Elige una unidad de esa empresa, o avisa a Juan para publicar la actualización.`
       : 'El servidor no encontró el equipo o la unidad. Recarga la pantalla e inténtalo de nuevo.'
   }
   return error?.message || 'No se pudo instalar el equipo. Inténtalo de nuevo.'
@@ -66,9 +66,14 @@ export function mensajeInstalarGps(error, { otraEmpresa = false, nombrePropia = 
  * deja instalar cualquier equipo del inventario, así que el que nunca reportó NO se esconde:
  * sale al final con `sinSenal: true` y «(sin señal todavía)» en el nombre. Primero van los que
  * hablaron más recientemente.
+ *
+ * `global` (T-215): con el inventario global del servidor (#749) el administrador FOM crea la
+ * unidad en CUALQUIER empresa sin entrar a ella y el equipo libre no tiene que ser de esa empresa:
+ * no se filtra por empresa. Si el servidor publicado aún no lo admite, rechaza la instalación y
+ * se explica al guardar (`mensajeInstalarGps`).
  */
-export function equiposParaNuevaUnidad(equipos, { destino = null, propia = null } = {}) {
-  const meta = destino || propia || null
+export function equiposParaNuevaUnidad(equipos, { destino = null, propia = null, global = false } = {}) {
+  const meta = global ? null : destino || propia || null
   const ms = (g) => { const t = Date.parse(g.ultimaConexion ?? ''); return Number.isFinite(t) ? t : 0 }
   return (equipos ?? [])
     .filter((g) => LIBRES.pasa(g))

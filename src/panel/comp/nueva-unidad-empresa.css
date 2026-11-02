@@ -1,0 +1,16 @@
+/* Nueva unidad en una empresa (T-215): se usa en Vehículos generales e Instalar en una unidad. */
+.nue { display: grid; gap: 14px; }
+.nue-par { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.nue-nota { margin: -6px 0 0; color: var(--e-texto-2); font-size: 12px; }
+.nue-mas { border: 1px solid var(--e-borde); border-radius: 12px; padding: 10px 14px; }
+.nue-mas summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--e-texto-2); }
+.nue-mas[open] summary { margin-bottom: 12px; }
+.nue-hecho { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--e-sup-baja); font-size: 13px; }
+.nue-gps { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--e-sup-baja); color: var(--e-texto-2); font-size: 13px; overflow-wrap: anywhere; }
+.nue-error { margin: 0; line-height: 1.5; }
+.nue-acciones { display: flex; justify-content: flex-end; gap: 12px; padding-top: 14px; border-top: 1px solid var(--e-borde); }
+@media (max-width: 700px) {
+  .nue-par { grid-template-columns: 1fr; }
+  .nue-acciones { flex-direction: column-reverse; }
+  .nue-acciones .pnl-btn { width: 100%; justify-content: center; }
+}

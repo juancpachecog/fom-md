@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDatos } from '../useDatos'
+import { useSesion } from '../useSesion'
 import { entrarEmpresa } from '../auth'
 import { vehiculosDeLaPlataforma } from '../datos/vehiculosPlataforma'
-import { Buscador, Campo, Cargando, Chips, Datos, ErrorCarga, Kpi, Modal, Tag, Vacio } from '../comp/ui'
+import { Buscador, Cargando, Chips, Datos, ErrorCarga, Kpi, Modal, Tag, Vacio } from '../comp/ui'
 import MiniFoto from '../comp/MiniFoto'
+import NuevaUnidadEmpresa from '../comp/NuevaUnidadEmpresa'
+import { empresaPropia } from '../datos/instalarGps'
 import { Icono } from '../Iconos'
 import * as f from '../datos/formato'
 import { etiqueta } from '../datos/catalogos'
@@ -18,7 +21,8 @@ import './admin-vehiculos.css'
 // Todas las unidades de todas las empresas en una lista: buscar, filtrar
 // por empresa, señal y tipo, ver la ficha de cada una y abrir su
 // expediente completo (se entra a su empresa primero). Crear unidades es
-// solo del administrador: el servidor rechaza el alta de un supervisor.
+// solo del administrador: el servidor rechaza el alta de un supervisor. «Nueva
+// unidad» crea en la empresa elegida SIN entrar a ella (T-215).
 // ============================================================
 
 const SENALES = [
@@ -32,6 +36,7 @@ const reportando = (v, ahora) => transmitiendo(v.ultimoReporte, ahora)
 
 export default function AdminVehiculos() {
   const navegar = useNavigate()
+  const sesion = useSesion()
   const datos = useDatos(() => vehiculosDeLaPlataforma(), [])
   const [q, setQ] = useState('')
   const [empresaId, setEmpresaId] = useState('')
@@ -42,11 +47,13 @@ export default function AdminVehiculos() {
   const [abriendo, setAbriendo] = useState(false)
   const [error, setError] = useState('')
   const [creando, setCreando] = useState(false)
+  const [creada, setCreada] = useState('')
   // «Sin señal · hace …» corre solo cada minuto, sin volver a leer las empresas.
   const ahora = useMinuto()
 
   const todos = datos.datos?.vehiculos ?? []
   const empresas = datos.datos?.empresas ?? []
+  const propia = empresaPropia(sesion)
   const tipos = useMemo(() => [...new Set(todos.map((v) => v.tipo))].sort(), [todos])
 
   const lista = useMemo(() => {
@@ -115,6 +122,7 @@ export default function AdminVehiculos() {
           No se pudieron leer las unidades de: {datos.datos.fallidas.map((x) => x.empresa.nombre).join(', ')}. Las demás sí se muestran.
         </p>
       )}
+      {creada && <p className="av-aviso" role="status"><Icono nombre="check" tam={16} />{creada}</p>}
       {error && <p className="pnl-campo-error" role="alert">{error}</p>}
 
       {datos.estado === 'cargando' ? <Cargando filas={6} /> : datos.estado === 'error' ? (
@@ -194,45 +202,20 @@ export default function AdminVehiculos() {
         )}
       </Modal>
 
-      {creando && <NuevaUnidadEnEmpresa empresas={empresas} alCerrar={() => setCreando(false)} />}
+      <NuevaUnidadEmpresa
+        abierto={creando}
+        empresas={empresas}
+        ofrecerGps
+        propia={propia}
+        nombrePropia={empresas.find((e) => e.id === propia)?.nombre || 'tu empresa'}
+        alCerrar={() => setCreando(false)}
+        alCerrarConUnidad={(r) => { setCreada(`La unidad «${r.alias}» se creó, pero sin GPS. Instálalo desde Administración FOM → GPS.`); datos.recargar() }}
+        alListo={(r) => {
+          setCreando(false)
+          setCreada(`La unidad «${r.alias}» se creó en ${r.empresaNombre}${r.instalado ? ' con su GPS instalado' : ''}.`)
+          datos.recargar()
+        }}
+      />
     </div>
-  )
-}
-
-/** Crear una unidad: se elige la empresa, se entra a ella y se abre el alta de la flota. */
-function NuevaUnidadEnEmpresa({ empresas, alCerrar }) {
-  const navegar = useNavigate()
-  const [empresaId, setEmpresaId] = useState('')
-  const [ocupado, setOcupado] = useState(false)
-  const [error, setError] = useState('')
-  async function continuar() {
-    const empresa = empresas.find((e) => e.id === empresaId)
-    if (!empresa) { setError('Elige la empresa de la unidad.'); return }
-    setOcupado(true)
-    setError('')
-    try {
-      await entrarEmpresa(empresa)
-      navegar('/panel/flota', { state: { nuevaUnidad: true } })
-    } catch (e) {
-      setError(e.message || 'No se pudo entrar a la empresa.')
-      setOcupado(false)
-    }
-  }
-  return (
-    <Modal titulo="Nueva unidad" abierto alCerrar={alCerrar} ancho={520}>
-      <div className="av-ficha">
-        <Campo etiqueta="¿De qué empresa es la unidad?" error={error}>
-          <select className="pnl-input" value={empresaId} onChange={(e) => setEmpresaId(e.target.value)}>
-            <option value="">Elige la empresa…</option>
-            {empresas.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-          </select>
-        </Campo>
-        <p className="av-nota">Se abre el alta de la flota de esa empresa con sus áreas y su GPS.</p>
-        <div className="av-acciones">
-          <button type="button" className="pnl-btn" onClick={alCerrar} disabled={ocupado}>Cancelar</button>
-          <button type="button" className="pnl-btn primario" onClick={continuar} disabled={ocupado}>{ocupado ? 'Entrando…' : 'Continuar'}</button>
-        </div>
-      </div>
-    </Modal>
   )
 }

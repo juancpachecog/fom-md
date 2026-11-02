@@ -271,9 +271,16 @@ export const api = {
       ...(empresaId === undefined ? {} : { empresaContexto: empresaId || null }),
     }),
 
-  /** Alta de vehiculo. */
-  crearVehiculo: (cuerpo) =>
-    pedir(`${CONSOLA}/vehicles`, { metodo: 'POST', cuerpo }),
+  /**
+   * Alta de vehiculo. `empresaId` (T-215): sin dato, la ruta normal (la de la empresa en gestión,
+   * si hay); un id, la ruta `/tenants/{id}` de esa empresa, sin entrar a ella; `null`, la ruta propia.
+   */
+  crearVehiculo: (cuerpo, empresaId) =>
+    pedir(`${CONSOLA}/vehicles`, {
+      metodo: 'POST',
+      cuerpo,
+      ...(empresaId === undefined ? {} : { empresaContexto: empresaId || null }),
+    }),
 
   /** Editar el vehiculo, incluida su area. */
   actualizarVehiculo: (vehicleId, cuerpo) =>

@@ -1143,9 +1143,11 @@ export const repoApi = {
      * final marcados «sin señal todavía». Si la lectura falla, el error se propaga: no es lo
      * mismo que «no hay equipos libres».
      */
-    async disponibles() {
+    // `global` (T-215): para crear la unidad en cualquier empresa sin entrar a ella; los libres del
+    // inventario global se ofrecen sin filtrar por empresa.
+    async disponibles({ global = false } = {}) {
       const propia = empresaPropia(sesionActual())
-      return equiposParaNuevaUnidad(await repoApi.gpsEscritura.listar({}), { destino: empresaGestionActualId() ?? propia, propia })
+      return equiposParaNuevaUnidad(await repoApi.gpsEscritura.listar({}), { destino: empresaGestionActualId() ?? propia, propia, global })
     },
     /** Un equipo, con su instalación vigente (`GET gps-devices/:id`). */
     async obtener(equipoId) {
