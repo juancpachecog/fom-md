@@ -11,9 +11,13 @@ import { tiempoSinSenal, transmitiendo } from './sinSenal.js'
 
 /**
  * Marcas y modelos que el receptor FOM sabe leer. El modelo elige el
- * protocolo; hoy el receptor solo habla Coban GPS103 (catálogo de gps-web).
+ * protocolo. Meitrack sólo ofrece preparación controlada: su presencia en el
+ * catálogo no acredita un receptor disponible ni habilita activación.
  */
 export const CATALOGO_GPS = {
+  Meitrack: {
+    T399L: { protocolo: 'meitrack-t399', protocoloNombre: 'Meitrack T399 (preparación controlada)', transporte: 'tcp' },
+  },
   Coban: {
     'GPS-403': { protocolo: 'coban-gps103', protocoloNombre: 'Coban GPS103', transporte: 'tcp' },
   },

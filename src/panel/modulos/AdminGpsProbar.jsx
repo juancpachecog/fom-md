@@ -31,6 +31,9 @@ const IP_RECEPTOR = import.meta.env?.VITE_GPS_RECEPTOR || ''
 export function ComandosSms({ equipo, clave, alCambiarClave }) {
   const [copiado, setCopiado] = useState(null)
   const [fallo, setFallo] = useState('')
+  if (equipo.fabricante === 'Meitrack' || equipo.modelo === 'T399L' || equipo.protocolo === 'meitrack-t399') {
+    return <section className="gp-card" role="status">Meitrack requiere el recorrido específico de preparación y recuperación. No utilice comandos Coban para este equipo. Registrar no acredita su puesta en servicio.</section>
+  }
   const comandos = armarComandos({ clave, apn: equipo.apn ?? '', ip: IP_RECEPTOR, puerto: PUERTO_RECEPTOR, transporte: equipo.transport ?? 'tcp' })
   const linea = equipo.linea || equipo.simPhone
   const copiar = async (c) => {
