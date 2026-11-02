@@ -8,20 +8,15 @@ import { useDatos } from '../useDatos'
 import { useSesion } from '../useSesion'
 import { Cabeza, Detectado, IcoGps, Pastilla, RAIZ_GPS, useAhora } from '../comp/GpsPiezas'
 import { ComandosSms, PruebaSenal } from './AdminGpsProbar'
-import { cambiosGps } from '../datos/metadatosGps'
+import { validarPreparacion, identidadConfirmada, coincideDetectado, testigoInventarioCoban } from '../datos/gps-discovery'
 import {
-  CATALOGO_GPS, ESTADOS_SIM, haceCuanto, validarEquipo, validarIccid, validarImei, validarLinea,
+  CATALOGO_GPS, ESTADOS_SIM, haceCuanto, validarIccid, validarImei, validarLinea,
 } from '../datos/gps'
 import './admin-gps.css'
 
 // ============================================================
-// NUEVO GPS EN 3 PASOS (T-95, tableros GW2 y GW3)
-//   1 · Equipo: marca y modelo (eligen el protocolo), IMEI, serie, firmware,
-//       TCP/UDP y la clave SMS (solo en memoria: arma los comandos).
-//   2 · Línea SIM: teléfono, ICCID, operador, APN, estado y plan.
-//   3 · Configurar y probar: al entrar se registra el equipo
-//       (POST gps-devices) y se muestran los comandos y la prueba de señal.
-// Registrar e instalar son pasos aparte: el equipo puede esperar en la gaveta.
+// NUEVO GPS: preparar equipo y SIM sin crear inventario; configurar por SMS,
+// comparar la identidad con la recepción y registrar al final, sin activar.
 // ============================================================
 
 const OPERADORES = [
@@ -52,26 +47,33 @@ export default function AdminGpsNuevo() {
   const [guardando, setGuardando] = useState(false)
   const [errorAlta, setErrorAlta] = useState('')
   const [meitrackReceived, setMeitrackReceived] = useState(false)
+  const [imeiSms, setImeiSms] = useState('')
+  const [seleccionado, setSeleccionado] = useState(null)
   const inFlight = useRef(false)
   const detectados = useDatos(() => repo.admin.gps.sinEmparejar(), [], 30_000)
 
   const modelo = CATALOGO_GPS[datos.marca]?.[datos.modelo] ?? null
   const meitrack = datos.marca === 'Meitrack' && datos.modelo === 'T399L'
+  const identidad = identidadConfirmada(datos.imei, imeiSms)
+  const imeiPreparacion = identidad ?? (!validarImei(datos.imei).error ? validarImei(datos.imei).valor : '')
+  const seleccionadoCoban = !meitrack && detectados.estado === 'ok' && (detectados.datos ?? []).find(d => d.imei === seleccionado && coincideDetectado(d, { inicial: datos.imei, sms: imeiSms, transporte: datos.transporte, ahora }))
+  const puedeRegistrar = !!identidad && (meitrack ? meitrackReceived && seleccionado === identidad : !!seleccionadoCoban)
   const poner = (campo, valor) => {
+    setSeleccionado(null)
+    setMeitrackReceived(false)
     setDatos((d) => ({ ...d, [campo]: valor }))
     setErrores((e) => ({ ...e, [campo]: undefined }))
     if (campo === 'imei' && valor !== imeiDeSenal) setImeiDeSenal(null)
   }
   const usarImei = (d) => {
-    if (equipo) return
-    setDatos((x) => ({ ...x, imei: d.imei, transporte: d.transporte === 'udp' ? 'udp' : 'tcp' }))
-    setImeiDeSenal(d.imei)
+    if (equipo || !coincideDetectado(d, { inicial: datos.imei, sms: imeiSms, transporte: datos.transporte, ahora })) return
+    setSeleccionado(d.imei)
     setErrores((e) => ({ ...e, imei: undefined }))
   }
 
   const siguiente1 = () => {
-    const e = validarEquipo(datos)
-    if (meitrack && (datos.firmware.trim() !== 'T399L-V254' || datos.transporte !== 'tcp')) e.firmware = 'Esta preparación requiere firmware observado T399L-V254 y transporte TCP.'
+    const e = validarPreparacion(datos)
+    if (meitrack && (datos.firmware.trim() && datos.firmware.trim() !== 'T399L-V254' || datos.transporte !== 'tcp')) e.firmware = 'La conexión controlada requiere firmware observado T399L-V254 y transporte TCP; puedes consultar la versión durante la preparación.'
     setErrores(e)
     if (Object.keys(e).length === 0) setPaso(2)
   }
@@ -92,44 +94,45 @@ export default function AdminGpsNuevo() {
     const e = validarLinea(datos)
     setErrores(e)
     if (Object.keys(e).length > 0) return
-    if (meitrack) { setPaso(3); return }
+    setPaso(3)
+  }
+
+  const registrarCoban = async () => {
+    if (inFlight.current || equipo || !puedeRegistrar || meitrack) return
+    inFlight.current = true
     setGuardando(true)
     setErrorAlta('')
     try {
-      if (!equipo) {
-        const r = await repo.admin.gps.registrar({
-          imei: validarImei(datos.imei).valor,
-          modelo: datos.modelo,
-          fabricante: datos.marca,
-          protocolo: modelo?.protocolo,
-          serie: datos.serie.trim() || undefined,
-          ...metadatos(),
-        }, sesion?.perfil)
-        if (!r?.id) throw new Error('El servidor no devolvió el equipo registrado. Búscalo en el inventario antes de volver a intentarlo.')
-        setEquipo({ id: r.id, ...metadatos() })
-      } else {
-        // Volvió atrás y cambió la línea: solo se manda lo que cambió. El IMEI ya no se corrige.
-        const cambios = cambiosGps(metadatos(), equipo)
-        if (Object.keys(cambios).length > 0) {
-          await repo.admin.gps.set(equipo.id, { serie: datos.serie.trim() || undefined, metadatos: cambios })
-          setEquipo((x) => ({ ...x, ...metadatos() }))
-        }
-      }
-      setPaso(3)
+      if (!navigator.locks?.request) throw Error('Use un navegador compatible con la protección de intentos entre pestañas.')
+      const payload = { imei: identidad, model: datos.modelo, manufacturer: datos.marca,
+        protocolFamily: modelo?.protocolo, ...metadatos(), ...(datos.serie.trim() ? { serialNumber: datos.serie.trim() } : {}) }
+      const unitHash = await sha256(identidad)
+      const id = await navigator.locks.request(`fom-727-registration:${unitHash}`, () => registerInventory(payload, {
+        storage: localStorage, digest: sha256,
+        request: async path => {
+          if (path === 'registration') return testigoInventarioCoban(await repo.admin.gps.listar(), payload)
+          const fresh = await repo.admin.gps.sinEmparejar()
+          if (!fresh.some(d => coincideDetectado(d, { inicial: datos.imei, sms: imeiSms, transporte: datos.transporte }))) throw Error('La señal coincidente ya no está disponible. Actualiza la lista.')
+          return repo.admin.gps.registrar({ imei: identidad, modelo: datos.modelo, fabricante: datos.marca,
+            protocolo: modelo?.protocolo, serie: datos.serie.trim() || undefined, ...metadatos() }, sesion?.perfil)
+        },
+      }))
+      setEquipo({ id, ...metadatos() })
     } catch (err) {
       setErrorAlta(err.message)
     } finally {
+      inFlight.current = false
       setGuardando(false)
     }
   }
 
   const registrarMeitrack = async () => {
-    if (inFlight.current || equipo || !meitrackReceived) return
+    if (inFlight.current || equipo || !puedeRegistrar || !meitrack) return
     inFlight.current = true
     setGuardando(true)
     setErrorAlta('')
     try {
-      const payload = { imei: validarImei(datos.imei).valor, model: datos.modelo, manufacturer: datos.marca,
+      const payload = { imei: identidad, model: datos.modelo, manufacturer: datos.marca,
         protocolFamily: 'meitrack-t399', ...metadatos(),
         ...(datos.serie.trim() ? { serialNumber: datos.serie.trim() } : {}) }
       if (!navigator.locks?.request) throw Error('Este navegador no permite proteger el intento entre pestañas. Use un navegador compatible; el alta permanece bloqueada.')
@@ -144,12 +147,15 @@ export default function AdminGpsNuevo() {
   const salir = () => navegar(equipo ? `${RAIZ_GPS}/${equipo.id}` : RAIZ_GPS)
   const bajada = paso === 3
     ? meitrack ? 'Conserva la recuperación, configura por SMS y comprueba la recepción antes del alta. No activa el GPS.' : 'Envía los comandos por SMS a la línea del equipo y espera su primera señal.'
-    : 'Registra el equipo en el inventario. Instalarlo en una unidad es un paso aparte.'
+    : 'Prepara el equipo y su línea, configura por SMS y confirma la identidad recibida antes de registrarlo.'
 
   // La vista del equipo para los comandos y la prueba: lo escrito aquí, con el id del registro.
-  const equipoVista = equipo && {
+  const equipoVista = {
     ...equipo,
-    imei: validarImei(datos.imei).valor,
+    imei: identidad ?? imeiPreparacion,
+    transport: datos.transporte,
+    apn: datos.apn.trim(),
+    carrier: datos.operador.trim(),
     modelo: datos.modelo,
     fabricante: datos.marca,
     linea: datos.telefono.trim(),
@@ -184,7 +190,7 @@ export default function AdminGpsNuevo() {
             <div className="gp-titulo">
               <p className="gp-k">Paso 1 de 3</p>
               <h2 className="gp-st" id="gp-p1">Datos del equipo</h2>
-              <span className="gp-lbl">La marca y el modelo eligen el protocolo. El IMEI no se corrige después.</span>
+              <span className="gp-lbl">Elige marca y modelo. Si aún no conoces el IMEI, podrás consultarlo por SMS y compararlo con la señal al final.</span>
             </div>
             <div className="gp-campos">
               <Campo id="n-marca" etiqueta="Marca *" error={errores.marca}>
@@ -215,7 +221,7 @@ export default function AdminGpsNuevo() {
                 </div>
                 <span className="gp-hint">{meitrack ? 'Esta preparación admite TCP; no acredita el estado de fábrica del equipo.' : `${(modelo?.transporte ?? 'tcp').toUpperCase()} es el de fábrica del ${datos.modelo}.`}</span>
               </div>
-              <Campo id="n-imei" etiqueta="IMEI *" todo error={errores.imei} ayuda={equipo ? 'Ya registrado: el IMEI no se corrige.' : '15 dígitos, único en FOM. Si no lo tienes, elige uno de «Detectados sin registrar».'}>
+              <Campo id="n-imei" etiqueta="IMEI conocido (opcional)" todo error={errores.imei} ayuda={equipo ? 'Ya registrado: el IMEI no se corrige.' : 'Déjalo vacío si no lo conoces. El registro esperará la coincidencia entre el SMS y la señal recibida.'}>
                 <div className={`gp-field${errores.imei ? ' mal' : imeiDeSenal ? ' ok' : ''}${equipo ? ' ro' : ''}`}>
                   <input id="n-imei" className="gp-mono" inputMode="numeric" autoComplete="off" maxLength={20} value={datos.imei} readOnly={Boolean(equipo)} onChange={(e) => poner('imei', e.target.value)} aria-invalid={Boolean(errores.imei)} />
                   {imeiDeSenal && <TomadoDeLaSenal d={(detectados.datos ?? []).find((x) => x.imei === imeiDeSenal)} ahora={ahora} />}
@@ -236,23 +242,12 @@ export default function AdminGpsNuevo() {
             </div>
           </section>
 
-          <section className="gp-card gp-col" aria-labelledby="det-t">
-            <div className="gp-titulo">
-              <h2 className="gp-st" id="det-t">Detectados sin registrar</h2>
-              <span className="gp-hint">Elige el equipo que ya envía datos. Lo que mandó se guarda tal cual.</span>
-            </div>
-            {detectados.estado === 'error' && <span className="gp-hint">{detectados.error?.message}</span>}
-            {detectados.estado === 'ok' && (detectados.datos ?? []).length === 0 && <span className="gp-hint">Ahora mismo no llega ningún IMEI sin registrar.</span>}
-            {(detectados.datos ?? []).map((d) => (
-              <Detectado key={d.imei} d={d} ahora={ahora} elegido={d.imei === datos.imei} detallado>
-                {d.imei === datos.imei
-                  ? <span className="en-uso"><IcoGps nombre="check" />En uso en este alta</span>
-                  : <button type="button" className="gp-btn2 chico" disabled={Boolean(equipo)} onClick={() => usarImei(d)}>Usar este IMEI</button>}
-              </Detectado>
-            ))}
-            <button type="button" className="gp-btn2 ancho" onClick={() => detectados.recargar()}><IcoGps nombre="sync" />Actualizar lista</button>
-            <span className="gp-hint">¿No aparece? Configura el equipo hacia el receptor FOM y actualiza.</span>
+          <section className="gp-card gp-col">
+            <h2 className="gp-st">Primero configura, después identifica</h2>
+            <p>En el último paso tendrás los comandos SMS y los dispositivos detectados sin registrar. Compara el IMEI que responda tu GPS, selecciona su señal y registra el equipo.</p>
+            <p>No se crea ningún registro al avanzar por estas pantallas.</p>
           </section>
+
         </div>
       )}
 
@@ -302,7 +297,7 @@ export default function AdminGpsNuevo() {
             <div className="gp-pie entre">
               <button type="button" className="gp-btn2" onClick={() => setPaso(1)} disabled={guardando}><IcoGps nombre="anterior" />Anterior</button>
               <button type="button" className="gp-btn" onClick={siguiente2} disabled={guardando}>
-                {guardando ? 'Registrando…' : meitrack || equipo ? 'Siguiente: Configurar y probar' : 'Registrar y configurar'}<IcoGps nombre="siguiente" />
+                Siguiente: Configurar y probar<IcoGps nombre="siguiente" />
               </button>
             </div>
           </section>
@@ -313,7 +308,7 @@ export default function AdminGpsNuevo() {
               <span className="gp-ibox"><IcoGps nombre="gps" /></span>
               <div className="gp-titulo">
                 <b id="gp-res" style={{ fontSize: 15, fontWeight: 600 }}>{datos.marca} {datos.modelo}</b>
-                <span className="gp-hint gp-mono">IMEI {validarImei(datos.imei).valor}</span>
+                <span className="gp-hint gp-mono">IMEI {validarImei(datos.imei).valor || 'pendiente de consultar por SMS'}</span>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -321,32 +316,66 @@ export default function AdminGpsNuevo() {
               <Pastilla tono="info">{datos.transporte.toUpperCase()}</Pastilla>
               {equipo && <Pastilla tono="ok">Registrado</Pastilla>}
             </div>
-              <span className="gp-hint">{meitrack ? 'Al seguir, preparas la configuración. El alta espera la recepción comprobada y no activa el GPS.' : 'Al seguir, el equipo queda registrado en el inventario y pasas a configurarlo y probarlo.'}</span>
+              <span className="gp-hint">Al seguir, preparas la configuración. El registro espera la coincidencia de identidad y la recepción comprobada; no activa el GPS.</span>
           </section>
         </div>
       )}
 
+      {paso === 3 && (
+        <section className="gp-card" aria-label="Identidad consultada por SMS">
+          <h2 className="gp-st">Configura y confirma la identidad</h2>
+          <p>Envía los comandos desde tu teléfono. La consulta de identidad no requiere conocer el IMEI de antemano. Compara la respuesta del mismo GPS con la señal recibida antes de registrar.</p>
+          <Campo id="n-imei-sms" etiqueta="IMEI consultado por SMS" ayuda="Puede quedar pendiente mientras envías las consultas de abajo. Después introduce sólo sus 15 dígitos, sin contraseñas ni respuestas completas.">
+            <div className="gp-field"><input id="n-imei-sms" inputMode="numeric" autoComplete="off" value={imeiSms} readOnly={!!equipo} onChange={e => { setImeiSms(e.target.value); setSeleccionado(null) }} /></div>
+          </Campo>
+          {imeiSms && !identidad && <p role="alert">El IMEI consultado no es válido o no coincide con el indicado al principio. No selecciones otro dispositivo para continuar.</p>}
+          {meitrack && <Campo id="n-fw-observed" etiqueta="Firmware observado por SMS" ayuda="Consulta E91 en la preparación de abajo. La conexión sólo se habilita para T399L-V254.">
+            <div className="gp-field"><input id="n-fw-observed" value={datos.firmware} readOnly={!!equipo} onChange={e => poner('firmware', e.target.value)} /></div>
+          </Campo>}
+        </section>
+      )}
       {paso === 3 && meitrack && (
         <>
-          <MeitrackInstallationSetup key={JSON.stringify([datos.imei, datos.firmware, datos.apn])}
-            password={clave} imei={validarImei(datos.imei).valor} firmware={datos.firmware.trim()} apn={datos.apn.trim()}
+          <MeitrackInstallationSetup key={JSON.stringify([imeiPreparacion, datos.firmware, datos.apn])}
+            password={clave} imei={imeiPreparacion} firmware={datos.firmware.trim()} apn={datos.apn.trim()}
             onReady={() => {}} onCapture={setMeitrackReceived} onPasswordChange={setClave} />
-          {errorAlta && <p className="gp-aviso error" role="alert">{errorAlta}</p>}
-          {equipo ? <p className="gp-aviso" role="status">Registro comprobado en inventario. La instalación, el reloj y las funciones siguen pendientes; el GPS no está activado.</p>
-            : <button type="button" className="gp-btn" disabled={guardando || !meitrackReceived} onClick={registrarMeitrack}>{guardando ? 'Comprobando registro…' : 'Registrar sin activar'}</button>}
+          {equipo && <p className="gp-aviso" role="status">Registro comprobado en inventario. La instalación, el reloj y las funciones siguen pendientes; el GPS no está activado.</p>}
         </>
       )}
-      {paso === 3 && !meitrack && equipoVista && (
+      {paso === 3 && !meitrack && (
         <>
-          <div className="gp-aviso" role="status"><IcoGps nombre="check" />Equipo registrado en el inventario. Ya puedes configurarlo y probarlo.</div>
+          <div className="gp-aviso" role="status">{equipo ? 'Registro comprobado en inventario; instalar y activar son pasos separados.' : 'Preparación sin registro. Configura por SMS, consulta el IMEI y elige la señal coincidente al final.'}</div>
           <div className="gp-grid l400">
-            <ComandosSms equipo={equipoVista} clave={clave} />
-            <PruebaSenal equipo={equipoVista} />
+            <ComandosSms equipo={equipoVista} clave={clave} alCambiarClave={setClave} />
+            {equipo && <PruebaSenal equipo={equipoVista} />}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button type="button" className="gp-btn2" onClick={() => setPaso(2)}><IcoGps nombre="anterior" />Anterior</button>
+            <button type="button" className="gp-btn2" disabled={!!equipo} onClick={() => setPaso(2)}><IcoGps nombre="anterior" />Anterior</button>
           </div>
         </>
+      )}
+      {paso === 3 && !equipo && (
+        <section className="gp-card gp-col" aria-labelledby="det-final">
+          <h2 className="gp-st" id="det-final">Detectados sin registrar · confirmar al final</h2>
+          <p>Compara el IMEI de la respuesta SMS. Selecciona la identidad coincidente con recepción comprobada y el mismo transporte.</p>
+          {meitrack ? <>
+            <p>Esta lista usa exclusivamente la captura Meitrack de esta ventana; una señal Coban no sirve para este equipo.</p>
+            {meitrackReceived && identidad ? <div className="gp-det">
+              <span className="gp-mono">{identidad}</span>
+              <p>Trama Meitrack conservada e identidad comprobada. Destino, APN y TCP coinciden con DB4.</p>
+              <button type="button" className="gp-btn2" onClick={() => setSeleccionado(identidad)}>{seleccionado === identidad ? 'Coincidencia seleccionada' : 'Seleccionar este dispositivo'}</button>
+            </div> : <p role="status">Pendiente de configuración, respuesta DB4 y recepción Meitrack comprobada.</p>}
+          </> : <>
+            {detectados.estado === 'error' && <p role="alert">{detectados.error?.message}</p>}
+            {(detectados.datos ?? []).length === 0 && <p>No hay dispositivos sin registrar detectados todavía. Envía los comandos y actualiza la lista.</p>}
+            {(detectados.datos ?? []).map(d => <Detectado key={d.imei} d={d} ahora={ahora} elegido={seleccionado === d.imei} detallado>
+              <button type="button" className="gp-btn2 chico" disabled={!coincideDetectado(d, { inicial: datos.imei, sms: imeiSms, transporte: datos.transporte, ahora })} onClick={() => usarImei(d)}>{seleccionado === d.imei ? 'Coincidencia seleccionada' : 'Seleccionar este dispositivo'}</button>
+            </Detectado>)}
+            <button type="button" className="gp-btn2" onClick={() => detectados.recargar()}>Actualizar lista</button>
+          </>}
+          {errorAlta && <p role="alert">{errorAlta}</p>}
+          <button type="button" className="gp-btn" disabled={guardando || !puedeRegistrar} onClick={meitrack ? registrarMeitrack : registrarCoban}>{guardando ? 'Comprobando registro…' : 'Registrar sin activar'}</button>
+        </section>
       )}
     </div>
   )

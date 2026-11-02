@@ -62,7 +62,8 @@ export function MeitrackInstallationSetup({ password, imei, firmware, apn, onRea
     const connection = capture?.received ? null : setupConnectionSms(password, baseline, imei, firmware, apn, emptyAuth, recoverySaved, announced, setup, elapsed);
     useEffect(() => { onReady(connection !== null); }, [connection, onReady, tick]);
     const configured = configuredT399Readback(latest, baseline, imei, firmware, apn, lastWindow?.destination ?? null);
-    useEffect(() => { onCapture(capture?.received === true && capture.reference === lastWindow?.reference && configured && emptyAuth); }, [capture, onCapture, lastWindow, configured, emptyAuth]);
+    const currentWindow = setupWindowUsable(setup, elapsed);
+    useEffect(() => { onCapture(currentWindow && capture?.received === true && capture.reference === lastWindow?.reference && configured && emptyAuth); }, [currentWindow, capture, onCapture, lastWindow, configured, emptyAuth]);
     async function copy(kind) {
         const currentElapsed = response ? performance.now() - response.at : Infinity;
         const command = kind === "recovery" ? recovery : capture?.received ? null
