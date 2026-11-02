@@ -128,7 +128,7 @@ export function armarComandos({ clave = '', apn = '', ip = '', puerto = PUERTO_R
     { titulo: 'Apuntar al receptor FOM', cuerpo: (k) => `adminip${k} ${destino} ${puerto}`, respuesta: 'Guarda la dirección y el puerto' },
     { titulo: udp ? 'Encender datos por UDP' : 'Encender datos por TCP', cuerpo: (k) => `GPRS${k},${udp ? '1,1' : '0,0'}`, respuesta: 'Responde: GPRS OK' },
     { titulo: 'Comprobar', cuerpo: (k) => `check${k}`, respuesta: `Debe decir GPRS ON y PORT ${puerto}` },
-    { titulo: 'Pedir el IMEI (opcional)', cuerpo: (k) => `imei${k}`, respuesta: 'Si no responde, FOM lo toma de la señal' },
+    { titulo: 'Consultar el IMEI del equipo', cuerpo: (k) => `imei${k}`, respuesta: 'Compara la respuesta con el dispositivo detectado antes de registrarlo' },
   ]
   return lista.map(({ titulo, cuerpo, respuesta }, i) => ({
     n: String(i + 1).padStart(2, '0'),
