@@ -701,19 +701,17 @@ export const repo = {
     },
 
     /**
-     * Alta de vehículo: SOLO el Administrador FOM, y solo con un GPS ya
-     * verificado (la regla dura de la app: sin GPS probado no hay unidad).
+     * Demostración de alta independiente, con GPS opcional (#767).
      */
-    async crear({ alias, placa, marca, modelo, anio, tipo = 'camioneta', gpsId, areaId = null }, actor) {
+    async crear({ alias, placa, marca, modelo, anio, tipo = 'camioneta', gpsId, areaId = null, numero }, actor) {
       if (actor?.rol !== 'admin') return fallo('Solo el Administrador FOM puede crear vehículos.')
       const placaN = String(placa || '').toUpperCase().replace(/\s+/g, '')
-      if (!placaN) return fallo('La placa es obligatoria.')
-      if (todosVehiculos().some((v) => v.placa.toUpperCase().replace(/\s+/g, '') === placaN))
+      if (!placaN && !alias?.trim() && !numero?.trim()) return fallo('Indica una placa, un alias o un número interno.')
+      if (placaN && todosVehiculos().some((v) => (v.placa || '').toUpperCase().replace(/\s+/g, '') === placaN))
         return fallo('Ya existe un vehículo con esa placa.')
       const gps = todosGps().find((g) => g.id === gpsId)
-      if (!gps) return fallo('Selecciona un GPS del inventario.')
-      if (!gps.verificado) return fallo('El GPS debe estar verificado antes de asignarse a un vehículo.')
-      if (gps.vehiculoId) return fallo('Ese GPS ya está instalado en otra unidad.')
+      if (gpsId && !gps) return fallo('Selecciona un GPS del inventario.')
+      if (gps && (gps.estado !== 'inventory' || gps.vehiculoId)) return fallo('Ese GPS no está disponible en inventario.')
 
       const n = todosVehiculos().length + 1
       const id = `veh-n${Date.now().toString(36)}`
@@ -725,33 +723,33 @@ export const repo = {
         modelo: modelo || 'Hilux',
         anio: Number(anio) || new Date().getFullYear(),
         placa: placaN,
-        numero: `U-${String(n).padStart(3, '0')}`,
+        numero: numero?.trim() || `U-${String(n).padStart(3, '0')}`,
         alias: alias?.trim() || `Unidad ${String(n).padStart(2, '0')}`,
         tipo,
-        gps: { id: gps.id, modelo: gps.modelo, imei: gps.imei, linea: gps.linea, verificado: true, pinSupport: gps.pinSupport, panicoProbado: gps.panicoProbado },
+        gps: gps ? { id: gps.id, modelo: gps.modelo, imei: gps.imei, linea: gps.linea, verificado: gps.verificado, pinSupport: gps.pinSupport, panicoProbado: gps.panicoProbado } : null,
         areaId: area.id,
         conductorPrincipalId: null,
-        estadoMarcha: 'parada',
-        velocidadKmh: 0,
+        estadoMarcha: null,
+        velocidadKmh: null,
         km: 0,
-        lat: area.base.lat,
-        lng: area.base.lng,
+        lat: null,
+        lng: null,
         indiceSeguro: 100,
         aceitePct: 100,
         tempMotorC: 0,
         ubicacionTexto: 'Patio principal',
-        ultimoReporte: new Date().toISOString(),
+        ultimoReporte: null,
         creadoEn: new Date().toISOString(),
       }
       agregar('vehiculos', fila)
-      guardarParche('gps', gps.id, { vehiculoId: id, empresaId: EMPRESA.id })
+      if (gps) guardarParche('gps', gps.id, { vehiculoId: id, empresaId: EMPRESA.id, estado: 'active' })
       auditar('crear_vehiculo', {
         actor,
         empresaId: EMPRESA.id,
         objetivo: `${fila.alias} · ${fila.placa}`,
-        detalle: `Alta con GPS ${gps.modelo} verificado`,
+        detalle: gps ? `Alta con GPS ${gps.modelo}, sin certificar funciones` : 'Alta sin GPS',
       })
-      return responder(fila, 300)
+      return responder({ ...fila, pendientes: [] }, 300)
     },
   },
 
@@ -1317,9 +1315,9 @@ export const repo = {
         return responder({ ...alDiaDemo(g), empresaNombre: empresa?.nombre ?? '—' })
       },
 
-      /** GPS verificados y sin unidad: los únicos válidos para crear vehículo. */
+      /** Inventario libre; la recepción no es requisito de instalación. */
       async disponibles() {
-        return responder(todosGps().filter((g) => g.verificado && !g.vehiculoId))
+        return responder(todosGps().filter((g) => g.estado === 'inventory' && !g.vehiculoId))
       },
 
       async registrar({ modelo, imei, linea = '', fabricante, protocolo, serie, ...metadata }, actor) {

@@ -25,6 +25,8 @@ import { cambiosGps } from './metadatosGps'
 import { MEITRACK, cuerpoAltaMeitrack } from './gpsMeitrack'
 import { buscarEquipoGps, empresaDeInstalacion, empresaPropia, equiposParaNuevaUnidad, mensajeInstalarGps } from './instalarGps'
 import { empresaDeReinicio, mensajeReiniciarClave } from './reiniciarClave'
+import { crearUnidad, gpsDisponible } from './altaUnidad'
+import { placaMayuscula } from './placas'
 import { LIMITE_EVENTOS, comoEventoManejo, diasServidor } from './eventosManejo'
 import { cloudinaryConfigurado, subirImagen } from './cloudinary'
 import { carpetaDe } from './archivos'
@@ -1147,7 +1149,8 @@ export const repoApi = {
     // inventario global se ofrecen sin filtrar por empresa.
     async disponibles({ global = false } = {}) {
       const propia = empresaPropia(sesionActual())
-      return equiposParaNuevaUnidad(await repoApi.gpsEscritura.listar({}), { destino: empresaGestionActualId() ?? propia, propia, global })
+      // Solo los que el servidor deja instalar (#767): en inventario, sin unidad ni instalación abierta.
+      return equiposParaNuevaUnidad((await repoApi.gpsEscritura.listar({})).filter(gpsDisponible), { destino: empresaGestionActualId() ?? propia, propia, global })
     },
     /** Un equipo, con su instalación vigente (`GET gps-devices/:id`). */
     async obtener(equipoId) {
@@ -1167,7 +1170,7 @@ export const repoApi = {
         ultimaRecepcion: r?.lastReceivedAt ?? null,
         frescuraS: Number(r?.freshnessSeconds) || 300,
         mensajes: (r?.messages ?? []).map((m) => ({
-          id: m.id,
+          id: m.receiptId ?? m.id,
           recibido: m.receivedAt,
           via: String(m.transport ?? '').toUpperCase(),
           bytes: m.bytes ?? null,
@@ -1417,48 +1420,19 @@ export const repoApi = {
   },
 
   vehiculosEscritura: {
-    /**
-     * Alta de vehiculo.
-     *
-     * El panel pide un GPS al crear, pero la superficie de consola da de alta
-     * la UNIDAD; el equipo se comisiona aparte desde la app de campo. Se avisa
-     * en vez de fingir que el GPS quedo asociado, porque un vehiculo que se
-     * cree «con GPS» y no lo tenga es peor que uno que se sepa sin el.
-     */
-    async crear({ alias, placa, marca, modelo, anio, tipo, areaId, gpsId, numero }) {
-      const r = await api.crearVehiculo({
-        code: (alias || placa || '').trim().toLowerCase().replace(/\s+/gu, '-'),
-        plate: placa || undefined,
-        alias: alias || undefined,
-        fleetNumber: numero?.trim() || undefined,
-        make: marca || undefined,
-        model: modelo || undefined,
-        modelYear: anio ? Number(anio) : undefined,
-        vehicleType: tipo || undefined,
-      })
-      const id = r?.vehicleId ?? r?.vehicle?.id ?? null
-      if (!id) throw new Error('El servidor no devolvió el identificador del vehículo creado. Revisa la flota antes de reintentar.')
-      if (id && areaId) await api.actualizarVehiculo(id, { areaId })
-      if (gpsId) {
-        // La unidad nació en la empresa en gestión; el equipo se instala por la ruta de esa misma
-        // empresa (la propia viaja como null), igual que en «Instalar en una unidad» (T-208/T-214).
-        const propia = empresaPropia(sesionActual())
-        const destino = empresaGestionActualId() ?? propia
-        // Sin saber cuál es la propia, la empresa en gestión manda (nunca caer en la ruta de otra).
-        const ruta = propia ? empresaDeInstalacion(destino, propia) : destino
-        try {
-          await api.instalarEquipoGps(gpsId, { vehicleId: id }, ruta)
-        } catch (e) {
-          // La unidad ya existe: se dice, para que no se cree otra al reintentar.
-          throw new Error(`La unidad se creó, pero no se pudo instalar el GPS. ${mensajeInstalarGps(e, { otraEmpresa: Boolean(ruta) })} Instálalo después desde Administración FOM → GPS.`)
-        }
-      }
-      return { id }
+    /** Alta independiente; efectos posteriores informados sin repetir el alta (#767). */
+    async crear(datos) {
+      // El GPS se instala por la ruta de la empresa en gestión (la propia viaja como null), igual que
+      // en «Instalar en una unidad» (T-208/T-214); sin saber cuál es la propia, manda la de gestión.
+      const propia = empresaPropia(sesionActual())
+      const destino = empresaGestionActualId() ?? propia
+      const rutaGps = propia ? empresaDeInstalacion(destino, propia) : destino
+      return crearUnidad({ ...datos, rutaGps }, api)
     },
 
     async set(id, parche) {
       await api.actualizarVehiculo(id, {
-        plate: parche.placa,
+        plate: placaMayuscula(parche.placa),
         alias: parche.alias,
         fleetNumber: parche.numero === undefined ? undefined : parche.numero?.trim() || null,
         make: parche.marca,
