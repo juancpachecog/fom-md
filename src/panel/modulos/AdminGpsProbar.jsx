@@ -11,6 +11,8 @@ import {
 } from '../datos/gps'
 import * as f from '../datos/formato'
 import './admin-gps.css'
+import { locationStatus } from '../meitrack/location-status.js'
+import { MeitrackClockReadback } from '../meitrack/MeitrackClockReadback.jsx'
 
 // ============================================================
 // PROBAR SEÑAL (T-95, tablero GW3)
@@ -176,7 +178,7 @@ export function PruebaSenal({ equipo, alTerminar }) {
         <div className="gp-aviso mute" role="status">Prueba marcada como fallida. El equipo queda en el inventario con su historial.</div>
       )}
       {error && <div className="gp-aviso error" role="alert">{error}</div>}
-      {neutral && <div className="gp-aviso info">Esta prueba muestra la recepción real del Meitrack. No activa el GPS ni certifica todavía la hora, la posición o las funciones del vehículo.</div>}
+      {neutral && <div className="gp-aviso info" role="status"><div><b>{locationStatus(tele.datos?.ubicacion).title}</b><p>{locationStatus(tele.datos?.ubicacion).detail}</p><span className="gp-hint">La recepción, la ubicación publicada y las funciones físicas son comprobaciones distintas.</span></div></div>}
 
       {!neutral && !resultado && prueba.estado === 'sin-instalar' && (
         <>
@@ -234,7 +236,8 @@ export function ProbarGps() {
       {estado === 'error' && <section className="gp-card"><ErrorCarga onReintentar={recargar} error={error} /></section>}
       {estado === 'ok' && g && (
         <div className="gp-grid l400">
-          <ComandosSms equipo={g} clave={clave} alCambiarClave={setClave} />
+          <div style={{display:'flex',flexDirection:'column',gap:16}}><ComandosSms equipo={g} clave={clave} alCambiarClave={setClave} />
+            {esMeitrack(g)&&<MeitrackClockReadback key={g.imei+g.firmwareVersion} imei={g.imei} firmware={g.firmwareVersion}/>}</div>
           <PruebaSenal equipo={g} />
         </div>
       )}

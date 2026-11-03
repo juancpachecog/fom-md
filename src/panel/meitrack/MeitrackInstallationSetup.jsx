@@ -4,6 +4,7 @@ import { t399ReadOnlyQuery } from './commands.js'
 import { readIdentitySms, readCommandsSms, readPendingSms, readConnectionOk } from './guided-sms.js'
 import { receiverAvailable, connectionSms, connectionReadback } from './operational-setup.js'
 import { parseSetupCapture } from './meitrack-setup.js'
+import { MeitrackClockReadback } from './MeitrackClockReadback.jsx'
 
 const request = (path, body, signal) => pedir(`/api/v1/console/meitrack-setup/${path}`, { metodo:'POST', cuerpo:body, señal:signal, empresaContexto:null })
 export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdentityChange, onCapture, onLockChange, onSelect, selected=false, canRegister=false, onRegister, registered=false, registering=false, registrationError='' }) {
@@ -73,6 +74,7 @@ export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdent
       {message && <p role="status">{message}</p>}
       <span className="gp-hint">La clave y las respuestas completas permanecen sólo en memoria. Descartar no deshace los SMS enviados. No se activa ni se instala el GPS al registrarlo.</span>
     </section>
+    {configured&&<MeitrackClockReadback key={imei+firmware} imei={imei} firmware={firmware}/>}
     <section className="gp-card gp-col" aria-label="Detectados sin registrar Meitrack">
       <h2 className="gp-st">Detectados sin registrar · confirmar al final</h2>
       <p>Después de configurar, busca si el GPS ya está reportando. Compara su IMEI y selecciona la señal coincidente para registrarlo.</p>

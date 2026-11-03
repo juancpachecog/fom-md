@@ -1146,6 +1146,7 @@ export const repoApi = {
         imei: r?.imei ?? null,
         ultimaRecepcion: r?.lastReceivedAt ?? null,
         frescuraS: Number(r?.freshnessSeconds) || 300,
+        ubicacion: r?.location ?? null,
         mensajes: (r?.messages ?? []).map((m) => ({
           id: m.receiptId ?? m.id,
           recibido: m.receivedAt,
