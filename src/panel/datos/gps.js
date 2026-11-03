@@ -16,7 +16,7 @@ import { tiempoSinSenal, transmitiendo } from './sinSenal.js'
  */
 export const CATALOGO_GPS = {
   Meitrack: {
-    T399L: { protocolo: 'meitrack-t399', protocoloNombre: 'Meitrack T399 (preparación controlada)', transporte: 'tcp' },
+    T399L: { protocolo: 'meitrack-t399', protocoloNombre: 'Meitrack T399', transporte: 'tcp' },
   },
   Coban: {
     'GPS-403': { protocolo: 'coban-gps103', protocoloNombre: 'Coban GPS103', transporte: 'tcp' },
@@ -214,6 +214,7 @@ export function buscarEquipos(lista, q) {
 }
 
 const LECTURAS = {
+  meitrack_received: 'Trama Meitrack recibida · hora y posición sin calificar',
   position_valid: 'Posición válida',
   position_invalid: 'Posición sin fijar',
   heartbeat: 'Latido (sin posición)',

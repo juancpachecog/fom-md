@@ -26,13 +26,14 @@ import './admin-gps.css'
 // IP del receptor para el comando «adminip»: sale de la configuración del sitio (no es un secreto,
 // pero tampoco se escribe en el código). Sin ella el comando muestra «[IP del receptor]».
 const IP_RECEPTOR = import.meta.env?.VITE_GPS_RECEPTOR || ''
+const esMeitrack = (equipo) => equipo?.protocolo === 'meitrack-t399' || equipo?.fabricante?.toLowerCase() === 'meitrack' || equipo?.modelo === 'T399L'
 
 /** Tarjeta de los cinco comandos SMS. */
 export function ComandosSms({ equipo, clave, alCambiarClave }) {
   const [copiado, setCopiado] = useState(null)
   const [fallo, setFallo] = useState('')
-  if (equipo.fabricante === 'Meitrack' || equipo.modelo === 'T399L' || equipo.protocolo === 'meitrack-t399') {
-    return <section className="gp-card" role="status">Meitrack requiere el recorrido específico de preparación y recuperación. No utilice comandos Coban para este equipo. Registrar no acredita su puesta en servicio.</section>
+  if (esMeitrack(equipo)) {
+    return <section className="gp-card" style={{ padding: 22 }} role="status"><h2 className="gp-st">Recepción Meitrack</h2><p>Comprueba aquí los mensajes del equipo ya registrado. Si está reportando, no hace falta repetir los SMS de configuración.</p><span className="gp-hint">La señal recibida acredita conectividad e identidad. La hora, posición y funciones del vehículo requieren su propia comprobación.</span></section>
   }
   const comandos = armarComandos({ clave, apn: equipo.apn ?? '', ip: IP_RECEPTOR, puerto: PUERTO_RECEPTOR, transporte: equipo.transport ?? 'tcp' })
   const linea = equipo.linea || equipo.simPhone
@@ -93,7 +94,8 @@ export function PruebaSenal({ equipo, alTerminar }) {
   const sesion = useSesion()
   const ahora = useAhora(5_000)
   const instalado = Boolean(equipo.vehiculoId)
-  const [prueba, setPrueba] = useState({ estado: instalado ? 'abriendo' : 'sin-instalar', sesionId: null, error: '' })
+  const neutral = esMeitrack(equipo)
+  const [prueba, setPrueba] = useState({ estado: neutral ? 'recepcion' : instalado ? 'abriendo' : 'sin-instalar', sesionId: null, error: '' })
   const [resultado, setResultado] = useState(null)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
@@ -101,12 +103,12 @@ export function PruebaSenal({ equipo, alTerminar }) {
 
   // Abre la prueba una sola vez por pantalla (el servidor retoma la vigente si ya había una).
   useEffect(() => {
-    if (!instalado || abierta.current) return
+    if (neutral || !instalado || abierta.current) return
     abierta.current = true
     repo.admin.gps.iniciarPrueba(equipo.id)
       .then((r) => setPrueba({ estado: 'abierta', sesionId: r.sesionId, error: '' }))
       .catch((e) => setPrueba({ estado: 'error', sesionId: null, error: e.message }))
-  }, [equipo.id, instalado])
+  }, [equipo.id, instalado, neutral])
 
   const tele = useDatos(() => repo.admin.gps.telemetria(equipo.id, { limite: 20 }), [equipo.id], resultado ? 0 : 10_000)
   const ultima = tele.datos?.mensajes?.[0] ?? null
@@ -118,6 +120,7 @@ export function PruebaSenal({ equipo, alTerminar }) {
   const reciente = checks[0].ok
 
   const completar = async (aprobada) => {
+    if (neutral) return
     setOcupado(true)
     setError('')
     try {
@@ -166,15 +169,16 @@ export function PruebaSenal({ equipo, alTerminar }) {
         </div>
       )}
 
-      {resultado?.aprobada && (
+      {!neutral && resultado?.aprobada && (
         <div className="gp-aviso" role="status"><IcoGps nombre="check" />GPS activo: la prueba quedó aprobada con su trama y su huella.</div>
       )}
-      {resultado && !resultado.aprobada && (
+      {!neutral && resultado && !resultado.aprobada && (
         <div className="gp-aviso mute" role="status">Prueba marcada como fallida. El equipo queda en el inventario con su historial.</div>
       )}
       {error && <div className="gp-aviso error" role="alert">{error}</div>}
+      {neutral && <div className="gp-aviso info">Esta prueba muestra la recepción real del Meitrack. No activa el GPS ni certifica todavía la hora, la posición o las funciones del vehículo.</div>}
 
-      {!resultado && prueba.estado === 'sin-instalar' && (
+      {!neutral && !resultado && prueba.estado === 'sin-instalar' && (
         <>
           <div className="gp-aviso info">
             Para activarlo, instálalo en una unidad: el servidor registra la prueba con el equipo ya montado. La señal se sigue viendo aquí mientras tanto.
@@ -182,9 +186,9 @@ export function PruebaSenal({ equipo, alTerminar }) {
           <Link className="gp-btn ancho" to={`${RAIZ_GPS}/${equipo.id}/instalar`}><IcoGps nombre="enlace" />Instalar en una unidad</Link>
         </>
       )}
-      {!resultado && prueba.estado === 'abriendo' && <span className="gp-hint">Abriendo la prueba…</span>}
-      {!resultado && prueba.estado === 'error' && <div className="gp-aviso error" role="alert">{prueba.error}</div>}
-      {!resultado && prueba.estado === 'abierta' && (
+      {!neutral && !resultado && prueba.estado === 'abriendo' && <span className="gp-hint">Abriendo la prueba…</span>}
+      {!neutral && !resultado && prueba.estado === 'error' && <div className="gp-aviso error" role="alert">{prueba.error}</div>}
+      {!neutral && !resultado && prueba.estado === 'abierta' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <button type="button" className="gp-btn ancho" disabled={!reciente || ocupado} onClick={() => completar(true)}>
             <IcoGps nombre="check" />{ocupado ? 'Guardando…' : 'Activar GPS'}
@@ -193,7 +197,7 @@ export function PruebaSenal({ equipo, alTerminar }) {
         </div>
       )}
 
-      <span className="gp-hint">Solo se activa con una señal del mismo IMEI en los últimos 5 minutos. Si falla, el equipo queda en el inventario con su historial.</span>
+      <span className="gp-hint">{neutral ? 'La comprobación se actualiza con las tramas del mismo IMEI. Los mensajes anteriores permanecen visibles aunque la señal deje de ser reciente.' : 'Solo se activa con una señal del mismo IMEI en los últimos 5 minutos. Si falla, el equipo queda en el inventario con su historial.'}</span>
 
       <div style={{ borderTop: '1px solid var(--e-borde, #262e39)', paddingTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         {instalado ? (
@@ -223,7 +227,7 @@ export function ProbarGps() {
       <Cabeza
         ruta={[['Administración FOM'], ['Inventario GPS', RAIZ_GPS], [g?.vehiculoNombre?.split(' · ')[0] || g?.imei || 'Equipo', `${RAIZ_GPS}/${id}`], ['Probar señal']]}
         titulo="Probar señal"
-        bajada={g ? `${nombreEquipo(g)} · ${nombreProtocolo(g.protocolo)}. Envía los comandos si hace falta y espera su señal.` : 'Envía los comandos por SMS a la línea del equipo y espera su señal.'}
+        bajada={g ? `${nombreEquipo(g)} · ${nombreProtocolo(g.protocolo)}. ${esMeitrack(g) ? 'Comprueba los mensajes recibidos del equipo.' : 'Envía los comandos si hace falta y espera su señal.'}` : 'Consulta la recepción del equipo.'}
         acciones={<button type="button" className="gp-btn2" onClick={() => navegar(`${RAIZ_GPS}/${id}`)}>Volver al equipo</button>}
       />
       {estado === 'cargando' && <section className="gp-card"><Cargando filas={4} /></section>}
