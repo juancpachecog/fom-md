@@ -51,7 +51,7 @@ export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdent
   function card(n,title,sms,hint,field){return <div className="gp-cmd"><span className="n">{n}</span><div className="tx"><b>{title}</b><code>{sms ? sms.replace(password,'••••') : n === '04' && sent ? 'Configuración marcada como enviada. No repetir.' : 'Completa la comprobación anterior.'}</code><span className="gp-hint">{hint}</span>{field}</div><button type="button" className="gp-btn2" disabled={!sms} onClick={()=>void copy(sms)}>Copiar</button></div>}
   function response(label,value,setValue,disabled=false){return <label className="gp-f"><span>{label}</span><div className="gp-field"><textarea value={value} maxLength={2048} autoComplete="off" spellCheck={false} disabled={disabled} onChange={e=>setValue(e.target.value)} /></div></label>}
   return <>
-    <section className="gp-card" style={{display:'flex',flexDirection:'column',gap:12,padding:'22px 24px'}} aria-label="Comandos SMS Meitrack">
+    <section className="gp-card gp-meitrack-sms" style={{display:'flex',flexDirection:'column',gap:12,padding:'22px 24px'}} aria-label="Comandos SMS Meitrack">
       <div className="gp-titulo"><p className="gp-k">Paso 3 de 3 · Comandos SMS</p><h2 className="gp-st">Configura el equipo</h2><span className="gp-lbl">Envía los mensajes en orden a la línea del GPS y pega cada respuesta. No se registra ningún equipo al copiar o avanzar.</span></div>
       {card('01','Identificar el GPS',t399ReadOnlyQuery(password,'E91'),'Lee IMEI y versión; no necesitas conocerlos de antemano.',response('Respuesta E91',identityText,setIdentityText,sent))}
       {identity && <p role="status">IMEI: {identity.imei} · Versión: {identity.firmware}</p>}
@@ -62,13 +62,13 @@ export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdent
       {card('03','Consultar conexión y pendientes',announced ? t399ReadOnlyQuery(password,'DA6',announced) : null,'Consulta el estado; no guarda una configuración anterior ni borra datos.',response('Respuesta DA6',pendingText,setPendingText,sent))}
       {pending && <p role="status">Pendientes GPRS: {pending.gprs} · SMS: {pending.sms}. {pending.gprs || pending.sms ? 'No cambies el destino mientras haya mensajes pendientes; no borres la memoria.' : 'Sin pendientes visibles en estos contadores.'}</p>}
       <label className="gp-f"><span><input type="checkbox" checked={noAuth} disabled={sent} onChange={e=>setNoAuth(e.target.checked)} /> Mi APN no utiliza usuario ni contraseña.</span></label>
-      {card('04','Configurar APN y servidor FOM',sent || registered ? null : command,'Este SMS configura APN, servidor y puerto juntos. Envíalo una sola vez; ante silencio o error, conserva la respuesta.',<>
+      {card('04','Configurar APN y servidor FOM',sent || registered || configured ? null : command,'Este SMS configura APN, servidor y puerto juntos. Envíalo una sola vez; ante silencio o error, conserva la respuesta.',<>
         <button type="button" className="gp-btn2" disabled={!command || sent || registered} onClick={()=>setSent(true)}>Ya envié la configuración</button>
         {response('Respuesta A21',okText,text=>{setOkText(text);if(readConnectionOk(text,imei))setSent(true)})}
       </>)}
       {imei && !receiver && <p role="status">El servicio de recepción no está disponible ahora. El mensaje de configuración permanece bloqueado; puedes seguir consultando la identidad.</p>}
       {okText && !acknowledged && <p role="alert">No se reconoció A21 OK del mismo equipo. No repitas el SMS automáticamente.</p>}
-      {card('05','Comprobar configuración',announced && (sent || acknowledged) ? t399ReadOnlyQuery(password,'DB4',announced) : null,'Comprueba que el GPS guardó TCP, APN, servidor y puerto correctos. El OK no prueba que FOM reciba datos.',response('Respuesta DB4',readback,setReadback))}
+      {card('05','Comprobar configuración',announced && pending ? t399ReadOnlyQuery(password,'DB4',announced) : null,'Comprueba que el GPS guardó TCP, APN, servidor y puerto correctos. Si ya estaba configurado para FOM, consulta DB4 sin reenviar A21. El OK no prueba recepción.',response('Respuesta DB4',readback,setReadback))}
       {readback && !configured && <p role="alert">La lectura no confirma el destino FOM y APN esperados. No repitas A21 sin revisar la respuesta.</p>}
       {message && <p role="status">{message}</p>}
       <span className="gp-hint">La clave y las respuestas completas permanecen sólo en memoria. Descartar no deshace los SMS enviados. No se activa ni se instala el GPS al registrarlo.</span>

@@ -209,3 +209,7 @@ label.gp-det b { font-size: 14px; font-weight: 600; }
   .gp-cmd { flex-wrap: wrap; }
   .gp-diag { flex-direction: column; }
 }
+
+/* Meitrack comparte las tarjetas SMS; las respuestas completas necesitan altura. */
+.gp-meitrack-sms .gp-field { height: auto; min-height: 76px; align-items: stretch; }
+.gp-meitrack-sms textarea { flex: 1; width: 100%; min-width: 0; min-height: 76px; box-sizing: border-box; resize: vertical; padding: 10px 0; border: 0; outline: 0; background: transparent; color: var(--e-texto, #f3f5f8); font: 400 13px/1.5 var(--e-mono, ui-monospace, Consolas, monospace); }
