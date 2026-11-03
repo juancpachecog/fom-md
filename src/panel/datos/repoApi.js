@@ -24,6 +24,7 @@ import { cuerpoCredencial, credencialesVigentes } from './credencialesPersona'
 import { cambiosGps } from './metadatosGps'
 import { buscarEquipoGps, mensajeInstalarGps } from './instalarGps'
 import { crearUnidad, gpsDisponible } from './altaUnidad'
+import { placaMayuscula } from './placas'
 import { LIMITE_EVENTOS, comoEventoManejo, diasServidor } from './eventosManejo'
 import { cloudinaryConfigurado, subirImagen } from './cloudinary'
 import { carpetaDe } from './archivos'
@@ -1382,7 +1383,7 @@ export const repoApi = {
 
     async set(id, parche) {
       await api.actualizarVehiculo(id, {
-        plate: parche.placa,
+        plate: placaMayuscula(parche.placa),
         alias: parche.alias,
         fleetNumber: parche.numero === undefined ? undefined : parche.numero?.trim() || null,
         make: parche.marca,

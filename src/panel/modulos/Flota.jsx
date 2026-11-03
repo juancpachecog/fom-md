@@ -707,7 +707,7 @@ export function ModalNuevaUnidad({ abierto, areas, alCerrar, alGuardar, actor })
       ) : (
         <>
           <Campo etiqueta="Placa (opcional)" ayuda="Si no tiene placa, usa un alias o número interno." error={error}>
-            <input type="text" className="pnl-input" value={placa} onChange={(e) => setPlaca(e.target.value)} placeholder="A12BC3D" />
+            <input type="text" className="pnl-input" value={placa} onChange={(e) => setPlaca(e.target.value.toUpperCase())} placeholder="A12BC3D" />
           </Campo>
           <Campo etiqueta="Alias (opcional)" ayuda="Por ejemplo: Manlift 01 o Camión con brazo.">
             <input type="text" className="pnl-input" value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="Unidad 27" />
