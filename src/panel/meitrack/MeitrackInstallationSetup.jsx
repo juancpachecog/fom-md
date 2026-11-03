@@ -48,7 +48,7 @@ export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdent
     try{await navigator.clipboard.writeText(text);setMessage('SMS copiado. Envíalo desde tu teléfono; FOM no lo ha enviado.')}
     catch{setMessage('No se pudo copiar. No se ha enviado ningún SMS.')}
   }
-  function card(n,title,sms,hint,field){return <div className="gp-cmd"><span className="n">{n}</span><div className="tx"><b>{title}</b><code>{sms ? sms.replace(password,'••••') : n === '04' && sent ? 'Configuración marcada como enviada. No repetir.' : 'Completa la comprobación anterior.'}</code><span className="gp-hint">{hint}</span>{field}</div><button type="button" className="gp-btn2" disabled={!sms} onClick={()=>void copy(sms)}>Copiar</button></div>}
+  function card(n,title,sms,hint,field){return <div className="gp-cmd"><span className="n">{n}</span><div className="tx"><b>{title}</b><code>{sms ? sms.replace(password,'••••') : n === '04' && configured ? 'La configuración para FOM ya está comprobada. No hace falta repetir A21.' : n === '04' && sent ? 'Configuración marcada como enviada. No repetir.' : 'Completa la comprobación anterior.'}</code><span className="gp-hint">{hint}</span>{field}</div><button type="button" className="gp-btn2" disabled={!sms} onClick={()=>void copy(sms)}>Copiar</button></div>}
   function response(label,value,setValue,disabled=false){return <label className="gp-f"><span>{label}</span><div className="gp-field"><textarea value={value} maxLength={2048} autoComplete="off" spellCheck={false} disabled={disabled} onChange={e=>setValue(e.target.value)} /></div></label>}
   return <>
     <section className="gp-card gp-meitrack-sms" style={{display:'flex',flexDirection:'column',gap:12,padding:'22px 24px'}} aria-label="Comandos SMS Meitrack">
