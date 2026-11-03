@@ -74,6 +74,7 @@ export default function AdminGpsNuevo() {
 
   const siguiente1 = () => {
     const e = validarPreparacion(datos)
+    if (meitrack && !/^[0-9]{4}$/.test(clave)) e.clave = 'Introduce la clave SMS actual de cuatro dígitos.'
     if (meitrack && (datos.firmware.trim() && datos.firmware.trim() !== 'T399L-V254' || datos.transporte !== 'tcp')) e.firmware = 'La conexión controlada requiere firmware observado T399L-V254 y transporte TCP; puedes consultar la versión durante la preparación.'
     setErrores(e)
     if (Object.keys(e).length === 0) setPaso(2)
@@ -145,9 +146,9 @@ export default function AdminGpsNuevo() {
     finally { inFlight.current = false; setGuardando(false) }
   }
 
-  const salir = () => navegar(equipo ? `${RAIZ_GPS}/${equipo.id}` : RAIZ_GPS)
+  const salir = () => { if (!guideLocked || equipo || window.confirm('Descartar cierra esta preparación. No deshace los SMS que ya enviaste al GPS. ¿Salir?')) navegar(equipo ? `${RAIZ_GPS}/${equipo.id}` : RAIZ_GPS) }
   const bajada = paso === 3
-    ? meitrack ? 'Conserva la recuperación, configura por SMS y comprueba la recepción antes del alta. No activa el GPS.' : 'Envía los comandos por SMS a la línea del equipo y espera su primera señal.'
+    ? meitrack ? 'Configura por SMS y busca la señal coincidente al final para registrar sin activar.' : 'Envía los comandos por SMS a la línea del equipo y espera su primera señal.'
     : 'Prepara el equipo y su línea, configura por SMS y confirma la identidad recibida antes de registrarlo.'
 
   // La vista del equipo para los comandos y la prueba: lo escrito aquí, con el id del registro.
@@ -163,30 +164,6 @@ export default function AdminGpsNuevo() {
     vehiculoId: null,
   }
 
-  if (meitrack) return <div className="gp">
-    <Cabeza ruta={[["Administración FOM"], ["Inventario GPS", RAIZ_GPS], ["Nuevo GPS"]]}
-      titulo="Nuevo GPS · Meitrack" bajada="Configura tu equipo paso a paso. No se registra ni se activa al avanzar." />
-    <section className="gp-card">
-      <label htmlFor="guided-brand">Modelo del equipo</label>
-      <select id="guided-brand" value={datos.marca} disabled={guideLocked || !!equipo} onChange={e => { poner('marca', e.target.value); poner('modelo', Object.keys(CATALOGO_GPS[e.target.value] ?? {})[0] ?? '') }}>
-        {Object.keys(CATALOGO_GPS).map(brand => <option key={brand}>{brand}</option>)}
-      </select>
-      <span className="gp-hint">Meitrack T399L · la guía identifica la versión por SMS.</span>
-    </section>
-    <MeitrackInstallationSetup password={clave} imei={imeiPreparacion} firmware={datos.firmware.trim()} apn={datos.apn.trim()}
-      knownImei={!validarImei(datos.imei).error ? validarImei(datos.imei).valor : ''} onPasswordChange={setClave} onReady={() => {}} onCapture={setMeitrackReceived}
-      onIdentityChange={value => { setImeiSms(value.imei); setDatos(d => ({ ...d, imei: validarImei(d.imei).error ? '' : d.imei, firmware: value.firmware, transporte: 'tcp' })); setSeleccionado(null); setMeitrackReceived(false) }}
-      lineData={datos} onLineChange={(key, value) => {
-        poner(key, value)
-        if (key === 'operador' && !datos.apn.trim()) {
-          const apn = OPERADORES.find(([name]) => name.toLowerCase() === value.trim().toLowerCase())?.[1]
-          if (apn) poner('apn', apn)
-        }
-      }} onLockChange={setGuideLocked}
-      onSelect={() => { if (identidad && meitrackReceived) setSeleccionado(identidad) }} selected={!!identidad && seleccionado === identidad}
-      canRegister={puedeRegistrar} onRegister={registrarMeitrack} registered={!!equipo} registering={guardando} registrationError={errorAlta} />
-    {equipo && <button type="button" className="gp-btn" onClick={salir}>Ir al equipo registrado</button>}
-  </div>
 
   return (
     <div className="gp">
@@ -256,10 +233,10 @@ export default function AdminGpsNuevo() {
               <Campo id="n-serie" etiqueta="Número de serie" error={errores.serie}>
                 <div className="gp-field"><input id="n-serie" placeholder="Opcional" maxLength={100} value={datos.serie} onChange={(e) => poner('serie', e.target.value)} /></div>
               </Campo>
-              <Campo id="n-fw" etiqueta="Firmware" error={errores.firmware}>
+              {!meitrack && <Campo id="n-fw" etiqueta="Firmware" error={errores.firmware}>
                 <div className="gp-field"><input id="n-fw" placeholder="Opcional" maxLength={100} value={datos.firmware} onChange={(e) => poner('firmware', e.target.value)} /></div>
-              </Campo>
-              <Campo id="n-clave" etiqueta="Clave SMS del equipo" todo ayuda="Solo arma los comandos del paso 3. No se guarda ni se envía al servidor.">
+              </Campo>}
+              <Campo id="n-clave" etiqueta="Clave SMS del equipo" error={errores.clave} todo ayuda="Solo arma los comandos del paso 3. No se guarda ni se envía al servidor.">
                 <div className="gp-field"><input id="n-clave" type="password" autoComplete="new-password" placeholder={meitrack ? 'Contraseña actual de cuatro dígitos' : 'De fábrica: 123456'} value={clave} onChange={(e) => setClave(e.target.value)} /></div>
               </Campo>
             </div>
@@ -347,7 +324,16 @@ export default function AdminGpsNuevo() {
         </div>
       )}
 
-      {paso === 3 && (
+      {paso === 3 && meitrack && <>
+        <MeitrackInstallationSetup password={clave} imei={imeiPreparacion} firmware={datos.firmware.trim()} apn={datos.apn.trim()}
+          knownImei={!validarImei(datos.imei).error ? validarImei(datos.imei).valor : ''} onCapture={setMeitrackReceived}
+          onIdentityChange={value => { setImeiSms(value.imei); setDatos(d => ({ ...d, firmware: value.firmware, transporte:'tcp' })); setSeleccionado(null); setMeitrackReceived(false) }}
+          onLockChange={setGuideLocked} onSelect={() => { if (identidad && meitrackReceived) setSeleccionado(identidad) }}
+          selected={!!identidad && seleccionado === identidad} canRegister={puedeRegistrar} onRegister={registrarMeitrack}
+          registered={!!equipo} registering={guardando} registrationError={errorAlta} />
+        <button type="button" className="gp-btn2" disabled={guideLocked || !!equipo} onClick={() => setPaso(2)}>Anterior: Línea SIM</button>
+      </>}
+      {paso === 3 && !meitrack && (
         <section className="gp-card" aria-label="Identidad consultada por SMS">
           <h2 className="gp-st">Configura y confirma la identidad</h2>
           <p>Envía los comandos desde tu teléfono. La consulta de identidad no requiere conocer el IMEI de antemano. Compara la respuesta del mismo GPS con la señal recibida antes de registrar.</p>
@@ -370,7 +356,7 @@ export default function AdminGpsNuevo() {
           </div>
         </>
       )}
-      {paso === 3 && !equipo && (
+      {paso === 3 && !meitrack && !equipo && (
         <section className="gp-card gp-col" aria-labelledby="det-final">
           <h2 className="gp-st" id="det-final">Detectados sin registrar · confirmar al final</h2>
           <p>Compara el IMEI de la respuesta SMS. Selecciona la identidad coincidente con recepción comprobada y el mismo transporte.</p>
