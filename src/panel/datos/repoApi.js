@@ -23,6 +23,7 @@ import { coleccionDePersona, indiceDePersona } from './perfilUsuario'
 import { cuerpoCredencial, credencialesVigentes } from './credencialesPersona'
 import { cambiosGps } from './metadatosGps'
 import { buscarEquipoGps, mensajeInstalarGps } from './instalarGps'
+import { crearUnidad, gpsDisponible } from './altaUnidad'
 import { LIMITE_EVENTOS, comoEventoManejo, diasServidor } from './eventosManejo'
 import { cloudinaryConfigurado, subirImagen } from './cloudinary'
 import { carpetaDe } from './archivos'
@@ -1112,6 +1113,9 @@ export const repoApi = {
   },
 
   gpsEscritura: {
+    async disponibles() {
+      return (await repoApi.gpsEscritura.listar()).filter(gpsDisponible)
+    },
     /**
      * Inventario real desde `GET /gps-devices`. Antes «listar» caía en la
      * semilla vacía y el inventario salía en cero aunque hubiera equipos
@@ -1371,30 +1375,9 @@ export const repoApi = {
   },
 
   vehiculosEscritura: {
-    /**
-     * Alta de vehiculo.
-     *
-     * El panel pide un GPS al crear, pero la superficie de consola da de alta
-     * la UNIDAD; el equipo se comisiona aparte desde la app de campo. Se avisa
-     * en vez de fingir que el GPS quedo asociado, porque un vehiculo que se
-     * cree «con GPS» y no lo tenga es peor que uno que se sepa sin el.
-     */
-    async crear({ alias, placa, marca, modelo, anio, tipo, areaId, gpsId, numero }) {
-      const r = await api.crearVehiculo({
-        code: (alias || placa || '').trim().toLowerCase().replace(/\s+/gu, '-'),
-        plate: placa || undefined,
-        alias: alias || undefined,
-        fleetNumber: numero?.trim() || undefined,
-        make: marca || undefined,
-        model: modelo || undefined,
-        modelYear: anio ? Number(anio) : undefined,
-        vehicleType: tipo || undefined,
-      })
-      const id = r?.vehicleId ?? r?.vehicle?.id ?? null
-      if (!id) throw new Error('El servidor no devolvió el identificador del vehículo creado. Revisa la flota antes de reintentar.')
-      if (id && areaId) await api.actualizarVehiculo(id, { areaId })
-      if (gpsId) await api.instalarEquipoGps(gpsId, { vehicleId: id })
-      return { id }
+    /** Alta independiente; efectos posteriores informados sin repetir el alta. */
+    async crear(datos) {
+      return crearUnidad(datos, api)
     },
 
     async set(id, parche) {
