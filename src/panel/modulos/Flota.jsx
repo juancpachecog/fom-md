@@ -1,8 +1,9 @@
 import MiniFoto from '../comp/MiniFoto'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import repo from '../datos/repo'
+import { cuerpoNuevaUnidad } from '../datos/altaUnidad'
 import { useDatos } from '../useDatos'
 import { useSesion } from '../useSesion'
 import { esAdminFom } from '../auth'
@@ -633,10 +634,9 @@ export default function Flota() {
 }
 
 /**
- * Alta de unidad, SOLO Administrador FOM. La regla dura de la app se
- * respeta completa: sin un GPS verificado y libre no se crea nada.
+ * Alta del activo, con instalación GPS opcional e independiente (#767).
  */
-function ModalNuevaUnidad({ abierto, areas, alCerrar, alGuardar, actor }) {
+export function ModalNuevaUnidad({ abierto, areas, alCerrar, alGuardar, actor }) {
   const [alias, setAlias] = useState('')
   const [numero, setNumero] = useState('')
   const [placa, setPlaca] = useState('')
@@ -647,33 +647,49 @@ function ModalNuevaUnidad({ abierto, areas, alCerrar, alGuardar, actor }) {
   const [gpsId, setGpsId] = useState('')
   const [areaSel, setAreaSel] = useState('')
   const [gpsLibres, setGpsLibres] = useState(null)
+  const [errorGps, setErrorGps] = useState('')
+  const [resultado, setResultado] = useState(null)
+  const enviado = useRef(false)
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
 
-  // Los GPS elegibles (verificados y sin unidad) se consultan al abrir.
   useEffect(() => {
-    if (abierto) repo.admin.gps.disponibles().then(setGpsLibres).catch(() => setGpsLibres([]))
+    if (!abierto) return
+    let vigente = true
+    setGpsLibres(null); setErrorGps('')
+    repo.admin.gps.disponibles().then((equipos) => {
+      if (vigente) setGpsLibres(equipos)
+    }).catch(() => {
+      if (vigente) {
+        setGpsLibres([])
+        setErrorGps('No se pudo consultar el inventario. Puedes crear la unidad sin GPS y asignarlo después.')
+      }
+    })
+    return () => { vigente = false }
   }, [abierto])
 
   const cerrar = () => {
+    if (guardando) return
     setAlias(''); setPlaca(''); setMarca(''); setModelo(''); setAnio('')
     setNumero('')
     setTipo('camioneta'); setGpsId(''); setAreaSel(''); setError('')
+    setResultado(null); enviado.current = false
     alCerrar()
   }
 
   const confirmar = async () => {
+    if (enviado.current) return
+    const datos = { alias, placa, marca, modelo, anio, tipo, gpsId, areaId: areaSel || null, numero }
+    try { cuerpoNuevaUnidad(datos) } catch (e) { setError(e.message); return }
+    enviado.current = true
     setGuardando(true)
     setError('')
     try {
-      await repo.vehiculos.crear(
-        { alias, placa, marca, modelo, anio, tipo, gpsId, areaId: areaSel || null, numero },
-        actor
-      )
-      await alGuardar()
-      cerrar()
+      const r = await repo.vehiculos.crear(datos, actor)
+      setResultado(r)
+      try { await alGuardar() } catch { /* Recargar no repite un alta confirmada. */ }
     } catch (e) {
-      setError(e.message)
+      setError(`${e.message} Revisa la flota antes de volver a crear esta unidad.`)
     } finally {
       setGuardando(false)
     }
@@ -681,22 +697,19 @@ function ModalNuevaUnidad({ abierto, areas, alCerrar, alGuardar, actor }) {
 
   return (
     <Modal titulo="Nueva unidad" abierto={abierto} alCerrar={cerrar} ancho={560}>
-      {gpsLibres !== null && gpsLibres.length === 0 ? (
-        <>
-          <p>No hay GPS verificados libres en el inventario.</p>
-          <p className="pnl-campo-ayuda">
-            Registra y verifica un equipo en Administración FOM → GPS antes de crear la unidad.
-          </p>
-          <div className="pnl-chips">
-            <button type="button" className="pnl-btn primario" onClick={cerrar}>Entendido</button>
-          </div>
-        </>
+      {resultado ? (
+        <div role="status">
+          <p>Unidad creada.</p>
+          {(resultado.pendientes ?? []).map((aviso) => <p key={aviso}>{aviso}</p>)}
+          <p className="pnl-campo-ayuda">Puedes continuar con su expediente, mantenimiento y órdenes de trabajo. La instalación GPS se gestiona por separado.</p>
+          <button type="button" className="pnl-btn primario" onClick={cerrar} disabled={guardando}>Cerrar</button>
+        </div>
       ) : (
         <>
-          <Campo etiqueta="Placa" error={error}>
+          <Campo etiqueta="Placa (opcional)" ayuda="Si no tiene placa, usa un alias o número interno." error={error}>
             <input type="text" className="pnl-input" value={placa} onChange={(e) => setPlaca(e.target.value)} placeholder="A12BC3D" />
           </Campo>
-          <Campo etiqueta="Alias (opcional)" ayuda="Si lo dejas vacío se numera como Unidad NN.">
+          <Campo etiqueta="Alias (opcional)" ayuda="Por ejemplo: Manlift 01 o Camión con brazo.">
             <input type="text" className="pnl-input" value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="Unidad 27" />
           </Campo>
           <Campo etiqueta="Número interno de flota (opcional)"><input className="pnl-input" value={numero} maxLength={30} onChange={e => setNumero(e.target.value)} /></Campo>
@@ -714,12 +727,15 @@ function ModalNuevaUnidad({ abierto, areas, alCerrar, alGuardar, actor }) {
               <option value="camioneta">Camioneta</option>
               <option value="camion">Camión</option>
               <option value="auto">Automóvil</option>
-              <option value="otro">Otro</option>
+              <option value="otro">Maquinaria / otro equipo</option>
             </select>
           </Campo>
-          <Campo etiqueta="GPS verificado" ayuda="Obligatorio: la unidad nace reportando.">
+          <Campo etiqueta="GPS (opcional)" ayuda="Puedes asignarlo después. Instalar el equipo no certifica sus señales ni funciones.">
+            {gpsLibres === null && <p role="status">Consultando inventario…</p>}
+            {errorGps && <p role="alert">{errorGps}</p>}
+            {!errorGps && gpsLibres?.length === 0 && <p>No hay GPS disponibles. Puedes asignar uno después.</p>}
             <select className="pnl-input" value={gpsId} onChange={(e) => setGpsId(e.target.value)}>
-              <option value="">Selecciona el equipo…</option>
+              <option value="">Sin GPS · asignar después</option>
               {(gpsLibres ?? []).map((g) => (
                 <option key={g.id} value={g.id}>{g.modelo} · {g.imei}</option>
               ))}
@@ -735,7 +751,7 @@ function ModalNuevaUnidad({ abierto, areas, alCerrar, alGuardar, actor }) {
           </Campo>
 
           <div className="pnl-chips">
-            <button type="button" className="pnl-btn primario" onClick={confirmar} disabled={guardando}>
+            <button type="button" className="pnl-btn primario" onClick={confirmar} disabled={guardando || enviado.current}>
               <Icono nombre="check" tam={16} />
               {guardando ? 'Creando…' : 'Crear unidad'}
             </button>
