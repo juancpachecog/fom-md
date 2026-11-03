@@ -214,7 +214,7 @@ export function buscarEquipos(lista, q) {
 }
 
 const LECTURAS = {
-  meitrack_received: 'Trama Meitrack recibida · hora y posición sin calificar',
+  meitrack_received: 'Trama Meitrack recibida',
   position_valid: 'Posición válida',
   position_invalid: 'Posición sin fijar',
   heartbeat: 'Latido (sin posición)',

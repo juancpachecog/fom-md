@@ -13,6 +13,7 @@ import {
 import { masNuevoPrimero } from '../datos/orden'
 import * as f from '../datos/formato'
 import './admin-gps.css'
+import { locationStatus } from '../meitrack/location-status.js'
 
 // ============================================================
 // DETALLE Y DIAGNÓSTICO DEL EQUIPO (T-95, tablero GW5)
@@ -115,6 +116,8 @@ function cuandoFue(iso, ahora) {
 }
 
 function Diagnostico({ g, tele, posiciones, ultimaPos, capacidades, ahora }) {
+  const meitrack=g.protocolo==='meitrack-t399'
+  const ubicacion=locationStatus(tele.datos?.ubicacion)
   const senal = senalDe(g, ahora)
   const est = estadoEquipo(g.estado)
   const mensajes = tele.datos?.mensajes ?? []
@@ -127,6 +130,7 @@ function Diagnostico({ g, tele, posiciones, ultimaPos, capacidades, ahora }) {
 
   return (
     <>
+      {meitrack&&<section className="gp-card gp-col" role="status"><h2 className="gp-st">{ubicacion.title}</h2><p>{ubicacion.detail}</p></section>}
       <div className="gp-grid l400">
         <div className="gp-pila">
           <section className={`gp-card gp-diag ${tonoCard}`} aria-live="polite">
@@ -150,7 +154,7 @@ function Diagnostico({ g, tele, posiciones, ultimaPos, capacidades, ahora }) {
                       ? <li>¿La unidad está apagada o sin batería? El equipo se alimenta de ella.</li>
                       : <li>¿El equipo está conectado a corriente? Sin instalar, necesita su fuente para transmitir.</li>}
                     <li>{linea ? `Revisa saldo y datos de la línea ${linea}.` : 'Registra la línea SIM del equipo en «Datos del equipo» y revisa que tenga saldo y datos.'}</li>
-                    <li>Envía <span className="gp-mono cmdx">check{PUNTOS_CLAVE}</span> por SMS: debe decir GPRS ON y PORT {PUERTO_RECEPTOR}.</li>
+                    {meitrack?<li>Conserva la lectura DB4 y comprueba la recepción en «Probar señal». Si ya estaba configurado, revisa la causa antes de repetir los SMS de configuración.</li>:<li>Envía <span className="gp-mono cmdx">check{PUNTOS_CLAVE}</span> por SMS: debe decir GPRS ON y PORT {PUERTO_RECEPTOR}.</li>}
                   </ol>
                 </>
               )}
