@@ -1142,7 +1142,7 @@ export const repoApi = {
         ultimaRecepcion: r?.lastReceivedAt ?? null,
         frescuraS: Number(r?.freshnessSeconds) || 300,
         mensajes: (r?.messages ?? []).map((m) => ({
-          id: m.id,
+          id: m.receiptId ?? m.id,
           recibido: m.receivedAt,
           via: String(m.transport ?? '').toUpperCase(),
           bytes: m.bytes ?? null,
