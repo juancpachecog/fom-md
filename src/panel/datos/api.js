@@ -11,6 +11,7 @@
 // semilla local. Así el sitio nunca depende de que el túnel esté arriba.
 // ============================================================
 import { aRutaPorEnte, SIN_RUTA_POR_ENTE } from './rutaPorEnte'
+import { placasEnRespuesta } from './placas'
 
 const BASE = (import.meta.env?.VITE_FOM_API || '').replace(/\/+$/, '')
 
@@ -178,7 +179,7 @@ async function pedirUnaVez(rutaPedida, { metodo = 'GET', cuerpo, señal, idempot
     error.codigo = typeof datos?.code === 'string' ? datos.code : null
     throw error
   }
-  return datos
+  return placasEnRespuesta(datos)
 }
 
 // --- Rutas concretas -------------------------------------------------------
