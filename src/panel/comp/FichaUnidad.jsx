@@ -66,6 +66,7 @@ export default function FichaUnidad({ unidad, variante = 'panel', conCabecera = 
     <div className="fleet-card-content">
     <span className={`fleet-status ${estado.color}`}><i />{sinSenal ? textoSinSenal(v.ultimoReporte, ahora) : estado.texto}</span>
     {ultimo && <small className="fleet-status-nota">{ultimo}</small>}
+    {v.soloRecepcion && v.conectado && v.posicionEn && Number.isFinite(v.lat) && Number.isFinite(v.lng) && <p role="status" className="fleet-status-nota">El GPS está reportando. La posición del mapa es histórica: recibida el {f.fechaHora(v.posicionEn)}. No hay una posición reciente para confirmar el movimiento.</p>}
     {ubicacionGps && !ubicacionGps.available && <div role="status" className="fleet-status-nota"><strong>{ubicacionGps.title}</strong><p>{ubicacionGps.detail}</p></div>}
     <h3 className="fleet-plate">{v.placa || 'Sin placa'}</h3>
     {descripcion && <p className="fleet-description">{descripcion}</p>}

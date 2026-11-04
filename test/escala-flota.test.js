@@ -215,3 +215,22 @@ test('repositorio compartido rechaza lectura fallida y recupera recepción Meitr
   assert.equal(llamadas.filter(l => l.ruta === '/gps-devices').length, 2)
   assert.ok(llamadas.every(l => l.metodo === 'GET'))
 })
+
+test('repositorio compilado incorpora heartbeat Coban y conserva la fecha de la posición histórica', async (t) => {
+ const original=globalThis.fetch,ahora=Date.now(),recibido=new Date(ahora-30000).toISOString(),posicion=new Date(ahora-15*3600000).toISOString(),llamadas=[]
+ globalThis.fetch=async(direccion,opciones={})=>{
+  const ruta=new URL(direccion).pathname.replace('/api/v1/console','');llamadas.push(opciones.method??'GET');let cuerpo
+  if(ruta==='/vehicles')cuerpo={items:[{id:'coban',lastReportAt:posicion}],page:{total:1,limit:200,offset:0}}
+  else if(ruta==='/gps-devices')cuerpo={devices:[{id:'gps',vehicleId:'coban',installationId:'inst',protocolFamily:'coban-gps103',installedAt:new Date(ahora-86400000).toISOString(),lastConnectionAt:recibido}]}
+  else if(ruta==='/drivers')cuerpo={items:[],page:{total:0,limit:200,offset:0}}
+  else if(ruta.endsWith('/position/latest'))cuerpo={position:{latitude:1,longitude:2,receivedAt:posicion,telemetry:{speedKph:80}}}
+  else throw Error('Ruta sintética no prevista')
+  return{ok:true,status:200,text:async()=>JSON.stringify(cuerpo)}
+ }
+ t.after(()=>{globalThis.fetch=original})
+ const {repoApi}=await repositorioReal(),[v]=await repoApi.vehiculos.listar({})
+ assert.equal(v.conectado,true);assert.equal(v.soloRecepcion,true);assert.equal(v.ultimoReporte,recibido)
+ assert.equal(v.posicionEn,posicion);assert.equal(v.lat,1);assert.equal(v.lng,2)
+ assert.equal(v.velocidadKmh,null);assert.equal(v.estadoMarcha,null);assert.equal(v.ignition,null)
+ assert.ok(llamadas.every(m=>m==='GET'))
+})
