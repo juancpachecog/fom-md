@@ -10,6 +10,7 @@
 import { HAY_API, api, pedir } from './api'
 import repo from './repo'
 import { leerTodasLasPaginas } from './listar-odts'
+import { conRecepcionEquipo } from './recepcionUnidad.js'
 
 const CONSOLA = '/api/v1/console'
 
@@ -81,6 +82,11 @@ export async function vehiculosDeLaPlataforma() {
     if (r.status === 'fulfilled') vehiculos.push(...r.value)
     else fallidas.push({ empresa: empresas[i], error: r.reason?.message || 'No se pudo leer.' })
   })
+  const equipos = await api.equiposGps().then(r => r?.devices ?? []).catch(() => [])
+  for (let i = 0; i < vehiculos.length; i++) {
+    const candidatos = equipos.filter(g => g.vehicleId === vehiculos[i].id)
+    if (candidatos.length === 1) vehiculos[i] = conRecepcionEquipo(vehiculos[i], candidatos[0])
+  }
   vehiculos.sort((a, b) => a.empresaNombre.localeCompare(b.empresaNombre) || a.alias.localeCompare(b.alias))
   return { empresas, fallidas, vehiculos }
 }

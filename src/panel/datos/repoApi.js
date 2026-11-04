@@ -19,6 +19,7 @@ import { hoyISO } from './formato'
 import { AVISO_SIN_DIAS_EN_SERVIDOR, diasParaEnviar, normalizarDias } from './diasPlanilla'
 import { quitarSaltos } from './recorrido'
 import { transmitiendo } from './sinSenal.js'
+import { conRecepcionEquipo } from './recepcionUnidad.js'
 import { coleccionDePersona, indiceDePersona } from './perfilUsuario'
 import { cuerpoCredencial, credencialesVigentes } from './credencialesPersona'
 import { cambiosGps } from './metadatosGps'
@@ -733,10 +734,12 @@ export const repoApi = {
       // El detalle del vehículo no trae su GPS: se une desde la lista de equipos por el id de la unidad.
       const equipo = await api
         .equiposGps()
-        .then((r) => (r?.devices ?? []).find((d) => d.vehicleId === id) ?? null)
+        .then((r) => { const equipos = (r?.devices ?? []).filter(d => d.vehicleId === id); return equipos.length === 1 ? equipos[0] : null })
         .catch(() => null)
+      const ubicacionGps = equipo?.protocolFamily === 'meitrack-t399'
+        ? await repoApi.gpsEscritura.telemetria(equipo.id, { limite: 1 }).then(r => r.ubicacion).catch(() => null) : null
       return {
-        ...comoUnidad(ficha.vehicle),
+        ...conRecepcionEquipo(comoUnidad(ficha.vehicle), equipo, ubicacionGps),
         conductorPrincipalId: asignacion?.id ?? null,
         asignacionId: asignacion?.asignacionId ?? null,
         conductorNombre: asignacion?.nombre ?? 'Sin asignar',
