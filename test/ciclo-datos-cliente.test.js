@@ -166,3 +166,18 @@ test('expiración conserva scope, cursor bigint textual y confirmación; el comp
     assert.ok(calls.every(c => !c.url.includes(another)))
   } finally { globalThis.fetch = previous; client.fijarEmpresaGestion(null) }
 })
+
+test('activación persistida con respuesta perdida se verifica por plan y estado sin repetir POST',async()=>{
+  const previous=globalThis.fetch,methods=[], item={planId:key,activationId:entity,active:true,status:'scheduled'}
+  globalThis.fetch=async(_url,options)=>{methods.push(options.method);return options.method==='POST'?respuesta({message:'Synthetic response lost'},503):respuesta({items:[item],executionEnabled:true})}
+  try{await client.activarRetencionVerificada(tenant,key);assert.deepEqual(methods,['POST','GET'])}finally{globalThis.fetch=previous}
+})
+test('activación bloqueada no se acredita y detener se consulta aparte sin repetir la escritura',async()=>{
+  const previous=globalThis.fetch,methods=[]
+  let stopped=false
+  globalThis.fetch=async(url,options)=>{methods.push(options.method);if(url.endsWith('/retention-stop'))stopped=true
+    return options.method==='POST'?respuesta({message:'Synthetic response lost'},503):respuesta({items:[{planId:key,activationId:entity,active:!stopped,status:stopped?'disabled':'policy_changed'}]})}
+  try{await assert.rejects(client.activarRetencionVerificada('global',key),/no quedó verificada/)
+    await client.detenerRetencionVerificada('global',entity);assert.deepEqual(methods,['POST','GET','POST','GET'])
+  }finally{globalThis.fetch=previous}
+})

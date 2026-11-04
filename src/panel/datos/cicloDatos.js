@@ -58,3 +58,23 @@ export const revisarExpiracion = (empresaId, family, afterCursor = '0') => consu
   `${rutaEmpresa(empresaId)}/expiry-plans`, { metodo: 'POST', cuerpo: { family, afterCursor } })
 export const expirarTelemetria = (empresaId, cuerpo) => consultar(`${rutaEmpresa(empresaId)}/expiry`, { metodo: 'POST', cuerpo })
 export const historialExpiracion = empresaId => consultar(`${rutaEmpresa(empresaId)}/expiry-history`)
+
+export const leerAgendaRetencion = empresaId => consultar(`${rutaEmpresa(empresaId)}/retention-schedule`)
+export async function activarRetencionVerificada(empresaId, planId) {
+  try { await consultar(`${rutaEmpresa(empresaId)}/retention-activation`, { metodo: 'POST',
+    cuerpo: { planId, confirmation: 'ACTIVAR RETENCION AUTOMATICA' } }) } catch { /* La lectura resuelve respuesta perdida. */ }
+  let actual
+  try { actual = await leerAgendaRetencion(empresaId) }
+  catch { throw new Error('No se pudo comprobar la activación. Consulta la agenda antes de reintentar.') }
+  if (!(actual.items || []).some(a => a.planId === planId && a.active && ['scheduled', 'queued', 'protected', 'idle'].includes(a.status))) throw new Error('La activación no quedó verificada. Revisa el plan, las políticas y la agenda antes de reintentar.')
+  return actual
+}
+export async function detenerRetencionVerificada(empresaId, activationId) {
+  try { await consultar(`${rutaEmpresa(empresaId)}/retention-stop`, { metodo: 'POST',
+    cuerpo: { activationId, confirmation: 'DETENER RETENCION' } }) } catch { /* No repetir la mutación para comprobarla. */ }
+  let actual
+  try { actual = await leerAgendaRetencion(empresaId) }
+  catch { throw new Error('No se pudo comprobar la detención. Consulta la agenda antes de reintentar.') }
+  if (!(actual.items || []).some(a => a.activationId === activationId && a.active === false)) throw new Error('La detención no quedó verificada. Consulta su estado antes de otra solicitud.')
+  return actual
+}

@@ -210,7 +210,7 @@ export default function AdminCicloDatos() {
         <label className="ciclo-campo">Meses<select value={meses} disabled={ocupado} onChange={e => setMeses(Number(e.target.value))}><option value={6}>6 meses</option>{inicialCompleta && <option value={3}>3 meses</option>}</select></label>
         <button type="button" className="pnl-btn" disabled={ocupado || accionesBloqueadas || soloHistorico || !motivoValido || ciclo.estado !== 'ok'} onClick={guardarPolitica}>Guardar política</button>
       </section>
-      <ExpiracionTelemetria key={empresaId} empresaId={empresaId} deshabilitado={soloHistorico || ciclo.estado !== 'ok' || ['queued', 'running'].includes(recibo?.status)} ocupado={ocupado} hacer={hacer} familia={familia} avisar={setAviso} informar={setExito} alTrabajar={setExpirando} politicaVersion={familiasRetencion.map(f => versionActual(ciclo.datos?.policies, f)?.version ?? 0).join(':')} />
+      <ExpiracionTelemetria confirmar={confirmar} key={empresaId} empresaId={empresaId} deshabilitado={soloHistorico || ciclo.estado !== 'ok' || ['queued', 'running'].includes(recibo?.status)} ocupado={ocupado} hacer={hacer} familia={familia} avisar={setAviso} informar={setExito} alTrabajar={setExpirando} politicaVersion={familiasRetencion.map(f => versionActual(ciclo.datos?.policies, f)?.version ?? 0).join(':')} />
     </>}
     {dialogo}
   </div>

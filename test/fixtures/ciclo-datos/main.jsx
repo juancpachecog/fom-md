@@ -11,11 +11,12 @@ const planId = '66666666-6666-4666-8666-666666666666'
 const empresaCompleta = new URLSearchParams(location.search).get('empresa') === '1'
 const policyLoss = new URLSearchParams(location.search).get('policyLoss')
 const expiryPlanId = '77777777-7777-4777-8777-777777777777'
-const expiryRecords = []
+const expiryRecords = [], activations = []
+let activationLost = false, stopLost = false, expiryFamily = 'raw_ingress'
 let expiryReceipt = null, expiryLost = false
 const state = { candidates: empresaCompleta ? [{ type: 'tenant', id: tenant, label: 'Empresa SINTÉTICA', status: 'active' }] : [{ type: 'vehicle', id: vehicle, label: 'Vehículo SINTÉTICO', status: 'active' },
   { type: 'user', id: user, label: 'Usuario SINTÉTICO', status: 'revoked' }], sets: [], policiesByScope: {}, policyLost: false,
-  stats: { reads: 0, setRequests: 0, sets: 0, retired: 0, cleaned: 0, receiptReads: 0, jobPosts: 0, queued: 0, policyPosts: 0, policyWrites: 0, policyReads: 0, expiryPlans: 0, expiryPosts: 0, expiredGroups: 0 }, failRead: true, failCreate: true,
+  stats: { reads: 0, setRequests: 0, sets: 0, retired: 0, cleaned: 0, receiptReads: 0, jobPosts: 0, queued: 0, policyPosts: 0, policyWrites: 0, policyReads: 0, expiryPlans: 0, expiryPosts: 0, expiredGroups: 0, activationPosts: 0, activations: 0, stopPosts: 0 }, failRead: true, failCreate: true,
   failCleanupResponse: true, receipt: null, pending: false, deletedCompany: false }
 let renderStats = () => {}
 const response = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } })
@@ -26,12 +27,34 @@ globalThis.fetch = async (url, options = {}) => {
   const body = options.body ? JSON.parse(options.body) : {}
   const finish = value => { renderStats({ ...state.stats }); return response(value) }
   if (!path.startsWith('/api/v1/console/')) throw new Error('Synthetic fixture rejects unrecognized network access')
+  if (path.endsWith('/retention-schedule')) return finish({executionEnabled:true,items:activations.filter(a=>a.scope===(path.includes('/global/')?'global':tenant))})
+  if (method==='POST' && path.endsWith('/retention-activation')) {
+    if(body.confirmation!=='ACTIVAR RETENCION AUTOMATICA'||body.planId!==expiryPlanId) return response({message:'Synthetic activation confirmation rejected'},400)
+    state.stats.activationPosts++
+    if(!activations.some(a=>a.planId===body.planId&&a.active)) {
+      activations.push({activationId:'88888888-8888-4888-8888-888888888888',planId:body.planId,family:expiryFamily,
+        scope:path.includes('/global/')?'global':tenant,createdAt:new Date().toISOString(),status:'scheduled',active:true,nextScanAt:new Date(Date.now()+15000).toISOString()})
+      state.stats.activations++
+    }
+    renderStats({...state.stats})
+    if(!activationLost){activationLost=true;throw new TypeError('Synthetic activation response lost after persistence')}
+    return finish({activationId:activations[0].activationId,replayed:false})
+  }
+  if(method==='POST'&&path.endsWith('/retention-stop')) {
+    state.stats.stopPosts++
+    const found=activations.find(a=>a.activationId===body.activationId&&a.scope===(path.includes('/global/')?'global':tenant))
+    if(!found||body.confirmation!=='DETENER RETENCION')return response({message:'Synthetic stop confirmation rejected'},400)
+    found.active=false;found.status='disabled';found.nextScanAt=null
+    renderStats({...state.stats})
+    if(!stopLost){stopLost=true;throw new TypeError('Synthetic stop response lost after persistence')}
+    return finish({activationId:found.activationId,stopped:true})
+  }
   if (path.endsWith('/expiry-history')) return finish({ items: expiryRecords.filter(r => r.scope === (path.includes('/global/') ? 'global' : tenant)) })
   if (method === 'POST' && path.endsWith('/expiry-plans')) {
-    state.stats.expiryPlans++
+    state.stats.expiryPlans++; expiryFamily = body.family
     return finish({ planId: expiryPlanId, canDelete: true, executionEnabled: true, recoveryDays: 7,
       expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), asOf: new Date().toISOString(),
-      policy: { family: body.family, calendarMonths: 6, version: 1, cutoffExclusive: '2026-05-04T00:00:00Z' },
+      policy: { id: planId, family: body.family, calendarMonths: 6, version: 1, cutoffExclusive: '2026-05-04T00:00:00Z' },
       confirmation: 'EXPIRAR TELEMETRIA', purpose: 'telemetry_expiry', nextCursor: '9007199254740993',
       counts: [{ family: 'gps_raw_messages', count: 1 }, { family: 'gps_raw_message_attempts', count: 1 }], blockers: [] })
   }

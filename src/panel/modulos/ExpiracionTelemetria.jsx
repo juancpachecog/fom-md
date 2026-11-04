@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react'
 import { ErrorCarga } from '../comp/ui'
 import { useDatos } from '../useDatos'
-import { expirarTelemetria, historialExpiracion, leerReciboLimpieza, revisarExpiracion } from '../datos/cicloDatos'
+import { activarRetencionVerificada, detenerRetencionVerificada, expirarTelemetria, historialExpiracion, leerAgendaRetencion, leerReciboLimpieza, revisarExpiracion } from '../datos/cicloDatos'
 
 const trabajando = recibo => ['queued', 'running'].includes(recibo?.status)
 const fecha = valor => Number.isFinite(Date.parse(valor)) ? new Date(valor).toLocaleString('es-VE') : 'No disponible'
 
-export default function ExpiracionTelemetria({ empresaId, deshabilitado, ocupado, hacer, familia, avisar, informar, alTrabajar, politicaVersion }) {
+export default function ExpiracionTelemetria({ empresaId, deshabilitado, ocupado, hacer, familia, avisar, informar, alTrabajar, politicaVersion, confirmar }) {
   const [tipo, setTipo] = useState('raw_ingress'), [cursor, setCursor] = useState('0')
   const [plan, setPlan] = useState(null), [frase, setFrase] = useState('')
   const [pendiente, setPendiente] = useState(''), [recibo, setRecibo] = useState(null)
+  const [fraseActivacion, setFraseActivacion] = useState('')
   const historial = useDatos(() => historialExpiracion(empresaId), [empresaId])
+  const agenda = useDatos(() => leerAgendaRetencion(empresaId), [empresaId], 30_000)
   const enTrabajo = trabajando(recibo)
-  useEffect(() => { setPlan(null); setFrase(''); setCursor('0') }, [tipo, politicaVersion])
+  useEffect(() => { setPlan(null); setFrase(''); setFraseActivacion(''); setCursor('0') }, [tipo, politicaVersion])
   useEffect(() => { alTrabajar(enTrabajo); return () => alTrabajar(false) }, [enTrabajo, alTrabajar])
 
   const observar = valor => {
@@ -70,6 +72,17 @@ export default function ExpiracionTelemetria({ empresaId, deshabilitado, ocupado
     if (trabajando(valor)) return 'La expiración sigue en cola o en ejecución.'
     if (valor.status !== 'verified' || valor.remaining !== 0) return 'Consulta el estado y las dependencias antes de preparar otra solicitud.'
   }, 'Expiración verificada mediante una consulta independiente.')
+  const activar = () => hacer(async () => {
+    if (!plan?.policy?.id || !plan.executionEnabled || fraseActivacion !== 'ACTIVAR RETENCION AUTOMATICA' || !Number.isFinite(Date.parse(plan.expiresAt)) || Date.parse(plan.expiresAt) <= Date.now()) {
+      throw new Error('Revisa un plan vigente con política registrada y escribe la confirmación completa.')
+    }
+    await activarRetencionVerificada(empresaId, plan.planId)
+    setPlan(null); setFrase(''); setFraseActivacion(''); await agenda.recargar()
+  }, 'Activación verificada mediante una consulta independiente. La retención se revisará de forma programada.')
+  const detener = item => hacer(async () => {
+    if (!await confirmar({ titulo: 'Detener retención programada', texto: 'Se detendrá esta activación y se protegerán sus trabajos pendientes. Esto no revierte los trabajos ya completados.', accion: 'Detener retención', peligro: true })) return false
+    await detenerRetencionVerificada(empresaId, item.activationId); setPlan(null); setFrase(''); setFraseActivacion(''); await agenda.recargar()
+  }, 'Detención verificada mediante una consulta independiente.')
 
   return <section className="ciclo-seccion" aria-label="Expiración de telemetría">
     <h2>Aplicar retención a datos vencidos</h2>
@@ -87,6 +100,11 @@ export default function ExpiracionTelemetria({ empresaId, deshabilitado, ocupado
       {plan.canDelete && <><p>Se eliminará el grupo de la base activa. Copia privada de recuperación durante {plan.recoveryDays} días.</p>
         <label className="ciclo-campo">Escribe EXPIRAR TELEMETRIA<input value={frase} autoComplete="off" disabled={ocupado || enTrabajo} onChange={e => setFrase(e.target.value)} /></label>
         <button className="pnl-btn peligro" disabled={ocupado || deshabilitado || enTrabajo || frase !== 'EXPIRAR TELEMETRIA'} onClick={ejecutar}>Expirar el grupo del plan</button></>}
+      {plan.policy?.id && plan.executionEnabled && agenda.datos?.executionEnabled && (!(plan.blockers ?? []).length || plan.nextCursor === null) && <>
+        <p>Puedes activar la revisión automática de esta familia con la política vigente. Cada grupo conserva sus comprobaciones y reservas. Cambiar la política exigirá activarla de nuevo.</p>
+        <label className="ciclo-campo">Escribe ACTIVAR RETENCION AUTOMATICA<input value={fraseActivacion} autoComplete="off" disabled={ocupado || enTrabajo} onChange={e => setFraseActivacion(e.target.value)} /></label>
+        <button className="pnl-btn peligro" disabled={ocupado || deshabilitado || enTrabajo || fraseActivacion !== 'ACTIVAR RETENCION AUTOMATICA'} onClick={activar}>Activar retención automática</button>
+      </>}
       {plan.nextCursor && <button className="pnl-btn sutil" disabled={ocupado || enTrabajo} onClick={() => { setCursor(plan.nextCursor); setPlan(null); setFrase('') }}>Continuar con otro grupo</button>}
     </div>}
     {pendiente && <button className="pnl-btn sutil" disabled={ocupado} onClick={() => comprobar(pendiente)}>Comprobar expiración</button>}
@@ -95,6 +113,17 @@ export default function ExpiracionTelemetria({ empresaId, deshabilitado, ocupado
       <p>Registros presentes: {recibo.remaining ?? 'Pendiente de comprobar'} · Completada: {recibo.completedAt ? fecha(recibo.completedAt) : 'Pendiente'}.</p>
       {(recibo.counts ?? []).map(c => <p key={c.family}>{familia(c.family)}: {c.count}</p>)}
     </div>}
+    <h3>Retención programada</h3>
+    <p>Guardar una política no activa la agenda. Para activarla, revisa antes los datos vencidos de la familia.</p>
+    {agenda.estado === 'error' ? <ErrorCarga error={agenda.error} onReintentar={agenda.recargar} /> : <>
+      {agenda.datos?.executionEnabled === false && <p>La agenda automática no está habilitada en este entorno.</p>}
+      {(agenda.datos?.items ?? []).map(item => <div className="ciclo-plan" key={item.activationId}>
+        <p>{item.family === 'raw_ingress' ? 'Ingreso crudo' : 'Telemetría canónica'} · {estadoAgenda(item.status)}</p>
+        {item.nextScanAt && <p>Próxima revisión: {fecha(item.nextScanAt)}.</p>}
+        {item.active && <button className="pnl-btn sutil" disabled={ocupado} onClick={() => detener(item)}>Detener esta retención</button>}
+      </div>)}
+      {agenda.estado === 'ok' && !(agenda.datos?.items ?? []).length && <p>No hay activaciones programadas en este ámbito.</p>}
+    </>}
     <h3>Solicitudes recientes</h3>
     {historial.estado === 'error' ? <ErrorCarga error={historial.error} onReintentar={historial.recargar} /> : <>
       {(historial.datos?.items ?? []).filter(item => item.status !== 'planned').map(item => <p key={item.planId}>
@@ -104,4 +133,10 @@ export default function ExpiracionTelemetria({ empresaId, deshabilitado, ocupado
       {historial.estado === 'ok' && !(historial.datos?.items ?? []).some(item => item.status !== 'planned') && <p>No hay solicitudes de expiración en este ámbito.</p>}
     </>}
   </section>
+}
+
+function estadoAgenda(status) {
+  return ({ scheduled: 'Programada', queued: 'Grupo en cola', protected: 'Grupo protegido; se conserva', idle: 'Barrido completado; próxima revisión pendiente',
+    policy_changed: 'La política cambió; requiere una activación nueva', scope_unavailable: 'La autorización o el ámbito ya no están disponibles',
+    disabled: 'Detenida', database_error: 'Requiere revisión; no se programan más grupos' })[status] || 'Pendiente de comprobar'
 }
