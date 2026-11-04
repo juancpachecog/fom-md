@@ -201,7 +201,36 @@ export default function AdminCicloDatos() {
 function familia(nombre) {
   return ({ tenants: 'Empresas', vehicles: 'Vehículos', users: 'Usuarios', gps_devices: 'GPS',
     tenant: 'Empresa', vehicle: 'Vehículo', user: 'Usuario', gps_device: 'GPS',
-    audit_log: 'Auditoría', dependencias: 'Dependencias', conjunto: 'Conjunto' })[nombre] || 'Referencias asociadas'
+    auth_sessions: 'Sesiones de acceso', auth_one_time_tokens: 'Tokens de un solo uso',
+    user_password_credentials: 'Credenciales de acceso', user_profiles: 'Perfiles personales',
+    user_credentials: 'Cualificaciones personales', tenant_memberships: 'Membresías',
+    user_map_preferences: 'Preferencias del mapa', identity_email_change_requests: 'Solicitudes de cambio de correo',
+    areas: 'Áreas', tenant_map_settings: 'Configuración del mapa', map_provider_profiles: 'Perfiles del proveedor de mapas',
+    map_provider_assignments: 'Asignaciones del proveedor de mapas', tenant_document_settings: 'Configuración documental',
+    document_types: 'Tipos de documento', documents: 'Documentos', document_files: 'Archivos documentales',
+    inspection_templates: 'Plantillas de inspección', inspection_template_items: 'Puntos de inspección',
+    inspections: 'Inspecciones', inspection_answers: 'Respuestas de inspección', inspection_evidence: 'Evidencias de inspección',
+    inspection_finding_events: 'Seguimiento de hallazgos', inspection_schedules: 'Inspecciones programadas',
+    inspection_submission_attempts: 'Intentos de envío de inspecciones', maintenance_service_plans: 'Planes de mantenimiento',
+    maintenance_plan_vehicles: 'Asignaciones a planes', maintenance_actions: 'Acciones de mantenimiento',
+    maintenance_action_attachments: 'Adjuntos de mantenimiento', work_orders: 'Órdenes de trabajo',
+    work_order_assignments: 'Asignaciones de trabajo', work_order_attachments: 'Adjuntos de órdenes',
+    work_order_events: 'Eventos de órdenes', work_order_execution_events: 'Eventos de ejecución',
+    emergency_reports: 'Emergencias', emergency_reporter_location_events: 'Ubicaciones de emergencias',
+    fleet_expenses: 'Gastos de flota', service_payments: 'Pagos del servicio', service_payment_receipts: 'Recibos de pago',
+    alert_rules: 'Reglas de alerta', alert_rule_vehicles: 'Unidades de las reglas',
+    alert_rule_vehicle_states: 'Estados de las reglas', alert_events: 'Eventos de alerta',
+    alert_evaluation_jobs: 'Evaluaciones de alerta', notifications: 'Notificaciones',
+    notification_receipts: 'Recibos de notificación', push_registrations: 'Registros de notificación push',
+    push_delivery_intents: 'Entregas push', push_delivery_attempts: 'Intentos de entrega push',
+    user_alerts: 'Avisos personales', user_alert_attachments: 'Adjuntos de avisos',
+    driver_notices: 'Avisos del conductor', driver_notice_attachment_refs: 'Adjuntos del conductor',
+    driver_behavior_events: 'Eventos de conducción', vehicle_driver_assignments: 'Asignaciones de conductor',
+    vehicle_driver_sessions: 'Sesiones de conducción', vehicle_live_state: 'Estado de las unidades',
+    vehicle_daily_metrics: 'Métricas diarias', vehicle_odometer_readings: 'Lecturas de odómetro',
+    mobile_mutation_receipts: 'Recibos de operaciones', audit_log: 'Auditoría',
+    storage_objects: 'Objetos de almacenamiento', external_references: 'Referencias externas',
+    esquema: 'Esquema y controles', dependencias: 'Dependencias', conjunto: 'Conjunto' })[nombre] || 'Referencias asociadas'
 }
 
 function estadoTrabajo(estado) {
