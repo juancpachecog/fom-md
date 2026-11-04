@@ -239,7 +239,7 @@ function Tablero({ resumen: r, vehiculos, odts, alertas, inspecciones, seleccion
             <div className="pnl-flota-barra"><i style={{ '--proporcion': `${total ? activas / total * 100 : 0}%` }} /></div>
             <div className="pnl-flota-leyenda">
               <span>{activas} {sabeMarcha ? 'en marcha' : 'reportando'}</span>
-              <span>{total - activas} {sabeMarcha ? 'detenidos' : 'sin señal'}</span>
+              <span>{sabeMarcha ? `${unidades.filter(u => u.estadoMarcha === 'parada' && u.senal.viva).length} detenidos · ${reportando} reportando` : `${total - reportando} sin señal`}</span>
             </div>
           </div>
         </Link>

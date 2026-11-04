@@ -14,3 +14,20 @@ export function conRecepcionEquipo(unidad, equipo, ubicacion = null, ahora = Dat
     conexion: ahora - Date.parse(ultima) < 300000 ? 'reportando' : 'sin_senal',
     ...(soloRecepcion ? { estadoMarcha: null, velocidadKmh: null, ignition: null } : {}) }
 }
+
+/** Inventario autorizado: una sola instalación inequívoca por vehículo. */
+export function conRecepcionFlota(unidades, equipos, empresaId = null, ahora = Date.now()) {
+  const porVehiculo = new Map()
+  for (const equipo of equipos) {
+    if (!equipo.vehicleId) continue
+    const anteriores = porVehiculo.get(equipo.vehicleId) ?? []
+    anteriores.push(equipo)
+    porVehiculo.set(equipo.vehicleId, anteriores)
+  }
+  return unidades.map(unidad => {
+    const candidatos = porVehiculo.get(unidad.id) ?? []
+    const equipo = candidatos.length === 1 ? candidatos[0] : null
+    if (empresaId && equipo?.operatingTenantId !== empresaId) return unidad
+    return conRecepcionEquipo(unidad, equipo, unidad.ubicacionGps ?? null, ahora)
+  })
+}

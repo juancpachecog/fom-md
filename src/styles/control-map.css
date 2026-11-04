@@ -137,3 +137,5 @@
 .leaflet-popup.ruta-popup span{display:block;color:#b7c7d9}
 .leaflet-popup.ruta-popup a.leaflet-popup-close-button{color:#b7c7d9}
 .ruta-item.activo{border-color:#349bfa;background:#173957;box-shadow:0 0 0 1px #349bfa55}
+
+.control-sin-posicion{font:inherit;color:#85c9ff;border:0;background:none;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}

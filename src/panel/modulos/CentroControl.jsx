@@ -40,7 +40,7 @@ function coincide(v, texto) {
 }
 
 // El conductor entra en la firma: el buscador también filtra por su nombre.
-const firmaFlota = (lista) => lista.map((v) => `${v.id}:${v.lat}:${v.lng}:${v.estadoMarcha}:${v.velocidadKmh}:${v.ultimoReporte}:${v.conectado}:${v.conductorNombre}`).join('|') + (lista.incompleta ? '|incompleta' : '')
+const firmaFlota = (lista) => lista.map((v) => `${v.id}:${v.lat}:${v.lng}:${v.estadoMarcha}:${v.velocidadKmh}:${v.ultimoReporte}:${v.conectado}:${v.soloRecepcion}:${v.conductorNombre}`).join('|') + (lista.incompleta ? '|incompleta' : '')
 const firmaPuntos = (p) => `${p.length}|${p[0]?.hora}|${p.at(-1)?.hora}|${p.at(-1)?.lat}|${p.at(-1)?.lng}`
 const firmaAnalisis = (a) => `${firmaPuntos(a.puntos)}|${a.viajes.length}|${a.paradas.length}`
 
@@ -75,12 +75,15 @@ export default function CentroControl() {
   // flota, y el trazo reciente con `cola`.
   const detalle = useDatos(
     () => (seleccionado
-      ? repo.admin.gps.listar().catch(() => []).then((equipos) => {
-          const e = equipos.find((g) => g.vehiculoId === seleccionado)
-          return { id: seleccionado, gps: e ? { modelo: e.modelo ?? 'Equipo GPS', imei: e.imei, linea: e.linea, verificado: e.verificado, conectado: e.conectado } : null }
+      ? repo.admin.gps.listar().then(async (equipos) => {
+          const candidatos = equipos.filter((g) => g.vehiculoId === seleccionado)
+          const e = candidatos.length === 1 ? candidatos[0] : null
+          const ubicacionGps = e?.protocolo === 'meitrack-t399'
+            ? await repo.admin.gps.telemetria(e.id, { limite: 1 }).then(r => r.ubicacion).catch(() => ({ state: 'unavailable' })) : null
+          return { id: seleccionado, ubicacionGps, gps: e ? { modelo: e.modelo ?? 'Equipo GPS', imei: e.imei, linea: e.linea, verificado: e.verificado, conectado: e.conectado } : null }
         })
       : Promise.resolve(null)),
-    [seleccionado]
+    [seleccionado], 30000
   )
 
   // Sin pedir el recorrido: los últimos minutos de camino de la unidad elegida, para saber de
@@ -179,7 +182,7 @@ export default function CentroControl() {
   const bajada =
     flota.estado === 'ok'
       ? `${f.numero(lista.length)} ${lista.length === 1 ? 'unidad' : 'unidades'} · ` +
-        (sabeMarcha ? `${enMarcha} en marcha` : `${reportando} reportando`)
+        (sabeMarcha ? `${enMarcha} en marcha · ${reportando} reportando` : `${reportando} reportando`)
       : 'Dónde está cada unidad, en tiempo real.'
   // La flota pasó del tope de lectura: se dice, para que nadie cuente de menos sin saberlo.
   const incompleta = flota.estado === 'ok' && Boolean(datosFlota?.incompleta)
@@ -187,7 +190,8 @@ export default function CentroControl() {
   const unidadLista = lista.find(v => v.id === seleccionado)
   const unidadDetalle = detalle.datos?.id === seleccionado ? detalle.datos : null
   // La lista va encima: sus datos son de hace menos de 15 s; los del expediente, de cuando se eligió.
-  const unidad = unidadLista ? { ...unidadDetalle, ...unidadLista } : null
+  const unidad = unidadLista ? { ...unidadDetalle, ...unidadLista, ubicacionGps: unidadDetalle?.ubicacionGps ?? unidadLista.ubicacionGps } : null
+  const sinPunto = lista.filter(v => !Number.isFinite(v.lat) || !Number.isFinite(v.lng)).length
   const estadosVisibles = [...new Map(lista.map(v => { const e = estadoUnidad(v); return [e.clave, e] })).values()]
 
   // En el teléfono la ficha y la lista son hojas a lo ancho que tapan el pie del mapa. Se mide
@@ -236,7 +240,7 @@ export default function CentroControl() {
           alto="100%" ficha={false} leyenda={false} espacioFicha herramientas />
       </div>
       <div className="control-search">
-        <div className="control-search-heading"><div><h1>Centro de control</h1><p>{bajada}</p>{incompleta && <p role="status">Lista incompleta: la flota es más grande de lo que se pudo leer.</p>}</div>
+        <div className="control-search-heading"><div><h1>Centro de control</h1><p>{bajada}{sinPunto > 0 && <> · <button type="button" className="control-sin-posicion" onClick={() => { setListaAbierta(true); setSeleccionado(null) }}>{sinPunto} sin posición · Ver unidades</button></>}</p>{incompleta && <p role="status">Lista incompleta: la flota es más grande de lo que se pudo leer.</p>}</div>
           <div className="control-acciones">
             <button className="pnl-btn" type="button" aria-label="Unidades" aria-expanded={listaAbierta} aria-controls="control-unidades" onClick={() => { setListaAbierta(v => !v); setSeleccionado(null) }}><Icono nombre="camion" tam={18} />Unidades</button>
           </div>
@@ -280,7 +284,7 @@ export default function CentroControl() {
         {detalle.estado === 'error' && <p className="control-detail-note">No se pudo cargar la ficha de la unidad. <button onClick={detalle.recargar}>Reintentar</button></p>}
       </aside>}
       {estadosVisibles.length > 0 && <div className="fleet-map-legend" aria-label="Estados de los vehículos">{estadosVisibles.map(e => <span className={e.color} key={e.clave}><i />{e.texto}</span>)}</div>}
-      <div className="control-live"><i />Actualización cada 15 s<span>Selecciona una unidad en el mapa</span></div>
+      <div className="control-live"><i />Actualización cada 15 s<span>Selecciona una unidad en el mapa o en Unidades</span></div>
     </section>
   )
 }
@@ -320,12 +324,14 @@ function ListaUnidades({ vehiculos, seleccionado, alSeleccionar }) {
                 {v.placa} ·{' '}
                 {v.conductorNombre === 'Sin asignar' ? 'Sin conductor' : v.conductorNombre}
               </span>
+              {(!Number.isFinite(v.lat) || !Number.isFinite(v.lng)) && <span>Sin posición publicada · selecciona para ver el diagnóstico</span>}
             </div>
             {/* Sin señal, cuánto lleva callada. Con velocidad en la base se muestra; sin ella, lo
                 único que consta es cuándo reportó el equipo por última vez. */}
             <em>
               {estado.clave === 'sin_senal'
                 ? textoSinSenal(v.ultimoReporte, ahora)
+                : v.soloRecepcion ? 'Reportando'
                 : v.velocidadKmh != null
                 ? f.velocidad(v.velocidadKmh)
                 : v.estadoMarcha === 'parada'

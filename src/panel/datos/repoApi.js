@@ -19,7 +19,7 @@ import { hoyISO } from './formato'
 import { AVISO_SIN_DIAS_EN_SERVIDOR, diasParaEnviar, normalizarDias } from './diasPlanilla'
 import { quitarSaltos } from './recorrido'
 import { transmitiendo } from './sinSenal.js'
-import { conRecepcionEquipo } from './recepcionUnidad.js'
+import { conRecepcionEquipo, conRecepcionFlota } from './recepcionUnidad.js'
 import { coleccionDePersona, indiceDePersona } from './perfilUsuario'
 import { cuerpoCredencial, credencialesVigentes } from './credencialesPersona'
 import { cambiosGps } from './metadatosGps'
@@ -115,7 +115,11 @@ async function flota(q = '') {
   }
   const peticion = leerTodasLasPaginas((desplazamiento, limite) => api.vehiculos({ q, limite, desplazamiento }))
     .then(async (r) => {
-      const lista = await conPosicionDirecta(r.items.map(comoUnidad))
+      const [unidades, equipos] = await Promise.all([
+        conPosicionDirecta(r.items.map(comoUnidad)),
+        api.equiposGps().then(r => r?.devices ?? []).catch(() => []),
+      ])
+      const lista = conRecepcionFlota(unidades, equipos, empresaContexto)
       if (r.incompleta) lista.incompleta = true
       return lista
     })

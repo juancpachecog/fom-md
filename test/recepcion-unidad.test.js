@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { conRecepcionEquipo } from '../src/panel/datos/recepcionUnidad.js'
+import { conRecepcionEquipo, conRecepcionFlota } from '../src/panel/datos/recepcionUnidad.js'
 import { estadoUnidad } from '../src/panel/datos/estadoUnidad.js'
 const ahora=Date.parse('2026-11-04T00:40:00Z')
 const unidad={id:'vehiculo',empresaId:'empresa',ultimoReporte:null,lat:null,lng:null,velocidadKmh:null,estadoMarcha:null}
@@ -20,4 +20,15 @@ test('recibir otra trama no rejuvenece la velocidad o marcha de una posición an
  const v=conRecepcionEquipo({...unidad,ultimoReporte:'2026-11-03T12:01:00Z',lat:1,lng:2,velocidadKmh:80,estadoMarcha:'en_marcha'},equipo,null,ahora)
  assert.equal(estadoUnidad(v).texto,'Reportando');assert.equal(v.estadoMarcha,null)
  assert.equal(v.lat,1);assert.equal(v.lng,2)
+})
+
+test('flota conserva unidades sin GPS y rechaza instalaciones ambiguas o de otra empresa',()=>{
+ const sinGps={id:'sin-gps',lat:null,lng:null,ultimoReporte:null}
+ const lista=conRecepcionFlota([unidad,sinGps],[equipo],'empresa',ahora)
+ assert.equal(estadoUnidad(lista[0]).texto,'Reportando')
+ assert.equal(lista[0].lat,null);assert.equal(lista[0].velocidadKmh,null)
+ assert.equal(lista[1],sinGps)
+ assert.equal(conRecepcionFlota([unidad],[equipo,equipo],'empresa',ahora)[0],unidad)
+ assert.equal(conRecepcionFlota([unidad],[equipo],'otra',ahora)[0],unidad)
+ assert.equal(conRecepcionFlota([unidad],[],'empresa',ahora)[0],unidad)
 })
