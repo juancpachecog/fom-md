@@ -207,6 +207,13 @@ export default function AdminCicloDatos() {
 function familia(nombre) {
   return ({ tenants: 'Empresas', vehicles: 'Vehículos', users: 'Usuarios', gps_devices: 'GPS',
     tenant: 'Empresa', vehicle: 'Vehículo', user: 'Usuario', gps_device: 'GPS',
+    gps_raw_messages: 'Recepciones GPS', gps_raw_message_attempts: 'Intentos de interpretación GPS',
+    gps_message_frames: 'Tramas GPS', gps_message_frame_segments: 'Segmentos de tramas GPS',
+    gps_positions: 'Posiciones GPS', gps_device_tenant_history: 'Historial empresarial del GPS',
+    gps_ingress_frame_receipts: 'Comprobantes de recepción GPS', gps_ingress_frame_receipt_segments: 'Segmentos de recepción GPS',
+    gps_ingress_decode_receipts: 'Resultados de interpretación GPS', gps_ingress_record_decodes: 'Registros GPS interpretados',
+    gps_ingress_attribution_runs: 'Atribuciones de recepción GPS', gps_ingress_record_attributions: 'Registros GPS atribuidos',
+    reserva_operacional: 'Reservas operacionales',
     auth_sessions: 'Sesiones de acceso', auth_one_time_tokens: 'Tokens de un solo uso',
     user_password_credentials: 'Credenciales de acceso', user_profiles: 'Perfiles personales',
     user_credentials: 'Cualificaciones personales', tenant_memberships: 'Membresías',
