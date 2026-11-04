@@ -182,7 +182,7 @@ export default function CentroControl() {
   const bajada =
     flota.estado === 'ok'
       ? `${f.numero(lista.length)} ${lista.length === 1 ? 'unidad' : 'unidades'} · ` +
-        (sabeMarcha ? `${enMarcha} en marcha` : `${reportando} reportando`)
+        (sabeMarcha ? `${enMarcha} en marcha · ${reportando} reportando` : `${reportando} reportando`)
       : 'Dónde está cada unidad, en tiempo real.'
   // La flota pasó del tope de lectura: se dice, para que nadie cuente de menos sin saberlo.
   const incompleta = flota.estado === 'ok' && Boolean(datosFlota?.incompleta)

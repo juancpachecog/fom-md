@@ -166,7 +166,7 @@ function TiraMovil({ unidades, sabeMarcha }) {
     ? [
         { t: total === 1 ? 'unidad' : 'unidades', n: total },
         { t: 'en marcha', n: enMarcha, c: 'verde' },
-        { t: 'detenidas', n: total - enMarcha - sinSenal, c: 'ambar' },
+        { t: 'detenidas', n: unidades.filter(v => v.estadoMarcha === 'parada' && v.conectado !== false).length, c: 'ambar' },
         { t: 'sin señal', n: sinSenal, c: 'gris' },
       ]
     : [
@@ -416,7 +416,7 @@ export default function Flota() {
                   valor={enMarcha}
                   icono="velocidad"
                   tono="ok"
-                  nota={f.cantidad(lista.length - enMarcha, 'detenida', 'detenidas')}
+                  nota={`${f.cantidad(lista.filter(v => v.estadoMarcha === 'parada' && v.conectado !== false).length, 'detenida', 'detenidas')} · ${reportando} reportando`}
                 />
               ) : (
                 /* La base no guarda la velocidad: se informa cuántos equipos
