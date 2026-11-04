@@ -5,8 +5,8 @@ import { useDatos } from '../useDatos'
 import { Cabecera, Cargando, ErrorCarga } from '../comp/ui'
 import { useConfirmar } from '../comp/Confirmar'
 import { textoDeError } from '../datos/responsableEmpresa'
-import { candidatosCiclo, claveCiclo, crearConjuntoPrueba, estadoCiclo, leerCiclo, leerReciboLimpieza, limpiarPruebas, marcarPrueba,
-  registrarRetencion, retirarRegistro, revisarLimpieza, revisarRetirada, TIPOS_CICLO, versionActual } from '../datos/cicloDatos'
+import { candidatosCiclo, claveCiclo, crearConjuntoPrueba, estadoCiclo, guardarRetencionVerificada, leerCiclo, leerReciboLimpieza, limpiarPruebas, marcarPrueba,
+  retirarRegistro, revisarLimpieza, revisarRetirada, TIPOS_CICLO, versionActual } from '../datos/cicloDatos'
 import './ciclo-datos.css'
 
 export default function AdminCicloDatos() {
@@ -34,11 +34,12 @@ export default function AdminCicloDatos() {
   const ambitosHistoricos = (historicos.datos?.historicalScopes ?? []).filter(h => !(empresas.datos ?? []).some(e => e.id === h.id))
   const soloHistorico = ciclo.datos?.historicalOnly === true
   const nombreAmbito = empresaId === 'global' ? 'inventario global y usuarios sin empresa' : empresa?.nombre
-  const politica = versionActual(ciclo.datos?.policies, 'canonical_telemetry')
+  const familiasRetencion = ['raw_ingress', 'canonical_telemetry']
+  const inicialCompleta = familiasRetencion.every(family => versionActual(ciclo.datos?.policies, family))
   const motivoValido = motivo.trim().length >= 2 && motivo.trim().length <= 500
   const elegidos = useMemo(() => new Set(seleccion.map(claveCiclo)), [seleccion])
 
-  useEffect(() => { setSeleccion([]); setConjuntoId(''); setPlan(null); setFrase(''); setOffset(0); setAviso(''); setExito(''); setConfirmarPruebas(false); setRecibo(null); setPlanPendiente('') }, [empresaId])
+  useEffect(() => { setSeleccion([]); setConjuntoId(''); setPlan(null); setFrase(''); setOffset(0); setAviso(''); setExito(''); setConfirmarPruebas(false); setRecibo(null); setPlanPendiente(''); setMeses(6) }, [empresaId])
   useEffect(() => { setOffset(0) }, [tipo, q])
   useEffect(() => { setPlan(null); setFrase(''); setRecibo(null); setPlanPendiente('') }, [conjuntoId])
   useEffect(() => {
@@ -147,12 +148,19 @@ export default function AdminCicloDatos() {
   }, 'El comprobante confirma que los registros del plan ya no están en la base activa.')
   const guardarPolitica = () => hacer(async () => {
     if (!motivoValido) throw new Error('Escribe el motivo de la política.')
-    const cambios = ['raw_ingress', 'canonical_telemetry'].map(family => ({ family, calendarMonths: Number(meses),
-      expectedVersion: versionActual(ciclo.datos?.policies, family)?.version ?? 0, reason: motivo.trim() }))
-    if (!await confirmar({ titulo: 'Guardar retención', texto: `Se registrarán ${meses} meses para la telemetría de ${nombreAmbito}. La política no elimina registros al guardar.`, accion: 'Guardar política', peligro: Number(meses) < (politica?.calendarMonths ?? 6) })) return false
-    for (const cambio of cambios) await registrarRetencion(empresaId, cambio)
+    const cambios = familiasRetencion.map(family => {
+      const actual = versionActual(ciclo.datos?.policies, family)
+      return { family, calendarMonths: Number(meses), expectedVersion: actual?.version ?? 0, reason: motivo.trim(),
+        sinCambios: !!actual && actual.calendarMonths === Number(meses) && actual.reason === motivo.trim() }
+    })
+    if (!await confirmar({ titulo: 'Guardar retención', texto: `Se registrarán ${meses} meses para la telemetría de ${nombreAmbito}. La política no elimina registros al guardar.`, accion: 'Guardar política', peligro: cambios.some(c => c.calendarMonths < (versionActual(ciclo.datos?.policies, c.family)?.calendarMonths ?? 6)) })) return false
+    try { await guardarRetencionVerificada(empresaId, cambios) }
+    catch (error) {
+      await Promise.all([ciclo.recargar(), historicos.recargar()])
+      throw error
+    }
     setPlan(null)
-  }, 'Política registrada. Guardar no ejecuta una limpieza.')
+  }, 'Políticas verificadas mediante una consulta independiente. Guardar no ejecuta una limpieza.')
 
   return <div className="pnl-modulo ciclo-datos">
     <Cabecera titulo="Retirada y limpieza de datos" bajada="Retira registros del uso y elimina pruebas acreditadas tras revisar su impacto." />
@@ -195,8 +203,8 @@ export default function AdminCicloDatos() {
             <p>{recibo.recoveryAvailable ? 'Copia privada de recuperación disponible dentro de su plazo.' : 'La ventana de recuperación ya terminó.'}</p></>}</div>}
       </section>
       <section className="ciclo-seccion"><h2>Retención de telemetría</h2><p>Inicialmente seis meses. Aumentar el plazo no recupera datos ya expirados. Los pagos, documentos y la auditoría tienen reglas propias.</p>
-        <p>{politica ? `Última política registrada: ${politica.calendarMonths} meses.` : 'Todavía no hay una política registrada para esta empresa.'}</p>
-        <label className="ciclo-campo">Meses<select value={meses} disabled={ocupado} onChange={e => setMeses(Number(e.target.value))}><option value={6}>6 meses</option>{politica && <option value={3}>3 meses</option>}</select></label>
+        {familiasRetencion.map(family => { const actual = versionActual(ciclo.datos?.policies, family); return <p key={family}>{family === 'raw_ingress' ? 'Ingreso crudo' : 'Telemetría canónica'}: {actual ? `${actual.calendarMonths} meses · versión ${actual.version}` : 'sin política registrada'}.</p> })}
+        <label className="ciclo-campo">Meses<select value={meses} disabled={ocupado} onChange={e => setMeses(Number(e.target.value))}><option value={6}>6 meses</option>{inicialCompleta && <option value={3}>3 meses</option>}</select></label>
         <button type="button" className="pnl-btn" disabled={ocupado || soloHistorico || !motivoValido || ciclo.estado !== 'ok'} onClick={guardarPolitica}>Guardar política</button>
       </section>
     </>}

@@ -8,9 +8,10 @@ const vehicle = '33333333-3333-4333-8333-333333333333'
 const user = '55555555-5555-4555-8555-555555555555'
 const planId = '66666666-6666-4666-8666-666666666666'
 const empresaCompleta = new URLSearchParams(location.search).get('empresa') === '1'
+const policyLoss = new URLSearchParams(location.search).get('policyLoss')
 const state = { candidates: empresaCompleta ? [{ type: 'tenant', id: tenant, label: 'Empresa SINTÉTICA', status: 'active' }] : [{ type: 'vehicle', id: vehicle, label: 'Vehículo SINTÉTICO', status: 'active' },
-  { type: 'user', id: user, label: 'Usuario SINTÉTICO', status: 'revoked' }], sets: [], policies: [],
-  stats: { reads: 0, setRequests: 0, sets: 0, retired: 0, cleaned: 0, receiptReads: 0, jobPosts: 0, queued: 0 }, failRead: true, failCreate: true,
+  { type: 'user', id: user, label: 'Usuario SINTÉTICO', status: 'revoked' }], sets: [], policiesByScope: {}, policyLost: false,
+  stats: { reads: 0, setRequests: 0, sets: 0, retired: 0, cleaned: 0, receiptReads: 0, jobPosts: 0, queued: 0, policyPosts: 0, policyWrites: 0, policyReads: 0 }, failRead: true, failCreate: true,
   failCleanupResponse: true, receipt: null, pending: false, deletedCompany: false }
 let renderStats = () => {}
 const response = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } })
@@ -80,12 +81,26 @@ globalThis.fetch = async (url, options = {}) => {
       : response({ message: 'Synthetic receipt not found' }, 404)
   }
   if (method === 'POST' && path.endsWith('/policies')) {
-    state.policies.push({ ...body, version: body.expectedVersion + 1 })
+    state.stats.policyPosts++
+    const scope = path.includes('/lifecycle/global/') ? 'global' : tenant
+    const policies = state.policiesByScope[scope] ??= []
+    const last = policies.filter(p => p.family === body.family).sort((a, b) => b.version - a.version)[0]
+    if ((last?.version ?? 0) === body.expectedVersion) {
+      policies.push({ ...body, version: body.expectedVersion + 1 }); state.stats.policyWrites++
+    } else if (!(last?.version === body.expectedVersion + 1 && last.calendarMonths === body.calendarMonths && last.reason === body.reason)) {
+      return response({ message: 'Synthetic policy version conflict' }, 409)
+    }
+    renderStats({ ...state.stats })
+    if (!state.policyLost && state.stats.policyPosts === (policyLoss === 'first' ? 1 : policyLoss === 'second' ? 2 : -1)) {
+      state.policyLost = true
+      throw new TypeError('Synthetic policy response lost after persistence')
+    }
     return finish({ id: planId })
   }
   if (path.includes('/lifecycle/tenants/') || path.endsWith('/lifecycle/global')) {
     const global = path.endsWith('/lifecycle/global')
-    return finish({ policies: state.policies, testSets: global ? [] : state.sets, purgeEnabled: false,
+    state.stats.policyReads++
+    return finish({ policies: state.policiesByScope[global ? 'global' : tenant] ?? [], testSets: global ? [] : state.sets, purgeEnabled: false,
       historicalOnly: !global && state.deletedCompany,
       historicalScopes: global && state.deletedCompany ? [{ id: tenant, reason: state.sets[0].reason, lastActivityAt: state.receipt.completedAt }] : [] })
   }

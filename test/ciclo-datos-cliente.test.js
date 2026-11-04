@@ -79,3 +79,72 @@ test('ámbito global es explícito y el plan usa POST con CSRF; recibo posterior
     assert.equal(calls.some(x => x.url.includes(`/tenants/${another}`)), false)
   } finally { globalThis.fetch = previous; client.fijarEmpresaGestion(null) }
 })
+
+const cambiosRetencion = ['raw_ingress', 'canonical_telemetry'].map(family => ({ family, calendarMonths: 6,
+  expectedVersion: 0, reason: 'Política sintética' }))
+const respuesta = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } })
+
+test('guardar retención consulta ambas versiones aparte y resuelve una respuesta perdida sin repetir POST', async () => {
+  const previous = globalThis.fetch, calls = [], policies = []
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options })
+    if (options.method === 'GET') return respuesta({ policies })
+    const body = JSON.parse(options.body)
+    policies.push({ ...body, version: body.expectedVersion + 1 })
+    return policies.length === 2 ? respuesta({ message: 'Synthetic lost response after commit' }, 503) : respuesta({ id: key })
+  }
+  try {
+    const actual = await client.guardarRetencionVerificada(tenant, cambiosRetencion)
+    assert.equal(actual.policies.length, 2)
+    assert.deepEqual(calls.map(c => c.options.method), ['POST', 'POST', 'GET'])
+    assert.ok(calls.every(c => c.url.includes(`/tenants/${tenant}`)))
+    assert.equal(calls[0].options.headers['x-fom-csrf'], 'fom-browser-v1')
+  } finally { globalThis.fetch = previous }
+})
+
+test('un guardado parcial no se declara completo y no continúa escribiendo tras una respuesta incierta', async () => {
+  const previous = globalThis.fetch, methods = [], policies = []
+  globalThis.fetch = async (_url, options) => {
+    methods.push(options.method)
+    if (options.method === 'GET') return respuesta({ policies })
+    const body = JSON.parse(options.body)
+    policies.push({ ...body, version: 1 })
+    return respuesta({ message: 'Synthetic lost first response' }, 503)
+  }
+  try {
+    await assert.rejects(client.guardarRetencionVerificada(tenant, cambiosRetencion), /configuración completa/)
+    assert.deepEqual(methods, ['POST', 'GET'])
+    assert.equal(policies.length, 1)
+  } finally { globalThis.fetch = previous }
+})
+
+test('sin lectura independiente no acredita políticas aunque los dos POST respondan éxito', async () => {
+  const previous = globalThis.fetch, methods = []
+  globalThis.fetch = async (_url, options) => {
+    methods.push(options.method)
+    return options.method === 'GET' ? respuesta({ message: 'Synthetic read unavailable' }, 503) : respuesta({ id: key })
+  }
+  try {
+    await assert.rejects(client.guardarRetencionVerificada('global', cambiosRetencion), /No se pudo comprobar/)
+    assert.deepEqual(methods, ['POST', 'POST', 'GET'])
+  } finally { globalThis.fetch = previous }
+})
+
+test('reintentar una configuración parcial conserva la familia ya observada y verifica el conjunto', async () => {
+  const previous = globalThis.fetch, methods = []
+  const policies = [{ ...cambiosRetencion[0], version: 1 }]
+  globalThis.fetch = async (_url, options) => {
+    methods.push(options.method)
+    if (options.method === 'GET') return respuesta({ policies })
+    const body = JSON.parse(options.body)
+    assert.equal(body.family, 'canonical_telemetry')
+    assert.equal(Object.hasOwn(body, 'sinCambios'), false)
+    policies.push({ ...body, version: 1 })
+    return respuesta({ id: key })
+  }
+  try {
+    await client.guardarRetencionVerificada(tenant, [{ ...cambiosRetencion[0], expectedVersion: 1, sinCambios: true }, cambiosRetencion[1]])
+    assert.deepEqual(methods, ['POST', 'GET'])
+    assert.equal(policies.filter(p => p.family === 'raw_ingress').length, 1)
+  } finally { globalThis.fetch = previous }
+})
