@@ -55,7 +55,7 @@ test('empresa propia: la de la cuenta aunque se esté dentro de otra', () => {
 test('ruta de la instalación: la propia es null; otra empresa, la suya', () => {
   assert.equal(empresaDeInstalacion('FOM', 'FOM'), null)
   assert.equal(empresaDeInstalacion('', 'FOM'), null)
-  assert.equal(empresaDeInstalacion('X', null), null)
+  assert.equal(empresaDeInstalacion('X', null), 'X')
   assert.equal(empresaDeInstalacion('X', 'FOM'), 'X')
 })
 

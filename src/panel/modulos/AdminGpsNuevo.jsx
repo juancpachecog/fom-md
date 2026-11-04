@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useConfirmar } from '../comp/Confirmar'
 import { pedir } from '../datos/api'
 import { MeitrackInstallationSetup } from '../meitrack/MeitrackInstallationSetup'
 import { registerInventory, sha256 } from '../meitrack/registration'
@@ -37,6 +38,7 @@ export default function AdminGpsNuevo() {
   const { state } = useLocation()
   const sesion = useSesion()
   const ahora = useAhora()
+  const { confirmar, dialogo } = useConfirmar()
   const [paso, setPaso] = useState(1)
   const [datos, setDatos] = useState(() => ({ ...INICIAL, imei: state?.imei ?? '' }))
   // De qué detectado salió el IMEI (para la pastilla «Tomado de la señal»).
@@ -146,7 +148,15 @@ export default function AdminGpsNuevo() {
     finally { inFlight.current = false; setGuardando(false) }
   }
 
-  const salir = () => { if (!guideLocked || equipo || window.confirm('Descartar cierra esta preparación. No deshace los SMS que ya enviaste al GPS. ¿Salir?')) navegar(equipo ? `${RAIZ_GPS}/${equipo.id}` : RAIZ_GPS) }
+  const salir = async () => {
+    const seguro = !guideLocked || equipo || await confirmar({
+      titulo: '¿Salir de la preparación?',
+      texto: 'Descartar cierra esta preparación. No deshace los SMS que ya enviaste al GPS.',
+      accion: 'Salir',
+      peligro: true,
+    })
+    if (seguro) navegar(equipo ? `${RAIZ_GPS}/${equipo.id}` : RAIZ_GPS)
+  }
   const bajada = paso === 3
     ? meitrack ? 'Configura por SMS y busca la señal coincidente al final para registrar sin activar.' : 'Envía los comandos por SMS a la línea del equipo y espera su primera señal.'
     : 'Prepara el equipo y su línea, configura por SMS y confirma la identidad recibida antes de registrarlo.'
@@ -373,6 +383,7 @@ export default function AdminGpsNuevo() {
           <button type="button" className="gp-btn" disabled={guardando || !puedeRegistrar} onClick={registrarCoban}>{guardando ? 'Comprobando registro…' : 'Registrar sin activar'}</button>
         </section>
       )}
+      {dialogo}
     </div>
   )
 }

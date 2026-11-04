@@ -100,7 +100,10 @@ export default function Entrar() {
             <h1>Inicia sesión</h1>
             <p className="lg-sub">Bienvenido de vuelta a tu panel</p>
             {ubicacion.state?.aviso && (
-              <div className="lg-demo" role="status">{ubicacion.state.aviso}</div>
+              <div className="lg-ok" role="status">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.7 2.7L16 9.8" /></svg>
+                <span>{ubicacion.state.aviso}</span>
+              </div>
             )}
 
             <form onSubmit={enviar} noValidate>

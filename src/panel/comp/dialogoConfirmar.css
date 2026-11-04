@@ -1,0 +1,13 @@
+/* Diálogo de confirmación propio (T-216): lleva las acciones a la derecha y
+   pinta en rojo lo destructivo, con los mismos tokens del panel. */
+.cnf-texto { margin: 0; color: var(--e-texto-2); font-size: var(--e-t-md); line-height: var(--e-lh-md); }
+.cnf-campo { margin-top: var(--e-md); }
+.cnf-acciones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--e-sm); margin-top: var(--e-lg); }
+.pnl-btn.primario.peligro {
+  background: var(--e-peligro);
+  color: #fff;
+}
+@media (max-width: 768px) {
+  .cnf-acciones { flex-direction: column-reverse; }
+  .cnf-acciones > .pnl-btn { width: 100%; justify-content: center; min-height: var(--app-boton-alto, 44px); }
+}

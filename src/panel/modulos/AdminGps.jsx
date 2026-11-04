@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { Cargando, ErrorCarga, Vacio } from '../comp/ui'
@@ -7,6 +7,10 @@ import { Cabeza, Detectado, IcoGps, Pastilla, ReceptorTarjeta, useAhora } from '
 import {
   FILTROS_INVENTARIO, buscarEquipos, cifrasInventario, estadoEquipo, nombreEquipo, senalDe,
 } from '../datos/gps'
+import {
+  ACCION_OTRAS_EMPRESAS, RUTA_OTRAS_EMPRESAS, TEXTO_OTRAS_EMPRESAS, TITULO_OTRAS_EMPRESAS,
+  deLaEmpresa, empresasDe, hayListadoGlobal,
+} from '../datos/gpsOtrasEmpresas'
 import AdminGpsNuevo from './AdminGpsNuevo'
 import AdminGpsDetalle from './AdminGpsDetalle'
 import AdminGpsInstalar from './AdminGpsInstalar'
@@ -55,6 +59,8 @@ function Inventario() {
     if (params.get('q')) setParams({}, { replace: true })
   }, [params, setParams])
   const [filtro, setFiltro] = useState('todos')
+  // Filtro por empresa (T-209): vacío = todas. Las cifras de arriba siempre cuentan el total.
+  const [empresaSel, setEmpresaSel] = useState('')
   const ahora = useAhora()
 
   const { datos, estado, error, recargar } = useDatos(cargarInventario, [], 30_000)
@@ -63,7 +69,10 @@ function Inventario() {
   const equipos = useMemo(() => datos?.equipos ?? [], [datos])
   const porUnidad = useMemo(() => new Map((datos?.vehiculos ?? []).map((v) => [v.id, v])), [datos])
   const cifras = cifrasInventario(equipos, ahora)
-  const buscados = buscarEquipos(equipos, q)
+  const global = hayListadoGlobal(equipos)
+  const empresas = useMemo(() => empresasDe(equipos), [equipos])
+  // El buscador mira todas las empresas; el filtro por empresa acota lo que se lista.
+  const buscados = deLaEmpresa(buscarEquipos(equipos, q), empresaSel)
   const elegido = FILTROS_INVENTARIO.find((x) => x.clave === filtro) ?? FILTROS_INVENTARIO[0]
   // Primero los montados en una unidad (por nombre), después los del inventario.
   const visibles = buscados
@@ -94,6 +103,15 @@ function Inventario() {
 
       {state?.aviso && <div className="gp-aviso" role="status"><IcoGps nombre="check" />{state.aviso}</div>}
 
+      {/* T-209: el servidor solo deja leer aquí los equipos de la empresa propia. */}
+      {!global && (
+      <div className="gp-aviso info" role="note" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+        <IcoGps nombre="senal" />
+        <span style={{ flex: 1, minWidth: 220 }}><b>{TITULO_OTRAS_EMPRESAS}.</b> {TEXTO_OTRAS_EMPRESAS}</span>
+        <Link className="gp-btn2 chico" to={RUTA_OTRAS_EMPRESAS}>{ACCION_OTRAS_EMPRESAS}</Link>
+      </div>
+      )}
+
       {estado === 'cargando' && <section className="gp-card"><Cargando filas={6} /></section>}
       {estado === 'error' && <section className="gp-card"><ErrorCarga onReintentar={recargar} error={error} /></section>}
 
@@ -118,11 +136,19 @@ function Inventario() {
                   ))}
                 </div>
               </div>
+              {empresas.length > 1 && (
+                <div className="gp-chips" role="group" aria-label="Filtrar por empresa" style={{ padding: '0 12px', flexWrap: 'wrap' }}>
+                  <button type="button" className="gp-chip" aria-pressed={!empresaSel} onClick={() => setEmpresaSel('')}>Todas las empresas <b>{equipos.length}</b></button>
+                  {empresas.map((e) => (
+                    <button key={e.id} type="button" className="gp-chip" aria-pressed={empresaSel === e.id} onClick={() => setEmpresaSel(e.id)}>{e.nombre} <b>{e.equipos}</b></button>
+                  ))}
+                </div>
+              )}
               <div style={{ padding: '0 12px' }}>
                 <label htmlFor="gp-buscar" className="gp-sr">Buscar equipo</label>
                 <div className="gp-field">
                   <IcoGps nombre="buscar" />
-                  <input id="gp-buscar" type="search" placeholder="Buscar IMEI, línea o unidad…" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
+                  <input id="gp-buscar" type="search" placeholder={global ? 'Buscar IMEI, línea, unidad o empresa…' : 'Buscar IMEI, línea o unidad…'} value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
                 </div>
               </div>
 
@@ -134,11 +160,11 @@ function Inventario() {
                 <div className="gp-tabla-caja">
                   <table className="gp-tbl">
                     <thead>
-                      <tr><th>Equipo</th><th>Unidad</th><th>Línea SIM</th><th>Estado</th><th>Señal</th><th><span className="gp-sr">Abrir</span></th></tr>
+                      <tr><th>Equipo</th>{global && <th>Empresa</th>}<th>Unidad</th><th>Línea SIM</th><th>Estado</th><th>Señal</th><th><span className="gp-sr">Abrir</span></th></tr>
                     </thead>
                     <tbody>
                       {visibles.map((g) => (
-                        <FilaEquipo key={g.id} g={g} unidad={porUnidad.get(g.vehiculoId)} ahora={ahora} abrir={() => navegar(g.id)} />
+                        <FilaEquipo key={g.id} g={g} conEmpresa={global} unidad={porUnidad.get(g.vehiculoId)} ahora={ahora} abrir={() => navegar(g.id)} />
                       ))}
                     </tbody>
                   </table>
@@ -187,16 +213,17 @@ function Cifra({ punto, titulo, valor, nota }) {
   )
 }
 
-function FilaEquipo({ g, unidad, ahora, abrir }) {
+function FilaEquipo({ g, unidad, ahora, abrir, conEmpresa }) {
   const est = estadoEquipo(g.estado)
   const senal = senalDe(g, ahora)
-  const subUnidad = unidad ? [unidad.marca, unidad.modelo, unidad.anio].filter(Boolean).join(' ') : g.empresaNombre && g.empresaNombre !== '—' ? g.empresaNombre : ''
+  const subUnidad = unidad ? [unidad.marca, unidad.modelo, unidad.anio].filter(Boolean).join(' ') : !conEmpresa && g.empresaNombre && g.empresaNombre !== '—' ? g.empresaNombre : ''
   return (
     <tr className="abrible" onClick={abrir}>
       <td>
         <b>{nombreEquipo(g)}</b><br />
         <span className="gp-hint gp-mono mono">IMEI {g.imei}</span>
       </td>
+      {conEmpresa && <td><Pastilla tono="mute">{g.empresaNombre}</Pastilla></td>}
       <td>
         {g.vehiculoId ? (
           <><b>{g.vehiculoNombre || 'Unidad sin nombre'}</b>{subUnidad && <><br /><span className="gp-hint">{subUnidad}</span></>}</>

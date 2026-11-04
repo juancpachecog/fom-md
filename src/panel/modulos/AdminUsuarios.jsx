@@ -11,6 +11,7 @@ import * as f from '../datos/formato'
 import { ROLES_ASIGNABLES, etiquetaRol, puedeGestionarA } from '../datos/catalogos'
 import { Icono } from '../Iconos'
 import AccionesUsuario from '../comp/AccionesUsuario'
+import { useConfirmar } from '../comp/Confirmar'
 import { useVistaTelefono } from '../comp/movil-navegacion'
 import UsuariosMovil from './UsuariosMovil'
 import { PastillaManejo } from '../comp/ManejoConductor'
@@ -190,10 +191,11 @@ export default function AdminUsuarios() {
  * las tiene la app: mismas funciones, mismos permisos (`accionesDeCuenta`).
  * `alCambiar` se llama tras cada cambio para releer lo que se ve.
  */
-function useAccionesCuenta({ actor, alCambiar }) {
+export function useAccionesCuenta({ actor, alCambiar }) {
   const [moviendo, setMoviendo] = useState(null)
   const [claveDe, setClaveDe] = useState(null) // {nombre, clave} tras restablecer
   const [aviso, setAviso] = useState('')
+  const { confirmar, dialogo } = useConfirmar()
 
   const accion = async (fn) => {
     setAviso('')
@@ -209,10 +211,10 @@ function useAccionesCuenta({ actor, alCambiar }) {
     const pregunta = DIRECTORIO_REAL
       ? `Se generará una clave temporal nueva para ${p.nombre}. La anterior deja de servir y sus sesiones abiertas se cierran. ¿Continuar?`
       : `¿Restablecer la clave de ${p.nombre} a la por defecto?`
-    if (!window.confirm(pregunta)) return
+    if (!await confirmar({ titulo: 'Restablecer clave', texto: pregunta, accion: 'Restablecer', peligro: true })) return
     setAviso('')
     try {
-      const r = await repo.admin.usuarios.cambiarClave(p.id, actor)
+      const r = await repo.admin.usuarios.cambiarClave(p.id, actor, { empresaId: p.empresaId })
       setClaveDe({ nombre: p.nombre, clave: r.clave })
       await alCambiar?.()
     } catch (e) {
@@ -220,28 +222,28 @@ function useAccionesCuenta({ actor, alCambiar }) {
     }
   }
 
-  const aDesempleados = (p) => {
-    if (!window.confirm(`${p.nombre} saldrá de ${p.empresaNombre} y su cuenta pasará a Desempleados C.A. ¿Continuar?`)) return
+  const aDesempleados = async (p) => {
+    if (!await confirmar({ titulo: 'Dar salida', texto: `${p.nombre} saldrá de ${p.empresaNombre} y su cuenta pasará a Desempleados C.A. ¿Continuar?`, accion: 'Dar salida', peligro: true })) return
     accion(() => repo.admin.usuarios.enviarADesempleados(p.id, actor))
   }
 
-  const eliminarDefinitivo = (p) => {
-    if (!window.confirm(`¿Eliminar DEFINITIVAMENTE la cuenta de ${p.nombre}?`)) return
-    if (!window.confirm('Esta acción no se puede deshacer. ¿Confirmas?')) return
+  const eliminarDefinitivo = async (p) => {
+    if (!await confirmar({ titulo: 'Eliminar cuenta', texto: `¿Eliminar DEFINITIVAMENTE la cuenta de ${p.nombre}?`, accion: 'Eliminar', peligro: true })) return
+    if (!await confirmar({ titulo: 'Eliminar cuenta', texto: 'Esta acción no se puede deshacer. ¿Confirmas?', accion: 'Sí, eliminar', peligro: true })) return
     accion(() => repo.admin.usuarios.eliminarDefinitivo(p.id, actor))
   }
 
   // Las tres acciones que el servidor SI sabe hacer sobre una cuenta. Ninguna
   // borra: suspender se deshace, revocar es terminal pero deja el rastro.
-  const suspender = (p) => {
-    if (!window.confirm(`${p.nombre} no podrá entrar hasta que la reactives. ¿Suspender?`)) return
+  const suspender = async (p) => {
+    if (!await confirmar({ titulo: 'Suspender cuenta', texto: `${p.nombre} no podrá entrar hasta que la reactives. ¿Suspender?`, accion: 'Suspender', peligro: true })) return
     accion(() => repo.admin.usuarios.suspender(p.id, 'Suspendida desde la consola'))
   }
   const reactivar = (p) => {
     accion(() => repo.admin.usuarios.reactivar(p.id, 'Reactivada desde la consola'))
   }
-  const revocarAcceso = (p) => {
-    if (!window.confirm(`Revocar el acceso de ${p.nombre} es definitivo: no se puede volver a activar, aunque su historial queda. ¿Continuar?`)) return
+  const revocarAcceso = async (p) => {
+    if (!await confirmar({ titulo: 'Revocar acceso', texto: `Revocar el acceso de ${p.nombre} es definitivo: no se puede volver a activar, aunque su historial queda. ¿Continuar?`, accion: 'Revocar', peligro: true })) return
     accion(() => repo.admin.usuarios.eliminar(p.id))
   }
 
@@ -256,6 +258,8 @@ function useAccionesCuenta({ actor, alCambiar }) {
   )
 
   const modalClave = (
+    <>
+    {dialogo}
     <Modal titulo="Clave restablecida" abierto={!!claveDe} alCerrar={() => setClaveDe(null)} ancho={440}>
       {claveDe && (
         <>
@@ -273,6 +277,7 @@ function useAccionesCuenta({ actor, alCambiar }) {
         </>
       )}
     </Modal>
+    </>
   )
 
   return { aviso, setAviso, hacer, modalMover, modalClave, restablecerClave, aDesempleados, eliminarDefinitivo, suspender, reactivar, revocarAcceso }
