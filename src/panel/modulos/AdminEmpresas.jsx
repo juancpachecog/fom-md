@@ -11,6 +11,7 @@ import * as f from '../datos/formato'
 import { COMPANY_TIPO, etiqueta } from '../datos/catalogos'
 import { Icono } from '../Iconos'
 import LogoEmpresa from '../comp/LogoEmpresa'
+import { useConfirmar } from '../comp/Confirmar'
 import { subirLogoDeEmpresa } from '../datos/logos'
 import {
   armarUsuarioResponsable, generarClaveTemporal, normalizarTelefono, problemaDelResponsable, textoDeError,
@@ -41,6 +42,7 @@ export default function AdminEmpresas() {
   const [servicio, setServicio] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const [confirmacion, setConfirmacion] = useState('')
+  const { confirmar, dialogo } = useConfirmar()
 
   const seleccionarEmpresa = (id) => {
     setSeleccionId(id)
@@ -84,14 +86,25 @@ export default function AdminEmpresas() {
   // Cada empresa tiene su logo y se ve de una vez al entrar; FOM Operations usa el de FOM.
   const subirLogo = (e, archivo) => accion(() => subirLogoDeEmpresa(e.id, archivo), `Logo de ${e.nombre} guardado.`)
 
-  const alternarServicio = (e) => {
-    const verbo = e.servicioActivo ? 'suspender' : 'reactivar'
-    if (!window.confirm(`¿Seguro que quieres ${verbo} el servicio de ${e.nombre}?`)) return
+  const alternarServicio = async (e) => {
+    const suspender = e.servicioActivo
+    const verbo = suspender ? 'suspender' : 'reactivar'
+    if (!await confirmar({
+      titulo: suspender ? 'Suspender servicio' : 'Reactivar servicio',
+      texto: `¿Seguro que quieres ${verbo} el servicio de ${e.nombre}?`,
+      accion: suspender ? 'Suspender' : 'Reactivar',
+      peligro: suspender,
+    })) return
     accion(() => repo.admin.empresas.setServicio(e.id, !e.servicioActivo, actor), `Servicio ${e.servicioActivo ? 'suspendido' : 'reactivado'} para ${e.nombre}.`)
   }
 
-  const eliminar = (e) => {
-    if (!window.confirm(`¿Retirar de operación ${e.nombre}? Se suspenderá su servicio y se conservará el historial.`)) return
+  const eliminar = async (e) => {
+    if (!await confirmar({
+      titulo: 'Retirar de operación',
+      texto: `¿Retirar de operación ${e.nombre}? Se suspenderá su servicio y se conservará el historial.`,
+      accion: 'Retirar',
+      peligro: true,
+    })) return
     accion(() => repo.admin.empresas.eliminar(e.id, actor), `${e.nombre} se retiró de operación. Su historial se conserva.`)
   }
 
@@ -134,6 +147,7 @@ export default function AdminEmpresas() {
         )}
       </div>
 
+      {dialogo}
       <ModalNueva abierto={creando} alCerrar={() => setCreando(false)} alGuardar={recargar} actor={actor} />
       <ModalPredefinidas empresa={predeDe} alCerrar={() => setPredeDe(null)} alGuardar={recargar} actor={actor} />
     </div>

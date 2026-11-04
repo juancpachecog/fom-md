@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { entrarEmpresa } from '../auth'
 import repo, { DIRECTORIO_REAL } from '../datos/repo'
 import { useSesion } from '../useSesion'
-import { ModalCrear, ModalCambiarRol } from './AdminUsuarios'
+import { ModalCrear, ModalCambiarRol, useAccionesCuenta } from './AdminUsuarios'
 import { useDatos } from '../useDatos'
 import { Buscador, Cargando, Datos, ErrorCarga, Tag, Tarjeta, Vacio } from '../comp/ui'
 import * as f from '../datos/formato'
@@ -52,6 +52,8 @@ export default function Plataforma() {
   const [desde, setDesde] = useState(0)
   const empresa = (empresas.datos ?? []).find((e) => e.id === empresaId)
   const personas = useDatos(() => repo.admin.plataforma.personas({ q, limite: POR_PAGINA, desde, empresa }), [q, desde, empresa])
+  // Restablecer la clave: la misma acción (y el mismo modal con la clave) que Usuarios de una empresa.
+  const cuenta = useAccionesCuenta({ actor: sesion?.perfil, alCambiar: personas.recargar })
   const total = personas.datos?.pagina?.total ?? null
   const paginas = total == null ? 1 : Math.max(1, Math.ceil(total / POR_PAGINA))
   const actual = Math.floor(desde / POR_PAGINA) + 1
@@ -186,6 +188,12 @@ export default function Plataforma() {
                     {puedeCambiarRol(seleccion) && (
                       <button type="button" className="pnl-btn primario" onClick={() => setEditandoRol(seleccion)}>Cambiar rol →</button>
                     )}
+                    {rolCanonico(seleccion.rol) !== 'admin_fom' && seleccion.userId && (
+                      <button type="button" className="pnl-btn" onClick={() => cuenta.restablecerClave({ ...seleccion, id: seleccion.userId })}>
+                        <Icono nombre="escudo" tam={16} />Restablecer clave
+                      </button>
+                    )}
+                    {cuenta.aviso && <p className="pnl-campo-error" role="alert">{cuenta.aviso}</p>}
                     <Link className="pnl-btn" to="/panel/admin/transferencias"><Icono nombre="comparar" tam={16} />Pasarla a otra empresa →</Link>
                     <Link className="pnl-btn" to={`/panel/admin/auditoria`}><Icono nombre="auditoria" tam={16} />Ver auditoría →</Link>
                     <Link className="pnl-btn sutil" to="/panel/admin/empresas"><Icono nombre="empresa" tam={16} />Ver las empresas →</Link>
@@ -200,6 +208,7 @@ export default function Plataforma() {
         )}
       </div>
       {creando && <ModalCrear abierto global empresaInicial={empresaId} empresas={empresas.datos ?? []} actor={sesion?.perfil} directorioReal={DIRECTORIO_REAL} alCerrar={() => setCreando(false)} alGuardar={personas.recargar} />}
+      {cuenta.modalClave}
       {editandoRol && <ModalCambiarRol key={editandoRol.id} persona={editandoRol} alCerrar={() => setEditandoRol(null)} alGuardar={personas.recargar} />}
     </div>
   )

@@ -32,7 +32,11 @@ export async function crearUnidad(datos, api) {
     catch { pendientes.push('No se confirmó el área; revísala en el expediente.') }
   }
   if (datos.gpsId) {
-    try { await api.instalarEquipoGps(datos.gpsId, { vehicleId: id }) }
+    try {
+      // `rutaGps`: la empresa por cuya ruta se instala (T-208); sin ella, la ruta propia.
+      if (datos.rutaGps) await api.instalarEquipoGps(datos.gpsId, { vehicleId: id }, datos.rutaGps)
+      else await api.instalarEquipoGps(datos.gpsId, { vehicleId: id })
+    }
     catch { pendientes.push('No se confirmó la instalación del GPS. Comprueba el inventario y la unidad antes de volver a instalarlo.') }
   }
   return { id, pendientes }

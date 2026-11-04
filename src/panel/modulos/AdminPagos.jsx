@@ -9,6 +9,7 @@ import * as f from '../datos/formato'
 import { masNuevoPrimero } from '../datos/orden'
 import { color, etiqueta } from '../datos/catalogos'
 import { Icono } from '../Iconos'
+import { useConfirmar } from '../comp/Confirmar'
 
 // ============================================================
 // PAGOS DEL SERVICIO (solo Administrador FOM)
@@ -35,22 +36,31 @@ export default function AdminPagos() {
   const [estadoPago, setEstadoPago] = useState('')
   const [registrando, setRegistrando] = useState(false)
   const [aviso, setAviso] = useState('')
+  const { confirmar, dialogo } = useConfirmar()
 
   const { datos, estado, error, recargar } = useDatos(() => cargar(empresaId, estadoPago), [empresaId, estadoPago])
 
-  const cambiarEstado = (p, nuevo) => {
-    const texto = nuevo === 'pagado'
-      ? `¿Marcar pagada la cuota ${p.periodo} de ${p.empresaNombre}?`
-      : `¿Marcar vencida la cuota ${p.periodo} de ${p.empresaNombre}?`
-    if (!window.confirm(texto)) return
-    const referencia = nuevo === 'pagado' ? window.prompt('Referencia del abono recibido (no realiza un cobro bancario):') : undefined
-    if (nuevo === 'pagado' && !referencia) return
+  const cambiarEstado = async (p, nuevo) => {
+    const pagado = nuevo === 'pagado'
+    // Al marcar pagada se pide la referencia en el mismo diálogo (antes un prompt aparte).
+    const respuesta = await confirmar({
+      titulo: pagado ? 'Marcar cuota pagada' : 'Marcar cuota vencida',
+      texto: pagado
+        ? `¿Marcar pagada la cuota ${p.periodo} de ${p.empresaNombre}?`
+        : `¿Marcar vencida la cuota ${p.periodo} de ${p.empresaNombre}?`,
+      accion: pagado ? 'Marcar pagada' : 'Marcar vencida',
+      peligro: !pagado,
+      campo: pagado ? { etiqueta: 'Referencia del abono recibido (no realiza un cobro bancario):', obligatorio: true } : undefined,
+    })
+    if (!respuesta) return
+    const referencia = pagado ? respuesta : undefined
     setAviso('')
     repo.admin.pagos.actualizarEstado(p.id, nuevo, actor, { ...p, referencia }).then(recargar).catch((e) => setAviso(e.message))
   }
 
   return (
     <>
+      {dialogo}
       <Cabecera
         titulo="Facturación"
         bajada="Registro administrativo de cuotas y pagos informados. Esta web no procesa cobros ni mueve dinero."

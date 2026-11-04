@@ -260,16 +260,28 @@ export const api = {
       cuerpo: { role, status, reason },
     }),
 
-  /** Reiniciar la credencial: nace obligada a cambiarse. */
-  reiniciarClave: (userId, { temporaryPassword, reason }) =>
-    pedir(`${CONSOLA}/users/${userId}/credential-reset`, {
+  /**
+   * Reiniciar la credencial: nace obligada a cambiarse. `empresaId` (T-210): sin dato, la ruta
+   * normal; un id, `/tenants/{id}/users/…` (la ruta sin empresa solo halla gente de la empresa
+   * propia y da 404 con la de otra); `null`, la ruta propia aunque se esté dentro de otra empresa.
+   */
+  reiniciarClave: (userId, { temporaryPassword, reason }, empresaId) =>
+    pedir(`${CONSOLA}/users/${encodeURIComponent(userId)}/credential-reset`, {
       metodo: 'POST',
       cuerpo: { temporaryPassword, reason },
+      ...(empresaId === undefined ? {} : { empresaContexto: empresaId || null }),
     }),
 
-  /** Alta de vehiculo. */
-  crearVehiculo: (cuerpo) =>
-    pedir(`${CONSOLA}/vehicles`, { metodo: 'POST', cuerpo }),
+  /**
+   * Alta de vehiculo. `empresaId` (T-215): sin dato, la ruta normal (la de la empresa en gestión,
+   * si hay); un id, la ruta `/tenants/{id}` de esa empresa, sin entrar a ella; `null`, la ruta propia.
+   */
+  crearVehiculo: (cuerpo, empresaId) =>
+    pedir(`${CONSOLA}/vehicles`, {
+      metodo: 'POST',
+      cuerpo,
+      ...(empresaId === undefined ? {} : { empresaContexto: empresaId || null }),
+    }),
 
   /** Editar el vehiculo, incluida su area. */
   actualizarVehiculo: (vehicleId, cuerpo) =>
@@ -368,6 +380,18 @@ export const api = {
 
   registrarEquipoGps: (cuerpo) =>
     pedir(`${CONSOLA}/gps-devices`, { metodo: 'POST', cuerpo }),
+  // Alta del Meitrack T399L (T-211). El POST de siempre lo rechaza; estas rutas son de la rama
+  // agent/issue-727-panel-setup-api de fom-core y pueden no estar publicadas todavía (404 «Cannot POST»).
+  // Son del administrador FOM y de la ventana de pruebas: van siempre por la ruta propia, nunca por
+  // la de otra empresa (`empresaContexto: null`).
+  meitrackVentana: (cuerpo) =>
+    pedir(`${CONSOLA}/meitrack-setup/readiness`, { metodo: 'POST', cuerpo, empresaContexto: null }),
+  meitrackRecepcion: (cuerpo) =>
+    pedir(`${CONSOLA}/meitrack-setup/capture`, { metodo: 'POST', cuerpo, empresaContexto: null }),
+  meitrackAlta: (cuerpo) =>
+    pedir(`${CONSOLA}/meitrack-setup/registration`, { metodo: 'POST', cuerpo, empresaContexto: null }),
+  meitrackRegistrar: (cuerpo) =>
+    pedir(`${CONSOLA}/meitrack-setup/register`, { metodo: 'POST', cuerpo, empresaContexto: null }),
   actualizarEquipoGps: (equipoId, cuerpo) =>
     pedir(`${CONSOLA}/gps-devices/${equipoId}`, { metodo: 'PATCH', cuerpo }),
   // `empresaId`: sin dato, la ruta normal (la de la empresa en gestión, si hay); un id, la ruta

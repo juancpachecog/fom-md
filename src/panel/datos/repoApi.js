@@ -24,13 +24,15 @@ import { leerRecepcionGps } from './leerRecepcionGps.js'
 import { coleccionDePersona, indiceDePersona } from './perfilUsuario'
 import { cuerpoCredencial, credencialesVigentes } from './credencialesPersona'
 import { cambiosGps } from './metadatosGps'
-import { buscarEquipoGps, mensajeInstalarGps } from './instalarGps'
+import { MEITRACK, cuerpoAltaMeitrack } from './gpsMeitrack'
+import { buscarEquipoGps, empresaDeInstalacion, empresaPropia, equiposParaNuevaUnidad, mensajeInstalarGps } from './instalarGps'
+import { empresaDeReinicio, mensajeReiniciarClave } from './reiniciarClave'
 import { crearUnidad, gpsDisponible } from './altaUnidad'
 import { placaMayuscula } from './placas'
 import { LIMITE_EVENTOS, comoEventoManejo, diasServidor } from './eventosManejo'
 import { cloudinaryConfigurado, subirImagen } from './cloudinary'
 import { carpetaDe } from './archivos'
-import { alCambiar, perfilActual } from '../auth'
+import { alCambiar, perfilActual, sesionActual } from '../auth'
 
 /**
  * Une el vehículo con su estado en vivo en la forma que consumen los módulos.
@@ -454,7 +456,9 @@ function comoEquipoGps(d) {
     conectado: Boolean(d.connected),
     ultimaConexion: d.lastConnectionAt ?? null,
     panicoProbado: false,
-    empresaNombre: '—',
+    // T-209: el listado global del administrador FOM trae la empresa de cada equipo.
+    empresaId: d.tenantId ?? null,
+    empresaNombre: d.tenantName || '—',
     vehiculoId: d.vehicleId ?? null,
     vehiculoNombre: d.vehicleId ? [d.vehicleCode, d.vehiclePlate].filter(Boolean).join(' · ') : null,
     vehiculoPlaca: d.vehiclePlate ?? null,
@@ -606,12 +610,21 @@ export const repoApi = {
        * vez para entregarla en mano; el servidor solo guarda su hash y la
        * marca como obligada a cambiarse en el primer ingreso.
        */
-      async cambiarClave(id) {
+      async cambiarClave(id, _actor, { empresaId } = {}) {
         const clave = claveTemporal()
-        await api.reiniciarClave(id, {
-          temporaryPassword: clave,
-          reason: 'reinicio-desde-consola',
-        })
+        // La persona de OTRA empresa se reinicia por la ruta de su empresa; la sin empresa solo
+        // halla a los de la empresa propia (T-210).
+        const propia = empresaPropia(sesionActual())
+        try {
+          await api.reiniciarClave(
+            id,
+            { temporaryPassword: clave, reason: 'reinicio-desde-consola' },
+            empresaDeReinicio(empresaId, propia),
+          )
+        } catch (e) {
+          e.message = mensajeReiniciarClave(e)
+          throw e
+        }
         return { clave, debeCambiarClave: true }
       },
 
@@ -1120,20 +1133,30 @@ export const repoApi = {
   },
 
   gpsEscritura: {
-    async disponibles() {
-      return (await repoApi.gpsEscritura.listar()).filter(gpsDisponible)
-    },
     /**
      * Inventario real desde `GET /gps-devices`. Antes «listar» caía en la
      * semilla vacía y el inventario salía en cero aunque hubiera equipos
      * instalados y reportando.
      */
     async listar({ q = '' } = {}) {
-      const r = await api.equiposGps()
+      const equipos = await leerRecepcionGps(() => api.equiposGps(), { opcional: false })
       const t = q.trim().toLowerCase()
-      return (r?.devices ?? [])
+      return equipos
         .map(comoEquipoGps)
         .filter((g) => !t || [g.imei, g.modelo, g.linea, g.vehiculoNombre].some((v) => String(v ?? '').toLowerCase().includes(t)))
+    },
+    /**
+     * Equipos que «Nueva unidad» puede instalar (T-214): libres y de la empresa donde se crea la
+     * unidad (la que el administrador «entró», o la propia). Los que nunca reportaron salen al
+     * final marcados «sin señal todavía». Si la lectura falla, el error se propaga: no es lo
+     * mismo que «no hay equipos libres».
+     */
+    // `global` (T-215): para crear la unidad en cualquier empresa sin entrar a ella; los libres del
+    // inventario global se ofrecen sin filtrar por empresa.
+    async disponibles({ global = false } = {}) {
+      const propia = empresaPropia(sesionActual())
+      // Solo los que el servidor deja instalar (#767): en inventario, sin unidad ni instalación abierta.
+      return equiposParaNuevaUnidad((await repoApi.gpsEscritura.listar({})).filter(gpsDisponible), { destino: empresaGestionActualId() ?? propia, propia, global })
     },
     /** Un equipo, con su instalación vigente (`GET gps-devices/:id`). */
     async obtener(equipoId) {
@@ -1273,6 +1296,27 @@ export const repoApi = {
       })
       return true
     },
+    /**
+     * Alta del Meitrack T399L (T-211): rutas `meitrack-setup` de fom-core. `registrar` solo
+     * guarda en el inventario (sin vehículo ni instalación) y el servidor exige antes una señal de
+     * prueba recibida y que no exista ya el alta.
+     */
+    meitrack: {
+      async ventana(imei) {
+        const r = await api.meitrackVentana({ imei, firmware: MEITRACK.firmware })
+        return r?.setup ?? null
+      },
+      /** La respuesta cruda del servidor; `resumenRecepcion` la lee. */
+      recepcion: (imei) => api.meitrackRecepcion({ imei, firmware: MEITRACK.firmware }),
+      async alta(datos) {
+        const r = await api.meitrackAlta(cuerpoAltaMeitrack(datos))
+        return r?.registration ?? { state: 'unavailable', id: null }
+      },
+      async registrar(datos) {
+        const r = await api.meitrackRegistrar(cuerpoAltaMeitrack(datos))
+        return { id: r?.gpsDevice?.id ?? r?.device?.id ?? r?.id ?? null }
+      },
+    },
   },
 
   empresas: {
@@ -1383,9 +1427,14 @@ export const repoApi = {
   },
 
   vehiculosEscritura: {
-    /** Alta independiente; efectos posteriores informados sin repetir el alta. */
+    /** Alta independiente; efectos posteriores informados sin repetir el alta (#767). */
     async crear(datos) {
-      return crearUnidad(datos, api)
+      // El GPS se instala por la ruta de la empresa en gestión (la propia viaja como null), igual que
+      // en «Instalar en una unidad» (T-208/T-214); sin saber cuál es la propia, manda la de gestión.
+      const propia = empresaPropia(sesionActual())
+      const destino = empresaGestionActualId() ?? propia
+      const rutaGps = propia ? empresaDeInstalacion(destino, propia) : destino
+      return crearUnidad({ ...datos, rutaGps }, api)
     },
 
     async set(id, parche) {

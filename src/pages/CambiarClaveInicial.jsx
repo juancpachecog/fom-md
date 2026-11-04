@@ -53,7 +53,7 @@ export default function CambiarClaveInicial() {
     if (resultado.ok) {
       navegar('/entrar', {
         replace: true,
-        state: { aviso: 'Contraseña cambiada. Entra de nuevo con tu contraseña nueva.' },
+        state: { aviso: 'Listo, tu contraseña quedó cambiada. Entra con la nueva.' },
       })
     }
     else {
