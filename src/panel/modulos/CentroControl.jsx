@@ -253,7 +253,7 @@ export default function CentroControl() {
       </div>
       {(flota.estado !== 'ok' || lista.length === 0) && <div className="control-panel control-feedback" role="status">
         {flota.estado === 'cargando' && <Cargando filas={3} />}
-        {flota.estado === 'error' && <ErrorCarga onReintentar={flota.recargar} />}
+        {flota.estado === 'error' && <ErrorCarga error={flota.error} onReintentar={flota.recargar} />}
         {flota.estado === 'ok' && lista.length === 0 && (
             <Vacio
               icono="buscar"

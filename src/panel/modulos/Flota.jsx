@@ -249,7 +249,7 @@ export default function Flota() {
   const ubicacion = useLocation()
   useEffect(() => { if (esAdmin && ubicacion.state?.nuevaUnidad) setCreando(true) }, [esAdmin, ubicacion.state])
 
-  const vehiculos = useDatos(() => repo.vehiculos.listar(), [])
+  const vehiculos = useDatos(() => repo.vehiculos.listar(), [], 30000)
   const areas = useDatos(() => repo.areas(), [])
   // «Sin señal · hace …» corre solo cada minuto, sin volver a pedir la flota, y con el mismo
   // reloj se recalcula la señal: a los 5 min sin reportar la unidad pasa sola a «Sin señal».

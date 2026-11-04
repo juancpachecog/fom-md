@@ -20,6 +20,7 @@ import { AVISO_SIN_DIAS_EN_SERVIDOR, diasParaEnviar, normalizarDias } from './di
 import { quitarSaltos } from './recorrido'
 import { transmitiendo } from './sinSenal.js'
 import { conRecepcionEquipo, conRecepcionFlota } from './recepcionUnidad.js'
+import { leerRecepcionGps } from './leerRecepcionGps.js'
 import { coleccionDePersona, indiceDePersona } from './perfilUsuario'
 import { cuerpoCredencial, credencialesVigentes } from './credencialesPersona'
 import { cambiosGps } from './metadatosGps'
@@ -117,7 +118,7 @@ async function flota(q = '') {
     .then(async (r) => {
       const [unidades, equipos] = await Promise.all([
         conPosicionDirecta(r.items.map(comoUnidad)),
-        api.equiposGps().then(r => r?.devices ?? []).catch(() => []),
+        leerRecepcionGps(() => api.equiposGps()),
       ])
       const lista = conRecepcionFlota(unidades, equipos, empresaContexto)
       if (r.incompleta) lista.incompleta = true
@@ -736,12 +737,10 @@ export const repoApi = {
       const delaUnidad = await repoApi.vehiculos.usuariosAsignados(id).catch(() => { asignacionesError = true; return [] })
       const asignacion = delaUnidad.find(c => c.rol === 'principal') ?? null
       // El detalle del vehículo no trae su GPS: se une desde la lista de equipos por el id de la unidad.
-      const equipo = await api
-        .equiposGps()
-        .then((r) => { const equipos = (r?.devices ?? []).filter(d => d.vehicleId === id); return equipos.length === 1 ? equipos[0] : null })
-        .catch(() => null)
+      const equipos = (await leerRecepcionGps(() => api.equiposGps())).filter(d => d.vehicleId === id)
+      const equipo = equipos.length === 1 ? equipos[0] : null
       const ubicacionGps = equipo?.protocolFamily === 'meitrack-t399'
-        ? await repoApi.gpsEscritura.telemetria(equipo.id, { limite: 1 }).then(r => r.ubicacion).catch(() => null) : null
+        ? await repoApi.gpsEscritura.telemetria(equipo.id, { limite: 1 }).then(r => r.ubicacion).catch(() => ({ state: 'unavailable' })) : null
       return {
         ...conRecepcionEquipo(comoUnidad(ficha.vehicle), equipo, ubicacionGps),
         conductorPrincipalId: asignacion?.id ?? null,

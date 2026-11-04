@@ -37,6 +37,7 @@ test('HTTP común y mapper real muestran placa/rótulo en mayúsculas y PATCH en
   globalThis.fetch = async (url, options) => {
     const method = options.method ?? 'GET'
     if (method === 'PATCH') { writes.push(JSON.parse(options.body)); return new Response('{}') }
+    if (String(url).includes('/gps-devices')) return new Response(JSON.stringify({ devices: [] }))
     if (String(url).includes('/vehicles')) return new Response(JSON.stringify({ items: [{ id: 'v1', code: 'ab123cd', plate: 'ab123cd', status: 'active' }], page: { total: 1 } }))
     if (String(url).includes('/drivers')) return new Response(JSON.stringify({ items: [], page: { total: 0 } }))
     if (String(url).includes('/synthetic')) return new Response(JSON.stringify({ nested: { vehiclePlate: 'ef456gh', vehicleCode: 'ef456gh' } }))
