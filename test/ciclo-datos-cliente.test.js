@@ -148,3 +148,21 @@ test('reintentar una configuración parcial conserva la familia ya observada y v
     assert.equal(policies.filter(p => p.family === 'raw_ingress').length, 1)
   } finally { globalThis.fetch = previous }
 })
+
+test('expiración conserva scope, cursor bigint textual y confirmación; el comprobante solo consulta', async () => {
+  const previous = globalThis.fetch, calls = []
+  globalThis.fetch = async (url, options) => { calls.push({ url, options }); return respuesta({ planId: key }) }
+  try {
+    client.fijarEmpresaGestion(another)
+    await client.revisarExpiracion(tenant, 'raw_ingress', '9007199254740993')
+    assert.match(calls[0].url, new RegExp('/tenants/' + tenant + '/expiry-plans$'))
+    assert.deepEqual(JSON.parse(calls[0].options.body), { family: 'raw_ingress', afterCursor: '9007199254740993' })
+    assert.equal(calls[0].options.headers['x-fom-csrf'], 'fom-browser-v1')
+    await client.expirarTelemetria(tenant, { planId: key, confirmation: 'EXPIRAR TELEMETRIA' })
+    await client.leerReciboLimpieza(key)
+    await client.historialExpiracion('global')
+    assert.deepEqual(calls.map(c => c.options.method), ['POST', 'POST', 'GET', 'GET'])
+    assert.match(calls[3].url, /lifecycle\/global\/expiry-history$/u)
+    assert.ok(calls.every(c => !c.url.includes(another)))
+  } finally { globalThis.fetch = previous; client.fijarEmpresaGestion(null) }
+})

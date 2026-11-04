@@ -53,3 +53,8 @@ export const leerReciboLimpieza = (planId) => consultar(`${BASE}/cleanup-receipt
 export function versionActual(policies, family) {
   return (policies || []).filter(p => p.family === family).reduce((last, p) => !last || p.version > last.version ? p : last, null)
 }
+
+export const revisarExpiracion = (empresaId, family, afterCursor = '0') => consultar(
+  `${rutaEmpresa(empresaId)}/expiry-plans`, { metodo: 'POST', cuerpo: { family, afterCursor } })
+export const expirarTelemetria = (empresaId, cuerpo) => consultar(`${rutaEmpresa(empresaId)}/expiry`, { metodo: 'POST', cuerpo })
+export const historialExpiracion = empresaId => consultar(`${rutaEmpresa(empresaId)}/expiry-history`)

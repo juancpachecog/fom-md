@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
+import '../../../src/styles/global.css'
 import '../../../src/styles/panel.css'
 
 const tenant = '11111111-1111-4111-8111-111111111111'
@@ -9,9 +10,12 @@ const user = '55555555-5555-4555-8555-555555555555'
 const planId = '66666666-6666-4666-8666-666666666666'
 const empresaCompleta = new URLSearchParams(location.search).get('empresa') === '1'
 const policyLoss = new URLSearchParams(location.search).get('policyLoss')
+const expiryPlanId = '77777777-7777-4777-8777-777777777777'
+const expiryRecords = []
+let expiryReceipt = null, expiryLost = false
 const state = { candidates: empresaCompleta ? [{ type: 'tenant', id: tenant, label: 'Empresa SINTÉTICA', status: 'active' }] : [{ type: 'vehicle', id: vehicle, label: 'Vehículo SINTÉTICO', status: 'active' },
   { type: 'user', id: user, label: 'Usuario SINTÉTICO', status: 'revoked' }], sets: [], policiesByScope: {}, policyLost: false,
-  stats: { reads: 0, setRequests: 0, sets: 0, retired: 0, cleaned: 0, receiptReads: 0, jobPosts: 0, queued: 0, policyPosts: 0, policyWrites: 0, policyReads: 0 }, failRead: true, failCreate: true,
+  stats: { reads: 0, setRequests: 0, sets: 0, retired: 0, cleaned: 0, receiptReads: 0, jobPosts: 0, queued: 0, policyPosts: 0, policyWrites: 0, policyReads: 0, expiryPlans: 0, expiryPosts: 0, expiredGroups: 0 }, failRead: true, failCreate: true,
   failCleanupResponse: true, receipt: null, pending: false, deletedCompany: false }
 let renderStats = () => {}
 const response = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } })
@@ -22,6 +26,35 @@ globalThis.fetch = async (url, options = {}) => {
   const body = options.body ? JSON.parse(options.body) : {}
   const finish = value => { renderStats({ ...state.stats }); return response(value) }
   if (!path.startsWith('/api/v1/console/')) throw new Error('Synthetic fixture rejects unrecognized network access')
+  if (path.endsWith('/expiry-history')) return finish({ items: expiryRecords.filter(r => r.scope === (path.includes('/global/') ? 'global' : tenant)) })
+  if (method === 'POST' && path.endsWith('/expiry-plans')) {
+    state.stats.expiryPlans++
+    return finish({ planId: expiryPlanId, canDelete: true, executionEnabled: true, recoveryDays: 7,
+      expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), asOf: new Date().toISOString(),
+      policy: { family: body.family, calendarMonths: 6, version: 1, cutoffExclusive: '2026-05-04T00:00:00Z' },
+      confirmation: 'EXPIRAR TELEMETRIA', purpose: 'telemetry_expiry', nextCursor: '9007199254740993',
+      counts: [{ family: 'gps_raw_messages', count: 1 }, { family: 'gps_raw_message_attempts', count: 1 }], blockers: [] })
+  }
+  if (method === 'POST' && path.endsWith('/expiry')) {
+    if (body.confirmation !== 'EXPIRAR TELEMETRIA' || body.planId !== expiryPlanId) return response({message:'Synthetic expiry confirmation rejected'},400)
+    state.stats.expiryPosts++
+    if (!expiryReceipt) {
+      const record = {planId:expiryPlanId, family:'raw_ingress', scope:path.includes('/global/') ? 'global' : tenant,
+        createdAt:new Date().toISOString(),status:'queued'}
+      expiryRecords.push(record)
+      expiryReceipt={planId:expiryPlanId,jobId:expiryPlanId,status:'queued',remaining:null,counts:[],completedAt:null}
+      setTimeout(() => {
+        state.stats.expiredGroups++;record.status='completed'
+        expiryReceipt={...expiryReceipt,status:'verified',remaining:0,completedAt:new Date().toISOString(),
+          counts:[{family:'gps_raw_messages',count:1},{family:'gps_raw_message_attempts',count:1}],recoveryAvailable:true}
+        renderStats({...state.stats})
+      },3000)
+    }
+    renderStats({...state.stats})
+    if(!expiryLost){expiryLost=true;throw new TypeError('Synthetic expiry response lost after queue persistence')}
+    return finish({planId:expiryPlanId,jobId:expiryPlanId,status:'queued',replayed:true})
+  }
+  if(method==='GET' && path.endsWith('/cleanup-receipts/'+expiryPlanId)) return expiryReceipt ? finish(expiryReceipt) : response({message:'Synthetic expiry receipt absent'},404)
   if (path.endsWith('/candidates')) {
     state.stats.reads++
     renderStats({ ...state.stats })
@@ -115,8 +148,8 @@ const { default: AdminCicloDatos } = await import('../../../src/panel/modulos/Ad
 function Fixture() {
   const [stats, setStats] = useState(state.stats)
   renderStats = setStats
-  return <MemoryRouter><main style={{ padding: 24 }}><h1>SINTÉTICO · ciclo de datos</h1>
+  return <MemoryRouter><div data-tema={new URLSearchParams(location.search).get('tema') || 'claro'}><main className="pnl" style={{ padding: 24, display: 'block' }}><h1>SINTÉTICO · ciclo de datos</h1>
     <p>Sin servidor nominal, credenciales, GPS, SMS ni datos reales. No es evidencia de producción.</p>
-    <output id="fixture-counters">{JSON.stringify(stats)}</output><AdminCicloDatos /></main></MemoryRouter>
+    <output id="fixture-counters">{JSON.stringify(stats)}</output><AdminCicloDatos /></main></div></MemoryRouter>
 }
 createRoot(document.getElementById('root')).render(<Fixture />)

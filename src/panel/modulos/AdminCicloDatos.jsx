@@ -7,6 +7,7 @@ import { useConfirmar } from '../comp/Confirmar'
 import { textoDeError } from '../datos/responsableEmpresa'
 import { candidatosCiclo, claveCiclo, crearConjuntoPrueba, estadoCiclo, guardarRetencionVerificada, leerCiclo, leerReciboLimpieza, limpiarPruebas, marcarPrueba,
   retirarRegistro, revisarLimpieza, revisarRetirada, TIPOS_CICLO, versionActual } from '../datos/cicloDatos'
+import ExpiracionTelemetria from './ExpiracionTelemetria'
 import './ciclo-datos.css'
 
 export default function AdminCicloDatos() {
@@ -19,6 +20,7 @@ export default function AdminCicloDatos() {
   const [recibo, setRecibo] = useState(null), [planPendiente, setPlanPendiente] = useState('')
   const [confirmarPruebas, setConfirmarPruebas] = useState(false), [frase, setFrase] = useState('')
   const [meses, setMeses] = useState(6)
+  const [expirando, setExpirando] = useState(false)
   const llaves = useRef(new Map())
   const ocupacion = useRef(false)
   const { confirmar, dialogo } = useConfirmar()
@@ -30,6 +32,7 @@ export default function AdminCicloDatos() {
   const conjuntos = ciclo.datos?.testSets ?? []
   const conjunto = conjuntos.find(s => s.id === conjuntoId)
   const enTrabajo = ['queued', 'running'].includes(recibo?.status)
+  const accionesBloqueadas = enTrabajo || expirando
   const empresa = empresas.datos?.find(e => e.id === empresaId)
   const ambitosHistoricos = (historicos.datos?.historicalScopes ?? []).filter(h => !(empresas.datos ?? []).some(e => e.id === h.id))
   const soloHistorico = ciclo.datos?.historicalOnly === true
@@ -169,7 +172,7 @@ export default function AdminCicloDatos() {
     {empresas.estado === 'error' && <ErrorCarga error={empresas.error} onReintentar={empresas.recargar} />}
     {historicos.estado === 'error' && <ErrorCarga error={historicos.error} onReintentar={historicos.recargar} />}
     <label className="ciclo-campo">Ámbito
-      <select value={empresaId} disabled={ocupado} onChange={e => setEmpresaId(e.target.value)}><option value="">Selecciona el ámbito</option>
+      <select value={empresaId} disabled={ocupado || expirando} onChange={e => setEmpresaId(e.target.value)}><option value="">Selecciona el ámbito</option>
         <option value="global">Inventario global y usuarios sin empresa</option>
         {(empresas.datos ?? []).map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
         {ambitosHistoricos.map(h => <option key={h.id} value={h.id}>Empresa eliminada · {h.reason.slice(0, 80)}</option>)}</select></label>
@@ -181,19 +184,19 @@ export default function AdminCicloDatos() {
           <label>Buscar<input value={q} maxLength={100} disabled={ocupado} onChange={e => setQ(e.target.value)} /></label></div>
         {candidatos.estado === 'error' ? <ErrorCarga error={candidatos.error} onReintentar={candidatos.recargar} /> : candidatos.estado === 'cargando' ? <Cargando /> : <>
           <div className="ciclo-tabla"><table><thead><tr><th>Prueba</th><th>Tipo</th><th>Registro</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{lista.map(item => <tr key={claveCiclo(item)}>
-            <td><input type="checkbox" aria-label={`Marcar ${item.label} como prueba`} disabled={ocupado || enTrabajo} checked={elegidos.has(claveCiclo(item))} onChange={() => elegir(item)} /></td>
-            <td>{TIPOS_CICLO[item.type]}</td><td>{item.label}</td><td>{estadoCiclo(item.status)}</td><td><button type="button" className="pnl-btn sutil" disabled={ocupado || enTrabajo || !motivoValido || ['archived','revoked','disabled'].includes(item.status)} onClick={() => retirar(item)}>Retirar</button></td></tr>)}</tbody></table></div>
+            <td><input type="checkbox" aria-label={`Marcar ${item.label} como prueba`} disabled={ocupado || accionesBloqueadas} checked={elegidos.has(claveCiclo(item))} onChange={() => elegir(item)} /></td>
+            <td>{TIPOS_CICLO[item.type]}</td><td>{item.label}</td><td>{estadoCiclo(item.status)}</td><td><button type="button" className="pnl-btn sutil" disabled={ocupado || accionesBloqueadas || !motivoValido || ['archived','revoked','disabled'].includes(item.status)} onClick={() => retirar(item)}>Retirar</button></td></tr>)}</tbody></table></div>
           {!lista.length && <p>No hay registros que coincidan.</p>}<div className="ciclo-filtros"><button className="pnl-btn sutil" disabled={ocupado || offset === 0} onClick={() => setOffset(Math.max(0, offset - 50))}>Anterior</button><span>{candidatos.datos?.total ?? 0} registros</span><button className="pnl-btn sutil" disabled={ocupado || offset + lista.length >= (candidatos.datos?.total ?? 0)} onClick={() => setOffset(offset + 50)}>Siguiente</button></div>
         </>}
         <label className="ciclo-check"><input type="checkbox" checked={confirmarPruebas} disabled={ocupado} onChange={e => setConfirmarPruebas(e.target.checked)} />Confirmo que los {seleccion.length} registros seleccionados y sus datos exclusivos son pruebas desechables. No contienen operación real que deba conservarse.</label>
-        <button type="button" className="pnl-btn" disabled={ocupado || enTrabajo || ciclo.estado !== 'ok' || !seleccion.length || !motivoValido || !confirmarPruebas} onClick={acreditar}>{conjuntoId ? 'Agregar pruebas al conjunto seleccionado' : 'Acreditar conjunto de pruebas'}</button>
+        <button type="button" className="pnl-btn" disabled={ocupado || accionesBloqueadas || ciclo.estado !== 'ok' || !seleccion.length || !motivoValido || !confirmarPruebas} onClick={acreditar}>{conjuntoId ? 'Agregar pruebas al conjunto seleccionado' : 'Acreditar conjunto de pruebas'}</button>
       </section>
       <section className="ciclo-seccion"><h2>Eliminar pruebas</h2><p>El impacto incluye el expediente exclusivo de los registros acreditados. Las relaciones compartidas y los datos sin procedencia demostrada bloquean la limpieza. Cada plan vence en 15 minutos.</p>
         {ciclo.estado === 'error' ? <ErrorCarga error={ciclo.error} onReintentar={ciclo.recargar} /> : <><label className="ciclo-campo">Conjunto<select value={conjuntoId} disabled={ocupado} onChange={e => setConjuntoId(e.target.value)}><option value="">Selecciona un conjunto</option>{conjuntos.map(s => <option key={s.id} value={s.id}>{s.reason} · {s.entities.length} acreditados{s.cleanupStatus ? ` · ${estadoTrabajo(s.cleanupStatus)}` : ''}</option>)}</select></label>
-          <button className="pnl-btn" disabled={ocupado || enTrabajo || soloHistorico || !conjuntoId} onClick={revisar}>Revisar impacto</button></>}
+          <button className="pnl-btn" disabled={ocupado || accionesBloqueadas || soloHistorico || !conjuntoId} onClick={revisar}>Revisar impacto</button></>}
         {plan && <div className="ciclo-plan"><p>{plan.message}</p>{(plan.counts ?? []).map(c => <p key={c.family}>{familia(c.family)}: {c.count}</p>)}{(plan.blockers ?? []).map((b, i) => <p key={i} role="alert">{familia(b.family)}: {b.reason || b.message || 'Revisa las dependencias del conjunto.'} ({b.count >= 501 ? '501 o más' : b.count})</p>)}
           {plan.executionEnabled === false && <p role="alert">La eliminación aún no está habilitada para este entorno.</p>}
-          {plan.canDelete && !enTrabajo && <><p>Se eliminarán de la base activa. Una copia privada permite recuperación durante {plan.recoveryDays} días.</p><label className="ciclo-campo">Escribe ELIMINAR PRUEBAS<input value={frase} disabled={ocupado} onChange={e => setFrase(e.target.value)} autoComplete="off" /></label><button className="pnl-btn peligro" disabled={ocupado || frase !== 'ELIMINAR PRUEBAS'} onClick={limpiar}>Eliminar las pruebas del plan</button></>}
+          {plan.canDelete && !accionesBloqueadas && <><p>Se eliminarán de la base activa. Una copia privada permite recuperación durante {plan.recoveryDays} días.</p><label className="ciclo-campo">Escribe ELIMINAR PRUEBAS<input value={frase} disabled={ocupado} onChange={e => setFrase(e.target.value)} autoComplete="off" /></label><button className="pnl-btn peligro" disabled={ocupado || frase !== 'ELIMINAR PRUEBAS'} onClick={limpiar}>Eliminar las pruebas del plan</button></>}
         </div>}
         {planPendiente && <button className="pnl-btn sutil" disabled={ocupado} onClick={comprobar}>Comprobar resultado de la limpieza</button>}
         {recibo && <div className="ciclo-plan" aria-label="Comprobante de limpieza"><p>{estadoTrabajo(recibo.status)}</p>
@@ -205,8 +208,9 @@ export default function AdminCicloDatos() {
       <section className="ciclo-seccion"><h2>Retención de telemetría</h2><p>Inicialmente seis meses. Aumentar el plazo no recupera datos ya expirados. Los pagos, documentos y la auditoría tienen reglas propias.</p>
         {familiasRetencion.map(family => { const actual = versionActual(ciclo.datos?.policies, family); return <p key={family}>{family === 'raw_ingress' ? 'Ingreso crudo' : 'Telemetría canónica'}: {actual ? `${actual.calendarMonths} meses · versión ${actual.version}` : 'sin política registrada'}.</p> })}
         <label className="ciclo-campo">Meses<select value={meses} disabled={ocupado} onChange={e => setMeses(Number(e.target.value))}><option value={6}>6 meses</option>{inicialCompleta && <option value={3}>3 meses</option>}</select></label>
-        <button type="button" className="pnl-btn" disabled={ocupado || soloHistorico || !motivoValido || ciclo.estado !== 'ok'} onClick={guardarPolitica}>Guardar política</button>
+        <button type="button" className="pnl-btn" disabled={ocupado || accionesBloqueadas || soloHistorico || !motivoValido || ciclo.estado !== 'ok'} onClick={guardarPolitica}>Guardar política</button>
       </section>
+      <ExpiracionTelemetria key={empresaId} empresaId={empresaId} deshabilitado={soloHistorico || ciclo.estado !== 'ok' || ['queued', 'running'].includes(recibo?.status)} ocupado={ocupado} hacer={hacer} familia={familia} avisar={setAviso} informar={setExito} alTrabajar={setExpirando} politicaVersion={familiasRetencion.map(f => versionActual(ciclo.datos?.policies, f)?.version ?? 0).join(':')} />
     </>}
     {dialogo}
   </div>
