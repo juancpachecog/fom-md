@@ -32,3 +32,19 @@ test('flota conserva unidades sin GPS y rechaza instalaciones ambiguas o de otra
  assert.equal(conRecepcionFlota([unidad],[equipo],'otra',ahora)[0],unidad)
  assert.equal(conRecepcionFlota([unidad],[],'empresa',ahora)[0],unidad)
 })
+
+test('heartbeat Coban fresco conserva posición histórica sin rejuvenecer movimiento',()=>{
+ const posicionEn='2026-11-03T12:01:00Z'
+ const v=conRecepcionEquipo({...unidad,ultimoReporte:posicionEn,posicionEn,lat:1,lng:2,velocidadKmh:80,estadoMarcha:'en_marcha',ignition:true},{...equipo,protocolFamily:'coban-gps103'},null,ahora)
+ assert.equal(v.conectado,true);assert.equal(estadoUnidad(v).texto,'Reportando')
+ assert.equal(v.ultimoReporte,equipo.lastConnectionAt);assert.equal(v.posicionEn,posicionEn)
+ assert.equal(v.lat,1);assert.equal(v.lng,2)
+ assert.equal(v.velocidadKmh,null);assert.equal(v.estadoMarcha,null);assert.equal(v.ignition,null)
+ assert.equal(conRecepcionEquipo(v,{...equipo,protocolFamily:'coban-gps103'},null,ahora+300000).conectado,false)
+ assert.equal(conRecepcionEquipo(unidad,{...equipo,protocolFamily:'unknown'},null,ahora),unidad)
+})
+
+test('señal actual no sustituye la fecha independiente de posición para la marcha',()=>{
+ const v=conRecepcionEquipo({...unidad,ultimoReporte:equipo.lastConnectionAt,posicionEn:'2026-11-03T12:00:00Z',velocidadKmh:60,estadoMarcha:'en_marcha'},equipo,null,ahora)
+ assert.equal(v.soloRecepcion,true);assert.equal(v.velocidadKmh,null);assert.equal(v.estadoMarcha,null)
+})

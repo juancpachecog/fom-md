@@ -33,6 +33,7 @@ function comoFila(v, empresa) {
     velocidadKmh: v.speedKph ?? null,
     km: v.odometerKm ?? null,
     ultimoReporte: v.lastReportAt ?? null,
+    posicionEn: v.lastPositionAt ?? v.lastReportAt ?? null,
     lat: v.latitude ?? null,
     lng: v.longitude ?? null,
     conductorNombre: null,
