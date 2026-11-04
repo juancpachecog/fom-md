@@ -43,4 +43,4 @@ function Fixture() {
     {dialogo}
   </main>
 }
-createRoot(document.getElementById('root')).render(<MemoryRouter><Fixture /></MemoryRouter>)
+createRoot(document.getElementById('root')).render(<MemoryRouter><div className="pnl" style={{ display: 'block', minHeight: '100vh' }}><Fixture /></div></MemoryRouter>)
