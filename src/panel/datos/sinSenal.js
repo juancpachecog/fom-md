@@ -53,7 +53,7 @@ export function conSenalAlDia(v, ahora = Date.now()) {
   const conexion = conectado ? 'reportando' : 'sin_senal'
   let estadoMarcha = v.estadoMarcha
   if (conectado && !v.soloRecepcion) estadoMarcha = marchaPorPosicion(v, ahora) ?? v.estadoMarcha
-  else registrarCorte(v, new Date(v.ultimoReporte).getTime() + SIN_SENAL_MS, ahora)
+  else if (!conectado) registrarCorte(v, new Date(v.ultimoReporte).getTime() + SIN_SENAL_MS, ahora)
   if (conectado === v.conectado && conexion === v.conexion && estadoMarcha === v.estadoMarcha) return v
   return { ...v, conectado, conexion, estadoMarcha }
 }

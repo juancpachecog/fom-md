@@ -174,3 +174,35 @@ test('repositorio real: flota, conductores, «faltan hoy» y órdenes con una em
   assert.ok(deUnidad.length > 0 && deUnidad.every((o) => o.vehiculoId === 'v001'))
   assert.equal(servidor.llamadas.filter((l) => l.ruta === '/work-orders').at(-1).url.searchParams.get('vehicleId'), 'v001')
 })
+
+test('repositorio real compartido muestra recepción Meitrack sin posición y lee inventario una sola vez', async (t) => {
+  const original = globalThis.fetch
+  const llamadas = []
+  const ahora = Date.now()
+  const recibido = new Date(ahora - 30000).toISOString()
+  globalThis.fetch = async (direccion, opciones = {}) => {
+    const ruta = new URL(direccion).pathname.replace('/api/v1/console', '')
+    llamadas.push({ ruta, metodo: opciones.method ?? 'GET' })
+    let cuerpo
+    if (ruta === '/vehicles') cuerpo = { items: [{ id: 'meitrack', alias: 'Unidad sin punto', lastReportAt: null }, { id: 'sin-gps', alias: 'Sin GPS' }], page: { total: 2, limit: 200, offset: 0 } }
+    else if (ruta === '/gps-devices') cuerpo = { devices: [{ id: 'equipo', vehicleId: 'meitrack', installationId: 'instalacion', protocolFamily: 'meitrack-t399', installedAt: new Date(ahora - 86400000).toISOString(), lastConnectionAt: recibido }] }
+    else if (ruta === '/drivers') cuerpo = { items: [], page: { total: 0, limit: 200, offset: 0 } }
+    else if (ruta.endsWith('/position/latest')) cuerpo = { position: null }
+    else throw Error('Ruta no prevista: ' + ruta)
+    return { ok: true, status: 200, text: async () => JSON.stringify(cuerpo) }
+  }
+  t.after(() => { globalThis.fetch = original })
+  const { repoApi } = await repositorioReal()
+  const [a, b] = await Promise.all([repoApi.vehiculos.listar({}), repoApi.vehiculos.listar({})])
+  const conGps = a.find(v => v.id === 'meitrack')
+  const sinGps = a.find(v => v.id === 'sin-gps')
+  assert.equal(conGps.conectado, true)
+  assert.equal(conGps.ultimoReporte, recibido)
+  assert.equal(conGps.soloRecepcion, true)
+  assert.equal(conGps.lat, null); assert.equal(conGps.lng, null)
+  assert.equal(conGps.velocidadKmh, null); assert.equal(conGps.estadoMarcha, null)
+  assert.equal(sinGps.conectado, false); assert.equal(sinGps.ultimoReporte, null)
+  assert.deepEqual(a, b)
+  assert.equal(llamadas.filter(l => l.ruta === '/gps-devices').length, 1)
+  assert.ok(llamadas.every(l => l.metodo === 'GET'))
+})
