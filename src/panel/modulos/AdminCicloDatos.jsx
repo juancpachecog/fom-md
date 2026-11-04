@@ -27,6 +27,8 @@ export default function AdminCicloDatos() {
   const candidatos = useDatos(() => empresaId ? candidatosCiclo(empresaId, { tipo, q, offset }) : Promise.resolve({ items: [], total: 0 }), [empresaId, tipo, q, offset])
   const lista = candidatos.datos?.items ?? []
   const conjuntos = ciclo.datos?.testSets ?? []
+  const conjunto = conjuntos.find(s => s.id === conjuntoId)
+  const enTrabajo = ['queued', 'running'].includes(recibo?.status)
   const empresa = empresas.datos?.find(e => e.id === empresaId)
   const nombreAmbito = empresaId === 'global' ? 'inventario global y usuarios sin empresa' : empresa?.nombre
   const politica = versionActual(ciclo.datos?.policies, 'canonical_telemetry')
@@ -36,6 +38,43 @@ export default function AdminCicloDatos() {
   useEffect(() => { setSeleccion([]); setConjuntoId(''); setPlan(null); setFrase(''); setOffset(0); setAviso(''); setExito(''); setConfirmarPruebas(false); setRecibo(null); setPlanPendiente('') }, [empresaId])
   useEffect(() => { setOffset(0) }, [tipo, q])
   useEffect(() => { setPlan(null); setFrase(''); setRecibo(null); setPlanPendiente('') }, [conjuntoId])
+  useEffect(() => {
+    const anterior = conjunto?.cleanupPlanId
+    if (!anterior) return
+    let vigente = true
+    setPlanPendiente(anterior)
+    leerReciboLimpieza(anterior).then(valor => { if (vigente) setRecibo(valor) })
+      .catch(error => { if (vigente) setAviso(textoDeError(error)) })
+    return () => { vigente = false }
+  }, [conjuntoId, conjunto?.cleanupPlanId])
+  useEffect(() => {
+    if (!planPendiente || !['queued', 'running'].includes(recibo?.status)) return
+    let vigente = true, temporizador, fallos = 0
+    const limite = Date.now() + 5 * 60_000
+    const programar = () => { if (vigente) temporizador = setTimeout(consultar, 2_000) }
+    const consultar = async () => {
+      if (!vigente) return
+      if (Date.now() >= limite) { setAviso('El trabajo puede continuar en el servidor. Puedes comprobar su resultado cuando quieras.'); return }
+      if (document.visibilityState === 'hidden') { programar(); return }
+      try {
+        const valor = await leerReciboLimpieza(planPendiente)
+        if (!vigente) return
+        fallos = 0; setRecibo(valor)
+        if (valor.status === 'verified' && valor.remaining === 0) {
+          setPlan(null); setFrase(''); setExito('Limpieza verificada mediante una consulta independiente.')
+          await Promise.all([ciclo.recargar(), candidatos.recargar()])
+        } else if (valor.status === 'blocked') setAviso(falloTrabajo(valor.failureCode))
+        else if (valor.status === 'changed') setAviso('El estado actual cambió. Revisa el comprobante antes de otra acción.')
+        else if (['queued', 'running'].includes(valor.status)) programar()
+      } catch (error) {
+        if (!vigente) return
+        setAviso('No se pudo consultar el avance; el trabajo puede continuar. Usa Comprobar resultado.')
+        if (++fallos < 3 && ![401, 403].includes(error.estado)) programar()
+      }
+    }
+    programar()
+    return () => { vigente = false; clearTimeout(temporizador) }
+  }, [empresaId, conjuntoId, planPendiente, recibo?.status])
   const llave = (command) => {
     if (!llaves.current.has(command)) llaves.current.set(command, crypto.randomUUID())
     return llaves.current.get(command)
@@ -44,7 +83,7 @@ export default function AdminCicloDatos() {
     if (ocupacion.current) return
     ocupacion.current = true
     setOcupado(true); setAviso(''); setExito('')
-    try { const resultado = await fn(); if (resultado === false) return; setExito(mensaje); await Promise.all([ciclo.recargar(), candidatos.recargar()]) }
+    try { const resultado = await fn(); if (resultado === false) return; setExito(typeof resultado === 'string' ? resultado : mensaje); await Promise.all([ciclo.recargar(), candidatos.recargar()]) }
     catch (error) { setAviso(textoDeError(error)) }
     finally { ocupacion.current = false; setOcupado(false) }
   }
@@ -77,7 +116,7 @@ export default function AdminCicloDatos() {
   const revisar = () => hacer(async () => { setPlan(await revisarLimpieza(conjuntoId)) }, 'Impacto consultado; todavía no se ha eliminado nada.')
   const limpiar = () => hacer(async () => {
     if (!plan?.canDelete || frase !== 'ELIMINAR PRUEBAS') throw new Error('Revisa el plan y escribe la confirmación completa.')
-    if (!Number.isFinite(Date.parse(plan.expiresAt)) || Date.now() >= Date.parse(plan.expiresAt)) throw new Error('El plan venció. Revisa nuevamente su impacto.')
+    if (!Number.isFinite(Date.parse(plan.expiresAt))) throw new Error('No se pudo validar el plan. Revisa nuevamente su impacto.')
     setPlanPendiente(plan.planId)
     let fallo
     try { await limpiarPruebas(conjuntoId, { planId: plan.planId, confirmation: frase }, llave(`cleanup:${plan.planId}`)) }
@@ -88,12 +127,19 @@ export default function AdminCicloDatos() {
     try { comprobado = await leerReciboLimpieza(plan.planId) }
     catch (error) { throw fallo || error }
     setRecibo(comprobado)
+    if (['queued', 'running'].includes(comprobado.status)) {
+      setFrase('')
+      return 'Solicitud guardada. El servidor ejecutará el trabajo y conservará su resultado aunque salgas de esta pantalla.'
+    }
+    if (comprobado.status === 'blocked') throw new Error(falloTrabajo(comprobado.failureCode))
     if (comprobado.status !== 'verified' || comprobado.remaining !== 0) throw new Error('El estado actual no acredita la limpieza completa. Revisa el comprobante.')
     setPlan(null); setFrase('')
   }, 'Limpieza verificada mediante una consulta independiente.')
   const comprobar = () => hacer(async () => {
     const comprobado = await leerReciboLimpieza(planPendiente)
     setRecibo(comprobado)
+    if (['queued', 'running'].includes(comprobado.status)) return 'La solicitud sigue en cola o en ejecución; todavía no se acredita la limpieza.'
+    if (comprobado.status === 'blocked') throw new Error(falloTrabajo(comprobado.failureCode))
     if (comprobado.status !== 'verified' || comprobado.remaining !== 0) throw new Error('El estado actual cambió; el comprobante muestra registros presentes.')
   }, 'El comprobante confirma que los registros del plan ya no están en la base activa.')
   const guardarPolitica = () => hacer(async () => {
@@ -121,25 +167,26 @@ export default function AdminCicloDatos() {
           <label>Buscar<input value={q} maxLength={100} disabled={ocupado} onChange={e => setQ(e.target.value)} /></label></div>
         {candidatos.estado === 'error' ? <ErrorCarga error={candidatos.error} onReintentar={candidatos.recargar} /> : candidatos.estado === 'cargando' ? <Cargando /> : <>
           <div className="ciclo-tabla"><table><thead><tr><th>Prueba</th><th>Tipo</th><th>Registro</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{lista.map(item => <tr key={claveCiclo(item)}>
-            <td><input type="checkbox" aria-label={`Marcar ${item.label} como prueba`} disabled={ocupado} checked={elegidos.has(claveCiclo(item))} onChange={() => elegir(item)} /></td>
-            <td>{TIPOS_CICLO[item.type]}</td><td>{item.label}</td><td>{estadoCiclo(item.status)}</td><td><button type="button" className="pnl-btn sutil" disabled={ocupado || !motivoValido || ['archived','revoked','disabled'].includes(item.status)} onClick={() => retirar(item)}>Retirar</button></td></tr>)}</tbody></table></div>
+            <td><input type="checkbox" aria-label={`Marcar ${item.label} como prueba`} disabled={ocupado || enTrabajo} checked={elegidos.has(claveCiclo(item))} onChange={() => elegir(item)} /></td>
+            <td>{TIPOS_CICLO[item.type]}</td><td>{item.label}</td><td>{estadoCiclo(item.status)}</td><td><button type="button" className="pnl-btn sutil" disabled={ocupado || enTrabajo || !motivoValido || ['archived','revoked','disabled'].includes(item.status)} onClick={() => retirar(item)}>Retirar</button></td></tr>)}</tbody></table></div>
           {!lista.length && <p>No hay registros que coincidan.</p>}<div className="ciclo-filtros"><button className="pnl-btn sutil" disabled={ocupado || offset === 0} onClick={() => setOffset(Math.max(0, offset - 50))}>Anterior</button><span>{candidatos.datos?.total ?? 0} registros</span><button className="pnl-btn sutil" disabled={ocupado || offset + lista.length >= (candidatos.datos?.total ?? 0)} onClick={() => setOffset(offset + 50)}>Siguiente</button></div>
         </>}
         <label className="ciclo-check"><input type="checkbox" checked={confirmarPruebas} disabled={ocupado} onChange={e => setConfirmarPruebas(e.target.checked)} />Confirmo que los {seleccion.length} registros seleccionados son pruebas desechables. No contienen operación real que deba conservarse.</label>
-        <button type="button" className="pnl-btn" disabled={ocupado || ciclo.estado !== 'ok' || !seleccion.length || !motivoValido || !confirmarPruebas} onClick={acreditar}>{conjuntoId ? 'Agregar pruebas al conjunto seleccionado' : 'Acreditar conjunto de pruebas'}</button>
+        <button type="button" className="pnl-btn" disabled={ocupado || enTrabajo || ciclo.estado !== 'ok' || !seleccion.length || !motivoValido || !confirmarPruebas} onClick={acreditar}>{conjuntoId ? 'Agregar pruebas al conjunto seleccionado' : 'Acreditar conjunto de pruebas'}</button>
       </section>
       <section className="ciclo-seccion"><h2>Eliminar pruebas</h2><p>Las relaciones compartidas y los datos sin procedencia demostrada bloquean la limpieza. Cada plan vence en 15 minutos.</p>
-        {ciclo.estado === 'error' ? <ErrorCarga error={ciclo.error} onReintentar={ciclo.recargar} /> : <><label className="ciclo-campo">Conjunto<select value={conjuntoId} disabled={ocupado} onChange={e => setConjuntoId(e.target.value)}><option value="">Selecciona un conjunto</option>{conjuntos.map(s => <option key={s.id} value={s.id}>{s.reason} · {s.entities.length} registros</option>)}</select></label>
-          <button className="pnl-btn" disabled={ocupado || !conjuntoId} onClick={revisar}>Revisar impacto</button></>}
+        {ciclo.estado === 'error' ? <ErrorCarga error={ciclo.error} onReintentar={ciclo.recargar} /> : <><label className="ciclo-campo">Conjunto<select value={conjuntoId} disabled={ocupado} onChange={e => setConjuntoId(e.target.value)}><option value="">Selecciona un conjunto</option>{conjuntos.map(s => <option key={s.id} value={s.id}>{s.reason} · {s.entities.length} acreditados{s.cleanupStatus ? ` · ${estadoTrabajo(s.cleanupStatus)}` : ''}</option>)}</select></label>
+          <button className="pnl-btn" disabled={ocupado || enTrabajo || !conjuntoId} onClick={revisar}>Revisar impacto</button></>}
         {plan && <div className="ciclo-plan"><p>{plan.message}</p>{(plan.counts ?? []).map(c => <p key={c.family}>{familia(c.family)}: {c.count}</p>)}{(plan.blockers ?? []).map((b, i) => <p key={i} role="alert">{familia(b.family)}: {b.reason || b.message || 'Revisa las dependencias del conjunto.'} ({b.count >= 501 ? '501 o más' : b.count})</p>)}
           {plan.executionEnabled === false && <p role="alert">La eliminación aún no está habilitada para este entorno.</p>}
-          {plan.canDelete && <><p>Se eliminarán de la base activa. Una copia privada permite recuperación durante {plan.recoveryDays} días.</p><label className="ciclo-campo">Escribe ELIMINAR PRUEBAS<input value={frase} disabled={ocupado} onChange={e => setFrase(e.target.value)} autoComplete="off" /></label><button className="pnl-btn peligro" disabled={ocupado || frase !== 'ELIMINAR PRUEBAS'} onClick={limpiar}>Eliminar las pruebas del plan</button></>}
+          {plan.canDelete && !enTrabajo && <><p>Se eliminarán de la base activa. Una copia privada permite recuperación durante {plan.recoveryDays} días.</p><label className="ciclo-campo">Escribe ELIMINAR PRUEBAS<input value={frase} disabled={ocupado} onChange={e => setFrase(e.target.value)} autoComplete="off" /></label><button className="pnl-btn peligro" disabled={ocupado || frase !== 'ELIMINAR PRUEBAS'} onClick={limpiar}>Eliminar las pruebas del plan</button></>}
         </div>}
         {planPendiente && <button className="pnl-btn sutil" disabled={ocupado} onClick={comprobar}>Comprobar resultado de la limpieza</button>}
-        {recibo && <div className="ciclo-plan" aria-label="Comprobante de limpieza"><p>{recibo.status === 'verified' && recibo.remaining === 0 ? 'Limpieza verificada' : 'El estado actual ha cambiado'}</p>
-          <p>Completada: {new Date(recibo.completedAt).toLocaleString('es-VE')} · Registros presentes: {recibo.remaining}</p>
-          {(recibo.counts ?? []).map(c => <p key={c.family}>{familia(c.family)} eliminados: {c.count}</p>)}
-          <p>{recibo.recoveryAvailable ? 'Copia privada de recuperación disponible dentro de su plazo.' : 'La ventana de recuperación ya terminó.'}</p></div>}
+        {recibo && <div className="ciclo-plan" aria-label="Comprobante de limpieza"><p>{estadoTrabajo(recibo.status)}</p>
+          {enTrabajo ? <p>El trabajo sigue en el servidor. El resultado se comprueba aparte al terminar.</p> : recibo.status === 'blocked' ? <p role="alert">{falloTrabajo(recibo.failureCode)}</p> : <>
+            <p>Completada: {recibo.completedAt ? new Date(recibo.completedAt).toLocaleString('es-VE') : 'Pendiente de comprobar'} · Registros presentes: {recibo.remaining ?? 'Pendiente'}</p>
+            {(recibo.counts ?? []).map(c => <p key={c.family}>{familia(c.family)} eliminados: {c.count}</p>)}
+            <p>{recibo.recoveryAvailable ? 'Copia privada de recuperación disponible dentro de su plazo.' : 'La ventana de recuperación ya terminó.'}</p></>}</div>}
       </section>
       <section className="ciclo-seccion"><h2>Retención de telemetría</h2><p>Inicialmente seis meses. Aumentar el plazo no recupera datos ya expirados. Los pagos, documentos y la auditoría tienen reglas propias.</p>
         <p>{politica ? `Última política registrada: ${politica.calendarMonths} meses.` : 'Todavía no hay una política registrada para esta empresa.'}</p>
@@ -155,4 +202,15 @@ function familia(nombre) {
   return ({ tenants: 'Empresas', vehicles: 'Vehículos', users: 'Usuarios', gps_devices: 'GPS',
     tenant: 'Empresa', vehicle: 'Vehículo', user: 'Usuario', gps_device: 'GPS',
     audit_log: 'Auditoría', dependencias: 'Dependencias', conjunto: 'Conjunto' })[nombre] || 'Referencias asociadas'
+}
+
+function estadoTrabajo(estado) {
+  return ({ queued: 'En cola', running: 'En ejecución', completed: 'Solicitud completada',
+    verified: 'Limpieza verificada', changed: 'El estado actual ha cambiado', blocked: 'Trabajo bloqueado' })[estado] || 'Pendiente de comprobar'
+}
+
+function falloTrabajo(codigo) {
+  return ({ plan_changed: 'El plan venció o cambió. Revisa nuevamente el impacto.',
+    scope_unavailable: 'La autorización o el ámbito ya no permiten continuar.',
+    policy_blocked: 'Una dependencia o la política impide la limpieza.' })[codigo] || 'El servidor detuvo la operación. Revisa el resultado antes de iniciar otra solicitud.'
 }
