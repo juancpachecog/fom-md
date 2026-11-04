@@ -107,6 +107,7 @@ function servidorFalso() {
     llamadas.push({ metodo: opciones.method ?? 'GET', ruta, url })
     if ((opciones.method ?? 'GET') !== 'GET') return responder({})
     if (ruta === '/vehicles') return pagina(vehiculos, url)
+    if (ruta === '/gps-devices') return responder({ devices: [] })
     if (ruta === '/drivers') return pagina(asignaciones, url)
     if (ruta === '/work-orders') {
       const v = url.searchParams.get('vehicleId')
@@ -175,17 +176,24 @@ test('repositorio real: flota, conductores, «faltan hoy» y órdenes con una em
   assert.equal(servidor.llamadas.filter((l) => l.ruta === '/work-orders').at(-1).url.searchParams.get('vehicleId'), 'v001')
 })
 
-test('repositorio real compartido muestra recepción Meitrack sin posición y lee inventario una sola vez', async (t) => {
+test('repositorio compartido rechaza lectura fallida y recupera recepción Meitrack sin posición al reintentar', async (t) => {
   const original = globalThis.fetch
   const llamadas = []
   const ahora = Date.now()
   const recibido = new Date(ahora - 30000).toISOString()
+  let falloInventario = true
   globalThis.fetch = async (direccion, opciones = {}) => {
     const ruta = new URL(direccion).pathname.replace('/api/v1/console', '')
     llamadas.push({ ruta, metodo: opciones.method ?? 'GET' })
     let cuerpo
     if (ruta === '/vehicles') cuerpo = { items: [{ id: 'meitrack', alias: 'Unidad sin punto', lastReportAt: null }, { id: 'sin-gps', alias: 'Sin GPS' }], page: { total: 2, limit: 200, offset: 0 } }
-    else if (ruta === '/gps-devices') cuerpo = { devices: [{ id: 'equipo', vehicleId: 'meitrack', installationId: 'instalacion', protocolFamily: 'meitrack-t399', installedAt: new Date(ahora - 86400000).toISOString(), lastConnectionAt: recibido }] }
+    else if (ruta === '/gps-devices') {
+      if (falloInventario) {
+        falloInventario = false
+        return { ok: false, status: 503, text: async () => JSON.stringify({ message: 'private failure' }) }
+      }
+      cuerpo = { devices: [{ id: 'equipo', vehicleId: 'meitrack', installationId: 'instalacion', protocolFamily: 'meitrack-t399', installedAt: new Date(ahora - 86400000).toISOString(), lastConnectionAt: recibido }] }
+    }
     else if (ruta === '/drivers') cuerpo = { items: [], page: { total: 0, limit: 200, offset: 0 } }
     else if (ruta.endsWith('/position/latest')) cuerpo = { position: null }
     else throw Error('Ruta no prevista: ' + ruta)
@@ -193,6 +201,7 @@ test('repositorio real compartido muestra recepción Meitrack sin posición y le
   }
   t.after(() => { globalThis.fetch = original })
   const { repoApi } = await repositorioReal()
+  await assert.rejects(repoApi.vehiculos.listar({}), /No se pudo comprobar la recepción GPS/)
   const [a, b] = await Promise.all([repoApi.vehiculos.listar({}), repoApi.vehiculos.listar({})])
   const conGps = a.find(v => v.id === 'meitrack')
   const sinGps = a.find(v => v.id === 'sin-gps')
@@ -203,6 +212,6 @@ test('repositorio real compartido muestra recepción Meitrack sin posición y le
   assert.equal(conGps.velocidadKmh, null); assert.equal(conGps.estadoMarcha, null)
   assert.equal(sinGps.conectado, false); assert.equal(sinGps.ultimoReporte, null)
   assert.deepEqual(a, b)
-  assert.equal(llamadas.filter(l => l.ruta === '/gps-devices').length, 1)
+  assert.equal(llamadas.filter(l => l.ruta === '/gps-devices').length, 2)
   assert.ok(llamadas.every(l => l.metodo === 'GET'))
 })
