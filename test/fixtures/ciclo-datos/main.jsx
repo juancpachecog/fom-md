@@ -9,7 +9,8 @@ const user = '55555555-5555-4555-8555-555555555555'
 const planId = '66666666-6666-4666-8666-666666666666'
 const state = { candidates: [{ type: 'vehicle', id: vehicle, label: 'Vehículo SINTÉTICO', status: 'active' },
   { type: 'user', id: user, label: 'Usuario SINTÉTICO', status: 'revoked' }], sets: [], policies: [],
-  stats: { reads: 0, setRequests: 0, sets: 0, retired: 0, cleaned: 0 }, failRead: true, failCreate: true }
+  stats: { reads: 0, setRequests: 0, sets: 0, retired: 0, cleaned: 0, receiptReads: 0 }, failRead: true, failCreate: true,
+  failCleanupResponse: true, receipt: null }
 let renderStats = () => {}
 const response = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } })
 
@@ -44,21 +45,31 @@ globalThis.fetch = async (url, options = {}) => {
     if (!set.entities.some(item => item.id === body.entityId)) set.entities.push({ type: body.entityType, id: body.entityId })
     return finish({ recorded: true })
   }
-  if (path.endsWith('/cleanup-preflight')) return finish({ planId, canDelete: true,
+  if (method === 'POST' && path.endsWith('/cleanup-plans')) return finish({ planId, canDelete: true,
+    executionEnabled: true, recoveryDays: 7, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
     counts: [{ family: 'synthetic', label: 'Registros SINTÉTICOS', count: state.sets[0]?.entities.length ?? 0 }],
     blockers: [], message: 'Plan SINTÉTICO: ninguna conexión ni eliminación nominal.' })
   if (path.endsWith('/cleanup')) {
     if (body.confirmation !== 'ELIMINAR PRUEBAS') return response({ message: 'Synthetic confirmation rejected' }, 400)
+    if (state.receipt) return finish({ planId, status: 'completed', replayed: true })
     state.stats.cleaned++
     const ids = new Set(state.sets[0]?.entities.map(item => item.id))
     state.candidates = state.candidates.filter(item => !ids.has(item.id))
-    return finish({ completed: true })
+    state.receipt = { planId, status: 'verified', remaining: 0, recoveryAvailable: true,
+      completedAt: new Date().toISOString(), counts: [{ family: 'vehicles', count: 1 }, { family: 'users', count: 1 }] }
+    renderStats({ ...state.stats })
+    if (state.failCleanupResponse) { state.failCleanupResponse = false; throw new TypeError('Synthetic cleanup response lost after commit') }
+    return finish({ planId, status: 'completed', replayed: false })
+  }
+  if (method === 'GET' && path.includes('/cleanup-receipts/')) {
+    state.stats.receiptReads++
+    return state.receipt ? finish(state.receipt) : response({ message: 'Synthetic receipt not found' }, 404)
   }
   if (method === 'POST' && path.endsWith('/policies')) {
     state.policies.push({ ...body, version: body.expectedVersion + 1 })
     return finish({ id: planId })
   }
-  if (path.includes('/lifecycle/tenants/')) return finish({ policies: state.policies, testSets: state.sets, purgeEnabled: false })
+  if (path.includes('/lifecycle/tenants/') || path.endsWith('/lifecycle/global')) return finish({ policies: state.policies, testSets: state.sets, purgeEnabled: false })
   // El componente de esta prueba no requiere una sesión nominal.
   return response({ message: 'Synthetic route not configured' }, 404)
 }

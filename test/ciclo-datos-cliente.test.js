@@ -56,3 +56,26 @@ test('resumen elige la versión más reciente de cada familia sin rejuvenecer la
   assert.equal(client.versionActual(policies, 'canonical_telemetry').calendarMonths, 6)
   assert.equal(client.versionActual([], 'raw_ingress'), null)
 })
+
+test('ámbito global es explícito y el plan usa POST con CSRF; recibo posterior solo GET', async () => {
+  const previous = globalThis.fetch, calls = []
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options })
+    return new Response(JSON.stringify({ planId: key }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  try {
+    client.fijarEmpresaGestion(another)
+    await client.leerCiclo('global')
+    assert.match(calls[0].url, /\/lifecycle\/global$/u)
+    await client.revisarLimpieza(key)
+    assert.match(calls[1].url, /\/cleanup-plans$/u)
+    assert.equal(calls[1].options.method, 'POST')
+    assert.equal(calls[1].options.headers['x-fom-csrf'], 'fom-browser-v1')
+    await client.limpiarPruebas(key, { planId: key, confirmation: 'ELIMINAR PRUEBAS' }, key)
+    await client.leerReciboLimpieza(key)
+    assert.equal(calls.length, 4)
+    assert.equal(calls[3].options.method, 'GET')
+    assert.match(calls[3].url, new RegExp(`/cleanup-receipts/${key}$`))
+    assert.equal(calls.some(x => x.url.includes(`/tenants/${another}`)), false)
+  } finally { globalThis.fetch = previous; client.fijarEmpresaGestion(null) }
+})
