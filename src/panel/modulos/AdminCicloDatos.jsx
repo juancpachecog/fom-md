@@ -23,6 +23,7 @@ export default function AdminCicloDatos() {
   const ocupacion = useRef(false)
   const { confirmar, dialogo } = useConfirmar()
   const empresas = useDatos(() => repo.admin.empresas.listar({}), [])
+  const historicos = useDatos(() => leerCiclo('global'), [])
   const ciclo = useDatos(() => empresaId ? leerCiclo(empresaId) : Promise.resolve(null), [empresaId])
   const candidatos = useDatos(() => empresaId ? candidatosCiclo(empresaId, { tipo, q, offset }) : Promise.resolve({ items: [], total: 0 }), [empresaId, tipo, q, offset])
   const lista = candidatos.datos?.items ?? []
@@ -30,6 +31,8 @@ export default function AdminCicloDatos() {
   const conjunto = conjuntos.find(s => s.id === conjuntoId)
   const enTrabajo = ['queued', 'running'].includes(recibo?.status)
   const empresa = empresas.datos?.find(e => e.id === empresaId)
+  const ambitosHistoricos = (historicos.datos?.historicalScopes ?? []).filter(h => !(empresas.datos ?? []).some(e => e.id === h.id))
+  const soloHistorico = ciclo.datos?.historicalOnly === true
   const nombreAmbito = empresaId === 'global' ? 'inventario global y usuarios sin empresa' : empresa?.nombre
   const politica = versionActual(ciclo.datos?.policies, 'canonical_telemetry')
   const motivoValido = motivo.trim().length >= 2 && motivo.trim().length <= 500
@@ -62,7 +65,7 @@ export default function AdminCicloDatos() {
         fallos = 0; setRecibo(valor)
         if (valor.status === 'verified' && valor.remaining === 0) {
           setPlan(null); setFrase(''); setExito('Limpieza verificada mediante una consulta independiente.')
-          await Promise.all([ciclo.recargar(), candidatos.recargar()])
+          await Promise.all([ciclo.recargar(), candidatos.recargar(), empresas.recargar(), historicos.recargar()])
         } else if (valor.status === 'blocked') setAviso(falloTrabajo(valor.failureCode))
         else if (valor.status === 'changed') setAviso('El estado actual cambió. Revisa el comprobante antes de otra acción.')
         else if (['queued', 'running'].includes(valor.status)) programar()
@@ -83,7 +86,7 @@ export default function AdminCicloDatos() {
     if (ocupacion.current) return
     ocupacion.current = true
     setOcupado(true); setAviso(''); setExito('')
-    try { const resultado = await fn(); if (resultado === false) return; setExito(typeof resultado === 'string' ? resultado : mensaje); await Promise.all([ciclo.recargar(), candidatos.recargar()]) }
+    try { const resultado = await fn(); if (resultado === false) return; setExito(typeof resultado === 'string' ? resultado : mensaje); await Promise.all([ciclo.recargar(), candidatos.recargar(), empresas.recargar(), historicos.recargar()]) }
     catch (error) { setAviso(textoDeError(error)) }
     finally { ocupacion.current = false; setOcupado(false) }
   }
@@ -156,11 +159,14 @@ export default function AdminCicloDatos() {
     {aviso && <p role="alert" className="ciclo-error">{aviso}</p>}
     {exito && <p role="status">{exito}</p>}
     {empresas.estado === 'error' && <ErrorCarga error={empresas.error} onReintentar={empresas.recargar} />}
+    {historicos.estado === 'error' && <ErrorCarga error={historicos.error} onReintentar={historicos.recargar} />}
     <label className="ciclo-campo">Ámbito
       <select value={empresaId} disabled={ocupado} onChange={e => setEmpresaId(e.target.value)}><option value="">Selecciona el ámbito</option>
         <option value="global">Inventario global y usuarios sin empresa</option>
-        {(empresas.datos ?? []).map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}</select></label>
+        {(empresas.datos ?? []).map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+        {ambitosHistoricos.map(h => <option key={h.id} value={h.id}>Empresa eliminada · {h.reason.slice(0, 80)}</option>)}</select></label>
     {empresaId && <>
+      {soloHistorico && <p role="status">La empresa fue eliminada. Puedes consultar sus conjuntos y comprobantes sin volver a crearla.</p>}
       <label className="ciclo-campo">Motivo de la operación<textarea value={motivo} onChange={e => setMotivo(e.target.value)} maxLength={500} disabled={ocupado} placeholder="Describe la retirada o la procedencia de estas pruebas." /></label>
       <section className="ciclo-seccion"><h2>Registros del ámbito</h2><p>Retirar conserva el historial. Marcar una prueba no la elimina.</p>
         <div className="ciclo-filtros"><label>Tipo<select value={tipo} disabled={ocupado} onChange={e => setTipo(e.target.value)}><option value="all">Todos</option>{Object.entries(TIPOS_CICLO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
@@ -176,7 +182,7 @@ export default function AdminCicloDatos() {
       </section>
       <section className="ciclo-seccion"><h2>Eliminar pruebas</h2><p>El impacto incluye el expediente exclusivo de los registros acreditados. Las relaciones compartidas y los datos sin procedencia demostrada bloquean la limpieza. Cada plan vence en 15 minutos.</p>
         {ciclo.estado === 'error' ? <ErrorCarga error={ciclo.error} onReintentar={ciclo.recargar} /> : <><label className="ciclo-campo">Conjunto<select value={conjuntoId} disabled={ocupado} onChange={e => setConjuntoId(e.target.value)}><option value="">Selecciona un conjunto</option>{conjuntos.map(s => <option key={s.id} value={s.id}>{s.reason} · {s.entities.length} acreditados{s.cleanupStatus ? ` · ${estadoTrabajo(s.cleanupStatus)}` : ''}</option>)}</select></label>
-          <button className="pnl-btn" disabled={ocupado || enTrabajo || !conjuntoId} onClick={revisar}>Revisar impacto</button></>}
+          <button className="pnl-btn" disabled={ocupado || enTrabajo || soloHistorico || !conjuntoId} onClick={revisar}>Revisar impacto</button></>}
         {plan && <div className="ciclo-plan"><p>{plan.message}</p>{(plan.counts ?? []).map(c => <p key={c.family}>{familia(c.family)}: {c.count}</p>)}{(plan.blockers ?? []).map((b, i) => <p key={i} role="alert">{familia(b.family)}: {b.reason || b.message || 'Revisa las dependencias del conjunto.'} ({b.count >= 501 ? '501 o más' : b.count})</p>)}
           {plan.executionEnabled === false && <p role="alert">La eliminación aún no está habilitada para este entorno.</p>}
           {plan.canDelete && !enTrabajo && <><p>Se eliminarán de la base activa. Una copia privada permite recuperación durante {plan.recoveryDays} días.</p><label className="ciclo-campo">Escribe ELIMINAR PRUEBAS<input value={frase} disabled={ocupado} onChange={e => setFrase(e.target.value)} autoComplete="off" /></label><button className="pnl-btn peligro" disabled={ocupado || frase !== 'ELIMINAR PRUEBAS'} onClick={limpiar}>Eliminar las pruebas del plan</button></>}
@@ -185,13 +191,13 @@ export default function AdminCicloDatos() {
         {recibo && <div className="ciclo-plan" aria-label="Comprobante de limpieza"><p>{estadoTrabajo(recibo.status)}</p>
           {enTrabajo ? <p>El trabajo sigue en el servidor. El resultado se comprueba aparte al terminar.</p> : recibo.status === 'blocked' ? <p role="alert">{falloTrabajo(recibo.failureCode)}</p> : <>
             <p>Completada: {recibo.completedAt ? new Date(recibo.completedAt).toLocaleString('es-VE') : 'Pendiente de comprobar'} · Registros presentes: {recibo.remaining ?? 'Pendiente'}</p>
-            {(recibo.counts ?? []).map(c => <p key={c.family}>{familia(c.family)} eliminados: {c.count}</p>)}
+            {(recibo.counts ?? []).map(c => <p key={c.family}>{familia(c.family)}: {c.count}</p>)}
             <p>{recibo.recoveryAvailable ? 'Copia privada de recuperación disponible dentro de su plazo.' : 'La ventana de recuperación ya terminó.'}</p></>}</div>}
       </section>
       <section className="ciclo-seccion"><h2>Retención de telemetría</h2><p>Inicialmente seis meses. Aumentar el plazo no recupera datos ya expirados. Los pagos, documentos y la auditoría tienen reglas propias.</p>
         <p>{politica ? `Última política registrada: ${politica.calendarMonths} meses.` : 'Todavía no hay una política registrada para esta empresa.'}</p>
         <label className="ciclo-campo">Meses<select value={meses} disabled={ocupado} onChange={e => setMeses(Number(e.target.value))}><option value={6}>6 meses</option>{politica && <option value={3}>3 meses</option>}</select></label>
-        <button type="button" className="pnl-btn" disabled={ocupado || !motivoValido || ciclo.estado !== 'ok'} onClick={guardarPolitica}>Guardar política</button>
+        <button type="button" className="pnl-btn" disabled={ocupado || soloHistorico || !motivoValido || ciclo.estado !== 'ok'} onClick={guardarPolitica}>Guardar política</button>
       </section>
     </>}
     {dialogo}

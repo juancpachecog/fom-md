@@ -7,10 +7,11 @@ const tenant = '11111111-1111-4111-8111-111111111111'
 const vehicle = '33333333-3333-4333-8333-333333333333'
 const user = '55555555-5555-4555-8555-555555555555'
 const planId = '66666666-6666-4666-8666-666666666666'
-const state = { candidates: [{ type: 'vehicle', id: vehicle, label: 'Vehículo SINTÉTICO', status: 'active' },
+const empresaCompleta = new URLSearchParams(location.search).get('empresa') === '1'
+const state = { candidates: empresaCompleta ? [{ type: 'tenant', id: tenant, label: 'Empresa SINTÉTICA', status: 'active' }] : [{ type: 'vehicle', id: vehicle, label: 'Vehículo SINTÉTICO', status: 'active' },
   { type: 'user', id: user, label: 'Usuario SINTÉTICO', status: 'revoked' }], sets: [], policies: [],
   stats: { reads: 0, setRequests: 0, sets: 0, retired: 0, cleaned: 0, receiptReads: 0, jobPosts: 0, queued: 0 }, failRead: true, failCreate: true,
-  failCleanupResponse: true, receipt: null, pending: false }
+  failCleanupResponse: true, receipt: null, pending: false, deletedCompany: false }
 let renderStats = () => {}
 const response = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } })
 
@@ -62,9 +63,10 @@ globalThis.fetch = async (url, options = {}) => {
       state.stats.cleaned++
       const ids = new Set(state.sets[0]?.entities.map(item => item.id))
       state.candidates = state.candidates.filter(item => !ids.has(item.id))
+      if (empresaCompleta && ids.has(tenant)) state.deletedCompany = true
       state.pending = false; state.sets[0].cleanupStatus = 'completed'
       state.receipt = { planId, jobId: planId, status: 'verified', remaining: 0, recoveryAvailable: true,
-        completedAt: new Date().toISOString(), counts: [{ family: 'vehicles', count: 1 }, { family: 'users', count: 1 }] }
+        completedAt: new Date().toISOString(), counts: empresaCompleta ? [{ family: 'tenants', count: 1 }] : [{ family: 'vehicles', count: 1 }, { family: 'users', count: 1 }] }
       renderStats({ ...state.stats })
     }, 3_000)
     renderStats({ ...state.stats })
@@ -81,13 +83,18 @@ globalThis.fetch = async (url, options = {}) => {
     state.policies.push({ ...body, version: body.expectedVersion + 1 })
     return finish({ id: planId })
   }
-  if (path.includes('/lifecycle/tenants/') || path.endsWith('/lifecycle/global')) return finish({ policies: state.policies, testSets: state.sets, purgeEnabled: false })
+  if (path.includes('/lifecycle/tenants/') || path.endsWith('/lifecycle/global')) {
+    const global = path.endsWith('/lifecycle/global')
+    return finish({ policies: state.policies, testSets: global ? [] : state.sets, purgeEnabled: false,
+      historicalOnly: !global && state.deletedCompany,
+      historicalScopes: global && state.deletedCompany ? [{ id: tenant, reason: state.sets[0].reason, lastActivityAt: state.receipt.completedAt }] : [] })
+  }
   // El componente de esta prueba no requiere una sesión nominal.
   return response({ message: 'Synthetic route not configured' }, 404)
 }
 
 const { default: repo } = await import('../../../src/panel/datos/repo')
-repo.admin.empresas.listar = async () => [{ id: tenant, nombre: 'Empresa SINTÉTICA' }]
+repo.admin.empresas.listar = async () => state.deletedCompany ? [] : [{ id: tenant, nombre: 'Empresa SINTÉTICA' }]
 const { default: AdminCicloDatos } = await import('../../../src/panel/modulos/AdminCicloDatos')
 
 function Fixture() {
