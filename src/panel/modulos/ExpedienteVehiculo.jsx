@@ -348,7 +348,7 @@ export default function ExpedienteVehiculo() {
   const [parteVista, setParteVista] = useState('resumen')
   const saltando = useRef(null)
 
-  const { datos: v, estado, error, recargar } = useDatos(() => repo.vehiculos.obtener(id), [id])
+  const { datos: v, estado, error, recargar } = useDatos(() => repo.vehiculos.obtener(id), [id], 30_000)
   const areas = useDatos(() => repo.areas(), [])
   const conductores = useDatos(() => repo.personal.listar({ soloConductores: true }), [])
 
