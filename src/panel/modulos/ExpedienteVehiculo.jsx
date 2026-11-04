@@ -652,7 +652,7 @@ export default function ExpedienteVehiculo() {
                   <Datos
                     items={[
                       { etiqueta: 'Temperatura del motor', valor: v.tempMotorC == null ? 'Sin dato' : `${v.tempMotorC} °C` },
-                      { etiqueta: 'Velocidad actual', valor: f.velocidad(v.velocidadKmh) },
+                      { etiqueta: 'Velocidad actual', valor: v.velocidadKmh == null ? 'Sin dato' : f.velocidad(v.velocidadKmh) },
                       { etiqueta: 'Estado', valor: etiqueta('marcha_estado', v.estadoMarcha) },
                       { etiqueta: 'Kilometraje', valor: f.km(v.km) },
                       { etiqueta: 'Ubicación', valor: v.ubicacionTexto || (Number.isFinite(v.lat) && Number.isFinite(v.lng) ? `${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}` : 'Sin posición') },

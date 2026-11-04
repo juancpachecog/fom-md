@@ -7,6 +7,7 @@ import FotoUnidad from './FotoUnidad'
 import { PastillaConductor } from './ManejoConductor'
 import { useSesion } from '../useSesion'
 import { esGestor } from '../roles'
+import { locationStatus } from '../meitrack/location-status.js'
 import '../../styles/fleet-map.css'
 export { estadoUnidad } from '../datos/estadoUnidad'
 
@@ -45,6 +46,7 @@ export default function FichaUnidad({ unidad, variante = 'panel', conCabecera = 
   if (!v) return null
   const estado = estadoUnidad(v)
   const sinSenal = estado.clave === 'sin_senal'
+  const ubicacionGps = v.ubicacionGps ? locationStatus(v.ubicacionGps) : null
   const ultimo = sinSenal ? textoUltimoReporte(v.ultimoReporte) : null
   const descripcion = [v.alias, [v.marca, v.modelo, v.anio].filter(Boolean).join(' ')].filter(Boolean).join(' · ')
   const extras = datosDe(v).filter(([k]) => !['Velocidad', 'Última señal', 'Conductor', 'Ubicación', 'Odómetro'].includes(k))
@@ -64,6 +66,7 @@ export default function FichaUnidad({ unidad, variante = 'panel', conCabecera = 
     <div className="fleet-card-content">
     <span className={`fleet-status ${estado.color}`}><i />{sinSenal ? textoSinSenal(v.ultimoReporte, ahora) : estado.texto}</span>
     {ultimo && <small className="fleet-status-nota">{ultimo}</small>}
+    {ubicacionGps && !ubicacionGps.available && <div role="status" className="fleet-status-nota"><strong>{ubicacionGps.title}</strong><p>{ubicacionGps.detail}</p></div>}
     <h3 className="fleet-plate">{v.placa || 'Sin placa'}</h3>
     {descripcion && <p className="fleet-description">{descripcion}</p>}
     <FotoUnidad key={v.id} unidad={v} puedeEditar={puedeEditar} />
