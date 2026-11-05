@@ -136,6 +136,7 @@ try:
 except Exception as e:
  receipt['failureType']=type(e).__name__
  if changed:
+  restoring=True
   try:
    assert sha(site)==NEW
    write_config(old);command(['nginx','-t']);command(['systemctl','reload','nginx'])
