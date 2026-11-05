@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { entrarEmpresa } from '../auth'
 import repo, { DIRECTORIO_REAL } from '../datos/repo'
 import { useDatos } from '../useDatos'
@@ -114,6 +114,7 @@ export default function AdminEmpresas() {
         titulo="Empresas"
         bajada="Elige una empresa para gestionar su operación, sus usuarios y su flota."
       >
+        <Link className="pnl-btn" to="/panel/admin/ciclo-datos">Retirada y limpieza</Link>
         <button type="button" className="pnl-btn primario" disabled={ocupado || entrando} onClick={() => setCreando(true)}>
           <Icono nombre="mas" tam={16} />
           Nueva empresa

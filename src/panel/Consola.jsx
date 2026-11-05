@@ -40,6 +40,7 @@ const CARGADORES = {
   Documentos: () => import('./modulos/Documentos'),
   Reportes: () => import('./modulos/Reportes'),
   AdminEmpresas: () => import('./modulos/AdminEmpresas'),
+  AdminCicloDatos: () => import('./modulos/AdminCicloDatos'),
   AdminPagos: () => import('./modulos/AdminPagos'),
   AdminGps: () => import('./modulos/AdminGps'),
   AdminUsuarios: () => import('./modulos/AdminUsuarios'),
@@ -85,12 +86,13 @@ const Jornadas = lazy(CARGADORES.Jornadas)
 const Transferencias = lazy(CARGADORES.Transferencias)
 const Plataforma = lazy(CARGADORES.Plataforma)
 const AdminVehiculos = lazy(CARGADORES.AdminVehiculos)
+const AdminCicloDatos = lazy(CARGADORES.AdminCicloDatos)
 
 /**
  * Qué módulo(s) pide cada ruta. Sirve para empezar a bajar la pantalla antes de
  * que se pinte (al abrir el enlace, o al pasar el dedo/ratón por el menú).
  */
-const MODULOS_ADMIN = { empresas: 'AdminEmpresas', plataforma: 'Plataforma', vehiculos: 'AdminVehiculos', transferencias: 'Transferencias', pagos: 'AdminPagos', gps: 'AdminGps', auditoria: 'AdminAuditoria', usuarios: 'AdminUsuarios' }
+const MODULOS_ADMIN = { empresas: 'AdminEmpresas', 'ciclo-datos': 'AdminCicloDatos', plataforma: 'Plataforma', vehiculos: 'AdminVehiculos', transferencias: 'Transferencias', pagos: 'AdminPagos', gps: 'AdminGps', auditoria: 'AdminAuditoria', usuarios: 'AdminUsuarios' }
 function modulosDeRuta(pathname, area) {
   const [tramo = '', sub] = pathname.replace(/^\/panel\/?/u, '').replace(/\/+$/u, '').split('/')
   const conductor = area === 'conductor'
@@ -203,6 +205,7 @@ const MENU_ADMIN = {
   grupo: 'Administración FOM',
   items: [
     { a: '/panel/admin/empresas', icono: 'empresa', texto: 'Empresas' },
+    { a: '/panel/admin/ciclo-datos', icono: 'auditoria', texto: 'Retirada y limpieza' },
     { a: '/panel/admin/plataforma', icono: 'buscar', texto: 'Usuarios generales' },
     { a: '/panel/admin/vehiculos', icono: 'camion', texto: 'Vehículos generales' },
     { a: '/panel/admin/transferencias', icono: 'comparar', texto: 'Transferencias' },
@@ -552,6 +555,7 @@ export default function Consola() {
           {esAdminFom(perfil) && (
             <>
               <Route path="admin/empresas" element={<AdminEmpresas />} />
+              <Route path="admin/ciclo-datos" element={<AdminCicloDatos />} />
               <Route path="admin/plataforma" element={<Plataforma />} />
               <Route path="admin/vehiculos" element={<AdminVehiculos />} />
               <Route path="admin/transferencias" element={<Transferencias />} />
