@@ -16,6 +16,7 @@ import * as f from '../datos/formato'
 import './admin-gps.css'
 import { locationStatus } from '../meitrack/location-status.js'
 import FuncionesInstalacion from './FuncionesInstalacion'
+import ComandosInstalacion from './ComandosInstalacion'
 
 // ============================================================
 // DETALLE Y DIAGNÓSTICO DEL EQUIPO (T-95, tablero GW5)
@@ -81,7 +82,7 @@ export default function AdminGpsDetalle() {
       />
 
       <div className="gp-tabs" role="tablist" aria-label="Partes del equipo">
-        {[['diagnostico', 'Diagnóstico'], ['datos', 'Datos del equipo'], ['funciones', 'Funciones y sensores'], ['historial', 'Historial']].map(([clave, texto]) => (
+        {[['diagnostico', 'Diagnóstico'], ['datos', 'Datos del equipo'], ['funciones', 'Funciones y sensores'], ['comandos', 'Comandos'], ['historial', 'Historial']].map(([clave, texto]) => (
           <button key={clave} type="button" role="tab" id={`gp-tab-${clave}`} aria-controls={`gp-panel-${clave}`} aria-selected={pestana === clave} className="gp-tab" onClick={() => setPestana(clave)}>{texto}</button>
         ))}
       </div>
@@ -97,6 +98,7 @@ export default function AdminGpsDetalle() {
         )}
         {pestana === 'historial' && <Historial g={g} posiciones={posiciones} />}
         {pestana === 'funciones' && (g.instalacionId ? <FuncionesInstalacion assignmentId={g.instalacionId} protocolFamily={g.protocolo}/> : <p>Instala el equipo en un vehículo para configurar sus funciones.</p>)}
+        {pestana === 'comandos' && (g.instalacionId ? <ComandosInstalacion key={g.instalacionId} assignmentId={g.instalacionId}/> : <p>Instala el equipo en un vehículo para consultar sus comandos.</p>)}
       </div>
 
       <VentanaDesmontar
