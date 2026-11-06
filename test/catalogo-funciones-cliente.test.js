@@ -43,3 +43,10 @@ test('etiqueta no lleva medición y números incompletos no se convierten en cer
   const d = api.cuerpoDefinicion({ ...form, category: 'variable', kind: 'numeric' }, null).definition
   assert.equal(d.dimension, 'temperature'); assert.equal(d.unit, 'celsius')
 })
+test('empresa seleccionada viaja explícita y no consulta el catálogo propio', async () => {
+  const old=globalThis.fetch,calls=[]
+  globalThis.fetch=async url=>{calls.push(url);return new Response(JSON.stringify({items:[],total:0}),{status:200,headers:{'content-type':'application/json'}})}
+  api.fijarEmpresaGestion(id)
+  try { await api.listarDefiniciones(); assert.match(calls[0],new RegExp(`/tenants/${id}/gps-managed-catalog`)) }
+  finally { api.fijarEmpresaGestion(null);globalThis.fetch=old }
+})
