@@ -42,6 +42,7 @@ const CARGADORES = {
   AdminEmpresas: () => import('./modulos/AdminEmpresas'),
   AdminCicloDatos: () => import('./modulos/AdminCicloDatos'),
   AdminPagos: () => import('./modulos/AdminPagos'),
+  CatalogoFunciones: () => import('./modulos/CatalogoFunciones'),
   AdminGps: () => import('./modulos/AdminGps'),
   AdminUsuarios: () => import('./modulos/AdminUsuarios'),
   AdminAuditoria: () => import('./modulos/AdminAuditoria'),
@@ -71,6 +72,7 @@ const Documentos = lazy(CARGADORES.Documentos)
 const Reportes = lazy(CARGADORES.Reportes)
 const AdminEmpresas = lazy(CARGADORES.AdminEmpresas)
 const AdminPagos = lazy(CARGADORES.AdminPagos)
+const CatalogoFunciones = lazy(CARGADORES.CatalogoFunciones)
 const AdminGps = lazy(CARGADORES.AdminGps)
 const AdminUsuarios = lazy(CARGADORES.AdminUsuarios)
 const AdminAuditoria = lazy(CARGADORES.AdminAuditoria)
@@ -92,7 +94,7 @@ const AdminCicloDatos = lazy(CARGADORES.AdminCicloDatos)
  * Qué módulo(s) pide cada ruta. Sirve para empezar a bajar la pantalla antes de
  * que se pinte (al abrir el enlace, o al pasar el dedo/ratón por el menú).
  */
-const MODULOS_ADMIN = { empresas: 'AdminEmpresas', 'ciclo-datos': 'AdminCicloDatos', plataforma: 'Plataforma', vehiculos: 'AdminVehiculos', transferencias: 'Transferencias', pagos: 'AdminPagos', gps: 'AdminGps', auditoria: 'AdminAuditoria', usuarios: 'AdminUsuarios' }
+const MODULOS_ADMIN = { funciones: 'CatalogoFunciones', empresas: 'AdminEmpresas', 'ciclo-datos': 'AdminCicloDatos', plataforma: 'Plataforma', vehiculos: 'AdminVehiculos', transferencias: 'Transferencias', pagos: 'AdminPagos', gps: 'AdminGps', auditoria: 'AdminAuditoria', usuarios: 'AdminUsuarios' }
 function modulosDeRuta(pathname, area) {
   const [tramo = '', sub] = pathname.replace(/^\/panel\/?/u, '').replace(/\/+$/u, '').split('/')
   const conductor = area === 'conductor'
@@ -210,6 +212,7 @@ const MENU_ADMIN = {
     { a: '/panel/admin/vehiculos', icono: 'camion', texto: 'Vehículos generales' },
     { a: '/panel/admin/transferencias', icono: 'comparar', texto: 'Transferencias' },
     { a: '/panel/admin/pagos', icono: 'costos', texto: 'Facturación' },
+    { a: '/panel/admin/funciones', icono: 'pin', texto: 'Variables y etiquetas' },
     { a: '/panel/admin/gps', icono: 'pin', texto: 'Inventario GPS' },
     { a: '/panel/admin/auditoria', icono: 'auditoria', texto: 'Auditoría' },
   ],
@@ -560,6 +563,7 @@ export default function Consola() {
               <Route path="admin/vehiculos" element={<AdminVehiculos />} />
               <Route path="admin/transferencias" element={<Transferencias />} />
               <Route path="admin/pagos" element={<AdminPagos />} />
+              <Route path="admin/funciones" element={<CatalogoFunciones />} />
               <Route path="admin/gps/*" element={<AdminGps />} />
               <Route path="admin/auditoria" element={<AdminAuditoria />} />
             </>
