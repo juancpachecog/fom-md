@@ -13,3 +13,25 @@ test('panel de comandos consulta bloqueos y rechaza habilitación no esperada; n
   assert.equal(api.motivoBloqueoComando('unknown'),'Requisito pendiente de validación')
  }finally{globalThis.fetch=old}
 })
+test('contrato v2 permite solicitud sólo con elegibilidad explícita y consulta independiente después de cada escritura',async()=>{
+ const id='11111111-1111-4111-8111-111111111111',requestId='22222222-2222-4222-8222-222222222222',key='33333333-3333-4333-8333-333333333333',old=globalThis.fetch,calls=[]
+ let state='requested',version=1
+ globalThis.fetch=async(url,o)=>{
+  calls.push({url,o});const path=String(url)
+  if(path.endsWith('/commands'))return new Response(JSON.stringify({assignmentId:id,contractVersion:2,readOnly:false,items:[{key:'device.status.read',instance:1,requestAllowed:true,dispatchAllowed:false,blockers:[]}]}),{status:200})
+  if(o.method==='POST'&&path.endsWith('/confirm')){state='validated';version=2}
+  return new Response(JSON.stringify({assignmentId:id,requestId,commandKey:'device.status.read',instance:1,state,version,events:[],canConfirm:state==='requested'}),{status:200})
+ }
+ try{
+  assert.equal((await api.leerComandosInstalacion(id)).items[0].requestAllowed,true)
+  const created=await api.crearSolicitudComando(id,{commandKey:'device.status.read',instance:1,expectedInstallationVersion:1,expiresInSeconds:60,reason:'Consulta sintética'},key)
+  assert.equal(created.requestId,requestId);assert.equal(calls.at(-2).o.headers['idempotency-key'],key);assert.equal(calls.at(-1).o.method,'GET');assert.ok(calls.at(-1).o.signal)
+  assert.equal((await api.confirmarSolicitudComando(id,requestId,{expectedVersion:1,confirmationPhrase:'CONFIRMAR 22222222'})).state,'validated')
+  assert.equal(calls.at(-1).o.method,'GET');assert.equal(calls.filter(c=>c.o.method==='POST').length,2)
+ }finally{globalThis.fetch=old}
+})
+test('recibo sin readback no acredita la solicitud y no dispara reintento automático',async()=>{
+ const id='11111111-1111-4111-8111-111111111111',requestId='22222222-2222-4222-8222-222222222222',old=globalThis.fetch;let posts=0
+ globalThis.fetch=async(url,o)=>{if(o.method==='POST'){posts++;return new Response(JSON.stringify({requestId,version:1,commandKey:'device.status.read',instance:1}),{status:200})}return new Response(JSON.stringify({message:'No disponible'}),{status:503})}
+ try{await assert.rejects(()=>api.crearSolicitudComando(id,{},'33333333-3333-4333-8333-333333333333'));assert.equal(posts,1)}finally{globalThis.fetch=old}
+})
