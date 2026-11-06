@@ -4,6 +4,11 @@ const consultar=(url,options={})=>pedir(url,{...options,empresaContexto:null})
 const uuid=id=>{if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(id||''))throw new Error('Registro inválido.');return id}
 const base=id=>`/api/v1/console/gps-installations/${uuid(id)}/managed-variables`
 export const leerVariablesInstalacion=id=>consultar(base(id))
+export function historialVinculoVariable(assignment,entry,instance,beforeVersion){
+ if(!Number.isSafeInteger(instance)||instance<1||instance>32||
+  (beforeVersion!==undefined&&(!Number.isSafeInteger(beforeVersion)||beforeVersion<1||beforeVersion>2147483647)))throw new Error('Página de historial inválida.')
+ return consultar(`${base(assignment)}/${uuid(entry)}/${instance}/history${beforeVersion===undefined?'':`?beforeVersion=${beforeVersion}`}`)
+}
 export async function listarVariablesEmpresa(empresa){
  const items=[]
  for(let offset=0;offset<1000;offset+=25){

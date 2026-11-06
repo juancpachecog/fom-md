@@ -20,3 +20,14 @@ test('POST de vínculo exige recibo y readback; no crea observaciones ni comando
   :{assignmentId:id,items:[{entryId:entry,instance:1,version:1}]}),{status:200})}
  try{await api.guardarVinculoVariable(id,entry,{instance:1},token);assert.equal(calls.length,2);assert.equal(calls[0].o.headers['idempotency-key'],token);assert.equal(calls[1].o.method,'GET');assert.match(calls[0].url,/managed-variables/)}finally{globalThis.fetch=old}
 })
+test('historial usa cursor de versión y nunca recibe tenant del formulario',async()=>{
+ const old=globalThis.fetch,calls=[]
+ globalThis.fetch=async(url,o)=>{calls.push({url,o});return new Response(JSON.stringify({items:[],nextBeforeVersion:null}),{status:200})}
+ try{
+  await api.historialVinculoVariable(id,entry,1,20)
+  assert.match(calls[0].url,/\/1\/history\?beforeVersion=20$/);assert.equal(calls[0].o.method,'GET')
+  assert.throws(()=>api.historialVinculoVariable(id,entry,0),/inválida/)
+  assert.throws(()=>api.historialVinculoVariable(id,entry,1,0),/inválida/)
+  assert.equal(calls.length,1)
+ }finally{globalThis.fetch=old}
+})

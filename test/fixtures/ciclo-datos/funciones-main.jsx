@@ -10,20 +10,21 @@ let state={assignmentId:assignment,isCurrent:true,installationVersion:0,profileI
 const entry='22222222-2222-4222-8222-222222222222'
 const variable={id:entry,key:'contacto_prueba',category:'variable',name:'Contacto de prueba',status:'active',version:1,definitionVersion:1,
  definition:{semanticKey:'contacto_prueba',version:1,kind:'boolean',unit:'none',maxInstances:1,direction:'observation',risk:'low'}}
-let aliases=[]
+let aliases=[],aliasHistory=[]
 const response=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json'}})
 globalThis.fetch=async(url,options={})=>{
  const u=new URL(String(url),location.origin),method=options.method||'GET'
  if(!u.pathname.startsWith('/fixture-api/api/v1/console/'))throw Error('Synthetic fixture rejects other network access')
  if(u.pathname.endsWith('/gps-managed-catalog'))return response({items:[variable],total:1,limit:25,offset:0})
  if(u.pathname.endsWith('/managed-variables'))return response({assignmentId:assignment,tenantId:assignment,items:aliases})
+ if(u.pathname.endsWith('/managed-variables/'+entry+'/1/history'))return response({assignmentId:assignment,entryId:entry,instance:1,items:aliasHistory.filter(r=>!u.searchParams.has('beforeVersion')||r.version<Number(u.searchParams.get('beforeVersion'))),nextBeforeVersion:null})
  if(u.pathname.endsWith('/managed-variables/'+entry)&&method==='POST'){
   const body=JSON.parse(options.body),old=aliases.find(a=>a.entryId===entry&&a.instance===body.instance)
   if(body.expectedVersion!==(old?.version||0))return response({message:'Version conflict'},409)
   const item={entryId:entry,key:variable.key,name:variable.name,status:'active',instance:body.instance,version:body.expectedVersion+1,definitionVersion:1,
    sourceFunctionId:body.sourceFunctionId,sourceMappingCurrent:true,mapping:body,effectiveFrom:new Date().toISOString(),
    projection:{observation:{status:'valid',value:false},sourceObservationId:'33333333-3333-4333-8333-333333333333',freshness:'unknown',enabled:false,verification:'pending',usable:false}}
-  aliases=[item];return response({assignmentId:assignment,entryId:entry,instance:body.instance,version:item.version,replayed:false})
+  aliases=[item];aliasHistory.unshift({...body,version:item.version,effectiveFrom:item.effectiveFrom});return response({assignmentId:assignment,entryId:entry,instance:body.instance,version:item.version,replayed:false})
  }
  if(u.pathname.endsWith('/gps-capability-catalog'))return response({items:[profile],page:{limit:50,offset:0,count:1,total:1}})
  if(u.pathname.endsWith('/versions/1'))return response(profile)
