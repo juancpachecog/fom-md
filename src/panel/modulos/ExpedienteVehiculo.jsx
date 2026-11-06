@@ -19,6 +19,7 @@ import { ArchivosDeDocumento, ModalNuevoDocumento } from './Documentos'
 import FotoUnidad from '../comp/FotoUnidad'
 import FichaDatosUnidad from './FichaDatosUnidad'
 import UsuariosUnidad from './UsuariosUnidad'
+import EtiquetasVehiculo from './EtiquetasVehiculo'
 import { FranjaFichaMovil, UbicacionUnidadMovil, textoRecorridoHoy, useHoyDeUnidad } from './FichaUnidadMovil'
 import { useMinuto } from '../datos/sinSenal'
 import * as f from '../datos/formato'
@@ -630,7 +631,7 @@ export default function ExpedienteVehiculo() {
               unidad={v} areas={areas} puedeEditar={esGestor(sesion?.perfil)} cambiarArea={cambiarArea}
               guardandoArea={guardandoArea} errorArea={errorArea} guardado={guardado}
               verUsuarios={() => irAParte('usuarios')}
-            /></Parte>}
+            />{esGestor(sesion?.perfil)&&<EtiquetasVehiculo key={v.id} vehicleId={v.id}/>}</Parte>}
 
             {/* ---------------- Telemetría ---------------- */}
             {ver('telemetria') && (

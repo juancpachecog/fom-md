@@ -50,7 +50,7 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
   return <section className="gp-card catalogo-funciones">
     <h2>Funciones de esta instalación</h2>
     <p>Contacto, motor en marcha y movimiento son señales diferentes. Seleccionar una función no envía comandos ni certifica su cableado.</p>
-    <Link className="pnl-btn" to="/panel/admin/funciones">Administrar variables y etiquetas</Link>
+    <Link className="pnl-btn" to="/panel/funciones">Administrar variables y etiquetas</Link>
     {error && <p role="alert" className="cf-error">{error}</p>}{message && <p role="status">{message}</p>}
     <div className="cf-scroll"><table><thead><tr><th>Función</th><th>Último valor</th><th>Vigencia</th><th>Verificación</th><th>Estado</th><th>Historial</th></tr></thead>
       <tbody>{current.datos?.items.map(item => <tr key={item.functionId}><td>{nombreFuncion(item.semanticKey)} · {item.instance}</td><td>{valorFuncion(item.lastObservation)} {item.lastObservation && item.unit !== 'none' ? item.unit : ''}</td><td>{({ fresh: 'Reciente', stale: 'Vencida', unknown: 'Sin calificar', missing: 'Sin dato' })[item.freshness] || 'Sin dato'}</td><td>{({ pass: 'Prueba registrada', fail: 'Prueba fallida', pending: 'Pendiente', not_started: 'Sin prueba' })[item.verification] || 'Pendiente'}</td><td>{item.enabled ? 'Habilitada' : 'Sin habilitar'}</td><td><button className="pnl-btn" disabled={busy} onClick={() => viewHistory(item)}>Ver muestras</button></td></tr>)}</tbody></table></div>

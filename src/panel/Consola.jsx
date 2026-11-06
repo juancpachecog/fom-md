@@ -115,6 +115,7 @@ function modulosDeRuta(pathname, area) {
     case 'reportes': return ['Reportes']
     case 'mi-perfil': return ['MiPerfil']
     case 'configuracion': return ['Configuracion']
+    case 'funciones': return ['CatalogoFunciones']
     case 'admin': return MODULOS_ADMIN[sub] ? [MODULOS_ADMIN[sub]] : []
     default: return []
   }
@@ -183,6 +184,7 @@ const MENU = [
     grupo: 'Flota',
     items: [
       { a: '/panel/flota', icono: 'camion', texto: 'Vehículos' },
+      { a: '/panel/funciones', icono: 'pin', texto: 'Variables y etiquetas', soloGestor: true },
       { a: '/panel/jornadas', icono: 'reloj', texto: 'Jornadas' },
       { a: '/panel/mantenimiento', icono: 'llave', texto: 'Mantenimiento', fin: true },
       { a: '/panel/inspecciones', icono: 'check', texto: 'Inspecciones', fin: true },
@@ -268,7 +270,7 @@ const MENU_POR_AREA = {
 /** Rutas alcanzables por area. Todo lo que no este aqui vuelve al inicio. */
 const RUTAS_POR_AREA = {
   admin: null, // todas
-  operativo: ['', 'mapa', 'alertas', 'seguridad', 'flota', 'jornadas', 'mantenimiento', 'inspecciones', 'documentos', 'personal', 'reportes'],
+  operativo: ['', 'mapa', 'alertas', 'seguridad', 'flota', 'funciones', 'jornadas', 'mantenimiento', 'inspecciones', 'documentos', 'personal', 'reportes'],
   gerencial: ['personal', 'reportes'],
   // Más el SOS y otra unidad con PIN (T-167b), que se abren desde Mi unidad y Mi perfil.
   conductor: ['', 'inspeccion', 'mapa', 'alertas', 'mantenimiento'].concat(['sos', 'otra-unidad']),
@@ -290,9 +292,10 @@ function inicioDe(area) {
 
 /** El menú de esta persona: el mismo para el lateral y para el teléfono. */
 function menuDe(perfil) {
-  return esAdminFom(perfil) && perfil.empresaGestion
+  const menu = esAdminFom(perfil) && perfil.empresaGestion
     ? [MENU_ADMIN, ...MENU]
     : MENU_POR_AREA[areaDe(perfil)] ?? MENU_POR_AREA.conductor
+  return menu.map(g=>({...g,items:g.items.filter(item=>!item.soloGestor||esGestor(perfil))}))
 }
 
 function Lateral({ perfil, abierto, cerrar, sinLeer }) {
@@ -569,6 +572,7 @@ export default function Consola() {
             </>
           )}
           {esGestor(perfil) && <Route path="admin/usuarios" element={<AdminUsuarios />} />}
+          {esGestor(perfil) && <Route path="funciones" element={<CatalogoFunciones />} />}
           <Route path="*" element={<Navigate to="/panel" replace />} />
         </Routes>
         </Suspense>
