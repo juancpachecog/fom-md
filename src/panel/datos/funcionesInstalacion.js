@@ -27,6 +27,29 @@ export const historialFuncion = (id, functionId, now = new Date()) => {
   const query = new URLSearchParams({ from: new Date(now.getTime() - 86400000).toISOString(), to: now.toISOString(), limit: '50', offset: '0' })
   return consultar(`${BASE}/gps-installations/${uuid(id)}/functions/${functionId}/observations?${query}`)
 }
+export function muestrasPruebaFuncion(id,functionId,now=new Date()){
+  if(!/^[1-9][0-9]{0,9}-[1-9][0-9]?$/u.test(functionId))throw new Error('Función inválida.')
+  const query=new URLSearchParams({from:new Date(now.getTime()-900000).toISOString(),to:now.toISOString(),limit:'100',offset:'0'})
+  return consultar(`${BASE}/gps-installations/${uuid(id)}/functions/${functionId}/observations?${query}`)
+}
+export function cuerpoPruebaFuncion(form,samples){
+  const ids=[...form.observationIds].sort()
+  if(!['pass','fail'].includes(form.result)||ids.length>8||new Set(ids).size!==ids.length||
+    ids.some(id=>!samples.some(s=>s.observationId===id&&s.commissioningEligible===true)))throw new Error('Selecciona únicamente muestras elegibles de esta prueba (máximo ocho).')
+  if(form.result==='pass'&&(!form.inspectionAttested||!ids.length))throw new Error('Para registrar resultado conforme debes confirmar la inspección y seleccionar muestras elegibles.')
+  if(form.result==='fail'&&!['no_signal','unexpected_value','wiring_unconfirmed','interpretation_missing','test_interrupted'].includes(form.reasonCode))throw new Error('Indica el motivo del resultado no conforme.')
+  return{result:form.result,inspectionAttested:form.inspectionAttested===true,reasonCode:form.result==='pass'?null:form.reasonCode,observationIds:ids}
+}
+export async function registrarPruebaFuncion(id,functionId,body,token){
+  if(!/^[1-9][0-9]{0,9}-[1-9][0-9]?$/u.test(functionId))throw new Error('Función inválida.')
+  const path=`${BASE}/gps-installations/${uuid(id)}/functions/${functionId}/test-reports`
+  const receipt=await consultar(path,{metodo:'POST',cuerpo:body,idempotente:true,idempotencia:token})
+  const report=await consultar(`${path}/${uuid(receipt.reportId)}`)
+  if(report.reportId!==receipt.reportId||report.assignmentId!==id||report.functionId!==functionId||report.result!==body.result||
+    report.inspectionAttested!==body.inspectionAttested||report.reasonCode!==body.reasonCode||
+    JSON.stringify([...report.observationIds].sort())!==JSON.stringify([...body.observationIds].sort()))throw new Error('La prueba no quedó verificada. Consulta su resultado antes de repetirla.')
+  return report
+}
 export const nombreFuncion = key => ({ 'navigation.speed': 'Velocidad GPS', 'navigation.heading': 'Rumbo GPS',
   'ignition.acc': 'Contacto (ACC)', 'door.open': 'Puerta abierta', 'input.digital.active': 'Entrada digital activa',
   'input.voltage': 'Voltaje de entrada' })[key] || key

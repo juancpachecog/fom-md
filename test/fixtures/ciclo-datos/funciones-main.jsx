@@ -11,11 +11,18 @@ const entry='22222222-2222-4222-8222-222222222222'
 const variable={id:entry,key:'contacto_prueba',category:'variable',name:'Contacto de prueba',status:'active',version:1,definitionVersion:1,
  definition:{semanticKey:'contacto_prueba',version:1,kind:'boolean',unit:'none',maxInstances:1,direction:'observation',risk:'low'}}
 let aliases=[],aliasHistory=[]
+let report=null
 const response=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json'}})
 globalThis.fetch=async(url,options={})=>{
  const u=new URL(String(url),location.origin),method=options.method||'GET'
  if(!u.pathname.startsWith('/fixture-api/api/v1/console/'))throw Error('Synthetic fixture rejects other network access')
  if(u.pathname.endsWith('/gps-managed-catalog'))return response({items:[variable],total:1,limit:25,offset:0})
+ if(u.pathname.endsWith('/test-reports')&&method==='POST'){
+  const body=JSON.parse(options.body),functionId=u.pathname.split('/functions/')[1].split('/')[0]
+  report={reportId:'44444444-4444-4444-8444-444444444444',assignmentId:assignment,functionId,...body,source:'operator_report',recordedAt:new Date().toISOString()}
+  return response({...report,replayed:false})
+ }
+ if(u.pathname.endsWith('/test-reports/44444444-4444-4444-8444-444444444444'))return response(report)
  if(u.pathname.endsWith('/managed-variables'))return response({assignmentId:assignment,tenantId:assignment,items:aliases})
  if(u.pathname.endsWith('/managed-variables/'+entry+'/1/history'))return response({assignmentId:assignment,entryId:entry,instance:1,items:aliasHistory.filter(r=>!u.searchParams.has('beforeVersion')||r.version<Number(u.searchParams.get('beforeVersion'))),nextBeforeVersion:null})
  if(u.pathname.endsWith('/managed-variables/'+entry)&&method==='POST'){

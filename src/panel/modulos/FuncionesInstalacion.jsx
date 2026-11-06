@@ -6,6 +6,7 @@ import { leerFuncionesInstalacion, listarPerfilesFunciones, leerPerfilFunciones,
   historialFuncion, fuentesFuncion, nuevaFilaFuncion, nombreFuncion, valorFuncion } from '../datos/funcionesInstalacion'
 import './catalogo-funciones.css'
 import VariablesInstalacion from './VariablesInstalacion'
+import PruebaFuncion from './PruebaFuncion'
 
 export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
   const current = useDatos(() => leerFuncionesInstalacion(assignmentId), [assignmentId], 30000)
@@ -13,7 +14,8 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
   const [profileKey, setProfileKey] = useState(''), [profile, setProfile] = useState(null), [rows, setRows] = useState(null)
   const [version, setVersion] = useState(0), [error, setError] = useState(''), [message, setMessage] = useState(''), [history, setHistory] = useState(null)
   const [busy, setBusy] = useState(false), lock = useRef(false), pending = useRef(null)
-  useEffect(() => { setProfileKey(''); setProfile(null); setRows(null); setError(''); setHistory(null); pending.current = null }, [assignmentId])
+  const [testFunction,setTestFunction]=useState(null)
+  useEffect(() => { setProfileKey(''); setProfile(null); setRows(null); setError(''); setHistory(null); setTestFunction(null); pending.current = null }, [assignmentId])
   const edit = async (id, v) => {
     if (lock.current) return
     lock.current = true; setBusy(true); setError(''); setMessage('')
@@ -34,7 +36,7 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
       const fingerprint = JSON.stringify(body)
       if (!pending.current || pending.current.fingerprint !== fingerprint) pending.current = { fingerprint, token: crypto.randomUUID() }
       await guardarFuncionesInstalacion(assignmentId, body, pending.current.token)
-      setRows(null); setProfile(null); pending.current = null; setMessage('Mapeo guardado y consultado aparte. Las pruebas de funciones permanecen pendientes.')
+      setRows(null); setProfile(null); setTestFunction(null); pending.current = null; setMessage('Mapeo guardado y consultado aparte. Las pruebas de funciones permanecen pendientes.')
       await current.recargar()
     } catch (e) { setError(e.message || 'No se pudo guardar el mapeo.') } finally { lock.current = false; setBusy(false) }
   }
@@ -53,7 +55,8 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
     <Link className="pnl-btn" to="/panel/funciones">Administrar variables y etiquetas</Link>
     {error && <p role="alert" className="cf-error">{error}</p>}{message && <p role="status">{message}</p>}
     <div className="cf-scroll"><table><thead><tr><th>Función</th><th>Último valor</th><th>Vigencia</th><th>Verificación</th><th>Estado</th><th>Historial</th></tr></thead>
-      <tbody>{current.datos?.items.map(item => <tr key={item.functionId}><td>{nombreFuncion(item.semanticKey)} · {item.instance}</td><td>{valorFuncion(item.lastObservation)} {item.lastObservation && item.unit !== 'none' ? item.unit : ''}</td><td>{({ fresh: 'Reciente', stale: 'Vencida', unknown: 'Sin calificar', missing: 'Sin dato' })[item.freshness] || 'Sin dato'}</td><td>{({ pass: 'Prueba registrada', fail: 'Prueba fallida', pending: 'Pendiente', not_started: 'Sin prueba' })[item.verification] || 'Pendiente'}</td><td>{item.enabled ? 'Habilitada' : 'Sin habilitar'}</td><td><button className="pnl-btn" disabled={busy} onClick={() => viewHistory(item)}>Ver muestras</button></td></tr>)}</tbody></table></div>
+      <tbody>{current.datos?.items.map(item => <tr key={item.functionId}><td>{nombreFuncion(item.semanticKey)} · {item.instance}</td><td>{valorFuncion(item.lastObservation)} {item.lastObservation && item.unit !== 'none' ? item.unit : ''}</td><td>{({ fresh: 'Reciente', stale: 'Vencida', unknown: 'Sin calificar', missing: 'Sin dato' })[item.freshness] || 'Sin dato'}</td><td>{({ pass: 'Prueba registrada', fail: 'Prueba fallida', pending: 'Pendiente', not_started: 'Sin prueba' })[item.verification] || 'Pendiente'}</td><td>{item.enabled ? 'Habilitada' : 'Sin habilitar'}</td><td><button className="pnl-btn" disabled={busy} onClick={() => viewHistory(item)}>Ver muestras</button><button className="pnl-btn" disabled={busy||!current.datos.isCurrent||!item.selected} onClick={()=>setTestFunction(item)}>Registrar prueba</button></td></tr>)}</tbody></table></div>
+    {testFunction&&<PruebaFuncion key={`${assignmentId}:${testFunction.functionId}`} assignmentId={assignmentId} fn={testFunction} onClose={()=>setTestFunction(null)} onSaved={current.recargar}/>}
     {!current.datos?.items.length && <p>Esta instalación aún no tiene un mapeo de funciones.</p>}
     {profiles.error ? <ErrorCarga error={profiles.error} onReintentar={profiles.recargar}/> : <div className="cf-toolbar"><label>Perfil de compatibilidad<select disabled={busy || !current.datos?.isCurrent} value={profileKey} onChange={e => { const [id, v] = e.target.value.split('@'); if (id) edit(id, Number(v)) }}><option value="">Seleccionar perfil…</option>{compatible.map(p => <option key={`${p.profileId}@${p.profileVersion}`} value={`${p.profileId}@${p.profileVersion}`}>{p.manufacturer} · {p.model} · v{p.profileVersion}</option>)}</select></label>
       {current.datos?.profileId && <button className="pnl-btn" disabled={busy || !current.datos.isCurrent} onClick={() => edit(current.datos.profileId, current.datos.profileVersion)}>Editar mapeo actual</button>}
