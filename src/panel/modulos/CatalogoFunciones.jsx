@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDatos } from '../useDatos'
 import { Cabecera, Cargando, ErrorCarga } from '../comp/ui'
+import { empresaGestionActualId } from '../datos/api'
 import { listarDefiniciones, leerDefinicion, historiaDefinicion, guardarDefinicion,
   cuerpoDefinicion, formularioDefinicion, UNIDADES_FUNCIONES } from '../datos/catalogoFunciones'
 import './catalogo-funciones.css'
@@ -10,7 +11,11 @@ export default function CatalogoFunciones() {
   const [selected, setSelected] = useState(null), [form, setForm] = useState(null), [history, setHistory] = useState(null)
   const [error, setError] = useState(''), [success, setSuccess] = useState(''), [busy, setBusy] = useState(false)
   const lock = useRef(false), pending = useRef(null)
-  const data = useDatos(() => listarDefiniciones({ category, status, offset }), [category, status, offset])
+  const empresa = empresaGestionActualId()
+  const scope = useRef(empresa)
+  scope.current = empresa
+  const data = useDatos(() => listarDefiniciones({ category, status, offset }), [category, status, offset, empresa])
+  useEffect(() => { setSelected(null); setForm(null); setHistory(null); setError(''); setSuccess(''); setOffset(0); pending.current = null }, [empresa])
   const open = item => { setSelected(item); setForm(formularioDefinicion(item)); setHistory(null); setError(''); setSuccess(''); pending.current = null }
   const change = (key, value) => { setForm(f => ({ ...f, [key]: value })); pending.current = null }
   const save = async event => {
@@ -20,7 +25,9 @@ export default function CatalogoFunciones() {
     try {
       const body = cuerpoDefinicion(form, selected), fingerprint = JSON.stringify({ id: selected?.id, body })
       if (!pending.current || pending.current.fingerprint !== fingerprint) pending.current = { fingerprint, token: crypto.randomUUID() }
+      const initialScope = empresa
       const item = await guardarDefinicion(selected?.id, body, pending.current.token)
+      if (scope.current !== initialScope) return
       setSelected(item); setForm(formularioDefinicion(item)); pending.current = null
       setSuccess('Cambio guardado y comprobado.'); await data.recargar()
     } catch (e) { setError(e.message || 'No se pudo guardar. Comprueba el estado antes de reintentar.') }

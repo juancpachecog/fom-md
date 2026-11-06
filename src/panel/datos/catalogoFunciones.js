@@ -1,20 +1,24 @@
-import { pedir } from './api'
+import { pedir, empresaGestionActualId } from './api'
 
 const BASE = '/api/v1/console/gps-managed-catalog'
+const baseEmpresa = (empresa = empresaGestionActualId()) => empresa
+  ? `/api/v1/console/tenants/${idValido(empresa)}/gps-managed-catalog` : BASE
+const consultar = (ruta, opciones = {}) => pedir(ruta, { ...opciones, empresaContexto: null })
 const idValido = id => {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(id || '')) throw new Error('Selecciona una definición válida.')
   return id
 }
 export const listarDefiniciones = ({ category = 'all', status = 'all', offset = 0 } = {}) =>
-  pedir(`${BASE}?${new URLSearchParams({ category, status, offset: String(offset), limit: '25' })}`)
-export const leerDefinicion = id => pedir(`${BASE}/${idValido(id)}`)
-export const historiaDefinicion = id => pedir(`${BASE}/${idValido(id)}/history`)
+  consultar(`${baseEmpresa()}?${new URLSearchParams({ category, status, offset: String(offset), limit: '25' })}`)
+export const leerDefinicion = (id, empresa = empresaGestionActualId()) => consultar(`${baseEmpresa(empresa)}/${idValido(id)}`)
+export const historiaDefinicion = id => consultar(`${baseEmpresa()}/${idValido(id)}/history`)
 
 /** Preserve the caller's key after an uncertain response; never claim a write from a toast. */
 export async function guardarDefinicion(id, body, token) {
-  const receipt = await pedir(id ? `${BASE}/${idValido(id)}` : BASE,
+  const empresa = empresaGestionActualId(), base = baseEmpresa(empresa)
+  const receipt = await consultar(id ? `${base}/${idValido(id)}` : base,
     { metodo: id ? 'PUT' : 'POST', cuerpo: body, idempotente: true, idempotencia: token })
-  const current = await leerDefinicion(receipt.entryId)
+  const current = await leerDefinicion(receipt.entryId, empresa)
   const item = current?.items?.[0]
   if (!item || item.id !== receipt.entryId || item.version !== receipt.version
     || item.key !== body.key || item.name !== body.name.trim() || item.status !== body.status) {

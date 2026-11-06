@@ -50,3 +50,14 @@ test('empresa seleccionada viaja explícita y no consulta el catálogo propio', 
   try { await api.listarDefiniciones(); assert.match(calls[0],new RegExp(`/tenants/${id}/gps-managed-catalog`)) }
   finally { api.fijarEmpresaGestion(null);globalThis.fetch=old }
 })
+test('readback conserva la empresa inicial aunque cambie el contexto durante POST', async () => {
+  const old=globalThis.fetch,calls=[]
+  api.fijarEmpresaGestion(id)
+  const body={key:'puerta',name:'Puerta',status:'active'}
+  globalThis.fetch=async(url,options)=>{calls.push(url)
+    if(options.method==='POST'){api.fijarEmpresaGestion(token);return new Response(JSON.stringify({entryId:id,version:1}),{status:200})}
+    return new Response(JSON.stringify({items:[{id,version:1,...body}]}),{status:200})
+  }
+  try { await api.guardarDefinicion(null,body,token); assert.ok(calls.every(url=>url.includes(`/tenants/${id}/`))) }
+  finally {api.fijarEmpresaGestion(null);globalThis.fetch=old}
+})
