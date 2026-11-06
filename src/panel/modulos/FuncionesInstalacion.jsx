@@ -5,6 +5,7 @@ import { Cargando, ErrorCarga } from '../comp/ui'
 import { leerFuncionesInstalacion, listarPerfilesFunciones, leerPerfilFunciones, guardarFuncionesInstalacion,
   historialFuncion, fuentesFuncion, nuevaFilaFuncion, nombreFuncion, valorFuncion } from '../datos/funcionesInstalacion'
 import './catalogo-funciones.css'
+import VariablesInstalacion from './VariablesInstalacion'
 
 export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
   const current = useDatos(() => leerFuncionesInstalacion(assignmentId), [assignmentId], 30000)
@@ -78,5 +79,6 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
       </fieldset>
     </form>}
     {history && <section className="cf-editor"><h3>Muestras de {history.name} — últimas 24 horas</h3><p>Hasta cincuenta muestras. Un dato histórico no acredita el estado actual.</p>{history.data.items.map(item => <p key={item.observationId}>{valorFuncion(item)} · {item.observedAt || item.receivedAt} · {item.quality}</p>)}{!history.data.items.length && <p>No hay muestras en esta ventana.</p>}</section>}
+    <VariablesInstalacion key={assignmentId} assignmentId={assignmentId} sources={current.datos?.items||[]}/>
   </section>
 }

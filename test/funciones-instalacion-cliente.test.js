@@ -7,12 +7,13 @@ const code=bundle.output.find(x=>x.type==='chunk'&&x.isEntry).code
 const api=await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)
 const assignment='11111111-1111-4111-8111-111111111111',key='22222222-2222-4222-8222-222222222222'
 const fn={semanticKey:'door.open',definitionVersion:1,valueKind:'boolean',unit:'none',maxInstances:2,direction:'observation',requirements:[]}
-const profile={profileId:'synthetic',profileVersion:1,nativeChannels:[],resources:[{key:'d1',channel:'digital.1',kind:'digital',modes:['digital_input']},{key:'a1',channel:'analog.1',kind:'analog',modes:['analog_input']}],functions:[fn]}
+const profile={profileId:'synthetic',profileVersion:1,nativeChannels:[],resources:[{key:'d1',channel:'digital.1',kind:'digital',modes:['digital_input']},{key:'d2',channel:'digital.2',kind:'digital',modes:['digital_input']},{key:'a1',channel:'analog.1',kind:'analog',modes:['analog_input']}],functions:[fn]}
 test('mapeo ofrece fuentes declaradas compatibles, respeta instancias y no convierte ACC en motor',()=>{
- assert.equal(api.fuentesFuncion(profile,fn).length,1)
+ assert.equal(api.fuentesFuncion(profile,fn).length,2)
  assert.equal(api.nombreFuncion('ignition.acc'),'Contacto (ACC)')
  const first=api.nuevaFilaFuncion(profile,fn,[]),second=api.nuevaFilaFuncion(profile,fn,[first])
  assert.equal(first.mapping.instance,1);assert.equal(second.mapping.instance,2)
+ assert.notEqual(first.mapping.resourceKey,second.mapping.resourceKey)
  assert.equal(first.mapping.mode,'digital_input');assert.equal(first.mapping.polarity,'normal')
  assert.throws(()=>api.nuevaFilaFuncion(profile,fn,[first,second]),/máximo/)
  assert.throws(()=>api.nuevaFilaFuncion(profile,{...fn,direction:'command'},[]),/lectura/)

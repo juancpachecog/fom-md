@@ -8,8 +8,8 @@ const idValido = id => {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(id || '')) throw new Error('Selecciona una definición válida.')
   return id
 }
-export const listarDefiniciones = ({ category = 'all', status = 'all', offset = 0 } = {}) =>
-  consultar(`${baseEmpresa()}?${new URLSearchParams({ category, status, offset: String(offset), limit: '25' })}`)
+export const listarDefiniciones = ({ category = 'all', status = 'all', offset = 0 } = {}, empresa = empresaGestionActualId()) =>
+  consultar(`${baseEmpresa(empresa)}?${new URLSearchParams({ category, status, offset: String(offset), limit: '25' })}`)
 export const leerDefinicion = (id, empresa = empresaGestionActualId()) => consultar(`${baseEmpresa(empresa)}/${idValido(id)}`)
 export const historiaDefinicion = id => consultar(`${baseEmpresa()}/${idValido(id)}/history`)
 

@@ -40,12 +40,15 @@ export function fuentesFuncion(profile, fn) {
   return [...(fn.requirements.some(q => q.kind === 'io') ? [] : native), ...io]
 }
 export function nuevaFilaFuncion(profile, fn, rows) {
-  const source = fuentesFuncion(profile, fn)[0]
-  if (!source || fn.direction !== 'observation') throw new Error('El perfil no declara una fuente de lectura compatible.')
   const used = new Set(rows.filter(r => r.mapping.semanticKey === fn.semanticKey).map(r => r.mapping.instance))
   let instance = 1
   while (used.has(instance)) instance++
   if (instance > fn.maxInstances || rows.length >= 32) throw new Error('Se alcanzó el máximo de sensores de esta función o instalación.')
+  const usedResources=new Set(rows.filter(r=>r.mapping.source==='io').map(r=>r.mapping.resourceKey))
+  const usedGroups=new Set(profile.resources.filter(r=>usedResources.has(r.key)&&r.exclusionGroup).map(r=>r.exclusionGroup))
+  const source = fuentesFuncion(profile, fn).find(c=>c.source==='native'||(!usedResources.has(c.resourceKey)
+    && !usedGroups.has(profile.resources.find(r=>r.key===c.resourceKey)?.exclusionGroup)))
+  if (!source || fn.direction !== 'observation') throw new Error('El perfil no declara una fuente de lectura compatible.')
   const { id: _id, ...mapping } = source
   return { selected: true, mapping: { semanticKey: fn.semanticKey, definitionVersion: fn.definitionVersion, instance,
     ...mapping, inputUnit: fn.unit, polarity: fn.valueKind === 'boolean' ? 'normal' : 'not_applicable', scale: 1, offset: 0 } }
