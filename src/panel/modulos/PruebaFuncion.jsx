@@ -26,7 +26,7 @@ export default function PruebaFuncion({assignmentId,fn,onClose,onSaved}){
    {!data.datos?.items.length&&<p>No hay muestras en esta ventana. Puedes registrar el motivo de una prueba no conforme.</p>}
    {data.datos?.items.map(s=><label className="cf-toolbar" key={s.observationId}><input type="checkbox" disabled={s.commissioningEligible!==true||!form.observationIds.includes(s.observationId)&&form.observationIds.length>=8}
     checked={form.observationIds.includes(s.observationId)} onChange={e=>change('observationIds',e.target.checked?[...form.observationIds,s.observationId]:form.observationIds.filter(id=>id!==s.observationId))}/>
-    {valorFuncion(s)} · evento {s.observedAt||'Sin hora calificada'} · recepción {s.receivedAt} · {s.quality}{s.commissioningEligible!==true?' · No elegible':''}</label>)}
+    {valorFuncion(s,fn.semanticKey)} · evento {s.observedAt||'Sin hora calificada'} · recepción {s.receivedAt} · {s.quality}{s.commissioningEligible!==true?' · No elegible':''}</label>)}
    <div className="cf-grid"><label>Resultado<select required value={form.result} onChange={e=>change('result',e.target.value)}><option value="">Seleccionar…</option><option value="pass">Conforme a lo inspeccionado</option><option value="fail">No conforme</option></select></label>
     {form.result==='fail'&&<label>Motivo del resultado<select required value={form.reasonCode} onChange={e=>change('reasonCode',e.target.value)}><option value="">Seleccionar…</option>{reasons.map(([v,t])=><option key={v} value={v}>{t}</option>)}</select></label>}
     <label><input type="checkbox" checked={form.inspectionAttested} onChange={e=>change('inspectionAttested',e.target.checked)}/>Confirmo que realicé la inspección de esta función y este montaje</label>

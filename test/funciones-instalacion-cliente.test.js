@@ -21,6 +21,18 @@ test('mapeo ofrece fuentes declaradas compatibles, respeta instancias y no convi
  assert.equal(api.valorFuncion({quality:'valid',valueKind:'boolean',booleanValue:false}),'No')
  assert.equal(api.valorFuncion({quality:'invalid',valueKind:'numeric',numericValue:0}),'Sin valor válido')
 })
+test('puerta, ACC y giro muestran estados distintos sin convertir ausencia o contradicción en apagado',()=>{
+ const observation={valueKind:'boolean',quality:'valid',booleanValue:false}
+ assert.equal(api.valorFuncion(observation,'door.open'),'Cerrada')
+ assert.equal(api.valorFuncion({...observation,booleanValue:true},'door.open'),'Abierta')
+ assert.equal(api.valorFuncion(observation,'ignition.acc'),'Sin contacto')
+ assert.equal(api.valorFuncion(observation,'engine.running'),'Sin giro detectado')
+ assert.equal(api.valorFuncion({...observation,quality:'contradictory'},'door.open'),'Sin valor válido')
+ assert.equal(api.valorFuncion({...observation,booleanValue:null},'engine.running'),'Sin dato')
+ assert.equal(api.valorFuncion(null,'door.open'),'Sin valor válido')
+ assert.equal(api.nombreFuncion('engine.rpm'),'Régimen del motor (RPM)')
+})
+
 test('configurar no certifica: PUT explícito, llave estable y lectura independiente de versión',async()=>{
  const old=globalThis.fetch,calls=[]
  const body={expectedVersion:0,profileId:'synthetic',profileVersion:1,functions:[]}

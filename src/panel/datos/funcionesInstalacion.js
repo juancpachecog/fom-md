@@ -52,7 +52,7 @@ export async function registrarPruebaFuncion(id,functionId,body,token){
 }
 export const nombreFuncion = key => ({ 'navigation.speed': 'Velocidad GPS', 'navigation.heading': 'Rumbo GPS',
   'ignition.acc': 'Contacto (ACC)', 'door.open': 'Puerta abierta', 'input.digital.active': 'Entrada digital activa',
-  'input.voltage': 'Voltaje de entrada' })[key] || key
+  'input.voltage': 'Voltaje de entrada', 'engine.rpm': 'Régimen del motor (RPM)', 'engine.running': 'Giro del motor detectado' })[key] || key
 
 export function fuentesFuncion(profile, fn) {
   const native = profile.nativeChannels.filter(n => n.semanticKey === fn.semanticKey && n.definitionVersion === fn.definitionVersion)
@@ -76,9 +76,14 @@ export function nuevaFilaFuncion(profile, fn, rows) {
   return { selected: true, mapping: { semanticKey: fn.semanticKey, definitionVersion: fn.definitionVersion, instance,
     ...mapping, inputUnit: fn.unit, polarity: fn.valueKind === 'boolean' ? 'normal' : 'not_applicable', scale: 1, offset: 0 } }
 }
-export function valorFuncion(observation) {
+export function valorFuncion(observation, semanticKey) {
   if (!observation || observation.quality !== 'valid') return 'Sin valor válido'
-  if (observation.valueKind === 'boolean') return observation.booleanValue === true ? 'Sí' : observation.booleanValue === false ? 'No' : 'Sin dato'
+  if (observation.valueKind === 'boolean') {
+    if (typeof observation.booleanValue !== 'boolean') return 'Sin dato'
+    const labels = { 'door.open': ['Cerrada', 'Abierta'], 'ignition.acc': ['Sin contacto', 'Contacto activo'],
+      'engine.running': ['Sin giro detectado', 'Giro detectado'] }[semanticKey]
+    return labels ? labels[observation.booleanValue ? 1 : 0] : observation.booleanValue ? 'Sí' : 'No'
+  }
   if (observation.valueKind === 'numeric') return observation.numericValue === null ? 'Sin dato' : String(observation.numericValue)
   return observation.enumValue ?? 'Sin dato'
 }

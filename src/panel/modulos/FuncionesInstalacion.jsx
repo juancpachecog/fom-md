@@ -43,7 +43,7 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
   const viewHistory = async item => {
     if (lock.current) return
     lock.current = true; setBusy(true); setError('')
-    try { setHistory({ name: nombreFuncion(item.semanticKey), data: await historialFuncion(assignmentId, item.functionId) }) }
+    try { setHistory({ name: nombreFuncion(item.semanticKey), semanticKey:item.semanticKey, data: await historialFuncion(assignmentId, item.functionId) }) }
     catch (e) { setError(e.message) } finally { lock.current = false; setBusy(false) }
   }
   if (current.estado === 'cargando' && !current.datos) return <Cargando/>
@@ -53,9 +53,13 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
     <h2>Funciones de esta instalación</h2>
     <p>Contacto, motor en marcha y movimiento son señales diferentes. Seleccionar una función no envía comandos ni certifica su cableado.</p>
     <Link className="pnl-btn" to="/panel/funciones">Administrar variables y etiquetas</Link>
+    <div className="cf-editor"><h3>Fuentes y cableado</h3><p>Puerta requiere un contacto instalado y una entrada con polaridad comprobada. ACC indica contacto eléctrico; el giro del motor requiere RPM o una fuente específica verificada.</p>
+      {protocolFamily === 'meitrack-t399' && <p>Meitrack CCE: el perfil v2 permite mapear entradas digitales. RPM solo aparecerá si la variante CAN realmente lo transmite. No asignes un pin de puerta por su número sin revisar el montaje.</p>}
+      {protocolFamily === 'coban-gps103' && <p>Coban ASCII: el perfil v2 requiere comprobar la variante del firmware. Una alarma de apertura no demuestra que la puerta se cerró después. Este perfil no interpreta RPM del motor.</p>}
+      <p>Sin dato o sin hora calificada no significa cerrado ni apagado. Editar variables o guardar el mapeo no habilita comandos.</p></div>
     {error && <p role="alert" className="cf-error">{error}</p>}{message && <p role="status">{message}</p>}
     <div className="cf-scroll"><table><thead><tr><th>Función</th><th>Último valor</th><th>Vigencia</th><th>Verificación</th><th>Estado</th><th>Historial</th></tr></thead>
-      <tbody>{current.datos?.items.map(item => <tr key={item.functionId}><td>{nombreFuncion(item.semanticKey)} · {item.instance}</td><td>{valorFuncion(item.lastObservation)} {item.lastObservation && item.unit !== 'none' ? item.unit : ''}</td><td>{({ fresh: 'Reciente', stale: 'Vencida', unknown: 'Sin calificar', missing: 'Sin dato' })[item.freshness] || 'Sin dato'}</td><td>{({ pass: 'Prueba registrada', fail: 'Prueba fallida', pending: 'Pendiente', not_started: 'Sin prueba' })[item.verification] || 'Pendiente'}</td><td>{item.enabled ? 'Habilitada' : 'Sin habilitar'}</td><td><button className="pnl-btn" disabled={busy} onClick={() => viewHistory(item)}>Ver muestras</button><button className="pnl-btn" disabled={busy||!current.datos.isCurrent||!item.selected} onClick={()=>setTestFunction(item)}>Registrar prueba</button></td></tr>)}</tbody></table></div>
+      <tbody>{current.datos?.items.map(item => <tr key={item.functionId}><td>{nombreFuncion(item.semanticKey)} · {item.instance}</td><td>{valorFuncion(item.lastObservation,item.semanticKey)} {item.lastObservation && item.unit !== 'none' ? item.unit : ''}</td><td>{({ fresh: 'Reciente', stale: 'Vencida', unknown: 'Sin calificar', missing: 'Sin dato' })[item.freshness] || 'Sin dato'}</td><td>{({ pass: 'Prueba registrada', fail: 'Prueba fallida', pending: 'Pendiente', not_started: 'Sin prueba' })[item.verification] || 'Pendiente'}</td><td>{item.enabled ? 'Habilitada' : 'Sin habilitar'}</td><td><button className="pnl-btn" disabled={busy} onClick={() => viewHistory(item)}>Ver muestras</button><button className="pnl-btn" disabled={busy||!current.datos.isCurrent||!item.selected} onClick={()=>setTestFunction(item)}>Registrar prueba</button></td></tr>)}</tbody></table></div>
     {testFunction&&<PruebaFuncion key={`${assignmentId}:${testFunction.functionId}`} assignmentId={assignmentId} fn={testFunction} onClose={()=>setTestFunction(null)} onSaved={current.recargar}/>}
     {!current.datos?.items.length && <p>Esta instalación aún no tiene un mapeo de funciones.</p>}
     {profiles.error ? <ErrorCarga error={profiles.error} onReintentar={profiles.recargar}/> : <div className="cf-toolbar"><label>Perfil de compatibilidad<select disabled={busy || !current.datos?.isCurrent} value={profileKey} onChange={e => { const [id, v] = e.target.value.split('@'); if (id) edit(id, Number(v)) }}><option value="">Seleccionar perfil…</option>{compatible.map(p => <option key={`${p.profileId}@${p.profileVersion}`} value={`${p.profileId}@${p.profileVersion}`}>{p.manufacturer} · {p.model} · v{p.profileVersion}</option>)}</select></label>
@@ -63,7 +67,7 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
     </div>}
     {profile && rows && <form className="cf-editor" onSubmit={save}>
       <h3>Mapeo de señales</h3><p>Guardar crea una versión nueva y deja sus verificaciones pendientes. El historial anterior se conserva.</p>
-      <fieldset disabled={busy}><div className="cf-toolbar">{profile.functions.filter(fn => fn.direction === 'observation').map(fn => <button type="button" className="pnl-btn" key={fn.semanticKey} onClick={() => { try { const next = nuevaFilaFuncion(profile, fn, rows); setRows(items => [...items, next]); pending.current = null } catch (e) { setError(e.message) } }}>Añadir {nombreFuncion(fn.semanticKey)}</button>)}</div>
+      <fieldset disabled={busy}><div className="cf-toolbar">{profile.functions.filter(fn => fn.direction === 'observation').map(fn => <button type="button" className="pnl-btn" key={fn.semanticKey} disabled={fn.interpretationSupport !== 'implemented' || !fuentesFuncion(profile,fn).length} onClick={() => { try { const next = nuevaFilaFuncion(profile, fn, rows); setRows(items => [...items, next]); pending.current = null } catch (e) { setError(e.message) } }}>Añadir {nombreFuncion(fn.semanticKey)}</button>)}</div>
         {rows.map((row, index) => {
           const fn = profile.functions.find(f => f.semanticKey === row.mapping.semanticKey && f.definitionVersion === row.mapping.definitionVersion)
           if (!fn) return <p role="alert" key={index}>La definición ya no pertenece a este perfil. Recarga antes de guardar.</p>
@@ -81,7 +85,7 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
         <button type="submit" className="pnl-btn primario">Guardar mapeo y comprobar</button><button type="button" className="pnl-btn" onClick={() => { setRows(null); setProfile(null) }}>Cancelar</button>
       </fieldset>
     </form>}
-    {history && <section className="cf-editor"><h3>Muestras de {history.name} — últimas 24 horas</h3><p>Hasta cincuenta muestras. Un dato histórico no acredita el estado actual.</p>{history.data.items.map(item => <p key={item.observationId}>{valorFuncion(item)} · {item.observedAt || item.receivedAt} · {item.quality}</p>)}{!history.data.items.length && <p>No hay muestras en esta ventana.</p>}</section>}
+    {history && <section className="cf-editor"><h3>Muestras de {history.name} — últimas 24 horas</h3><p>Hasta cincuenta muestras. Un dato histórico no acredita el estado actual.</p>{history.data.items.map(item => <p key={item.observationId}>{valorFuncion(item,history.semanticKey)} · {item.observedAt || item.receivedAt} · {item.quality}</p>)}{!history.data.items.length && <p>No hay muestras en esta ventana.</p>}</section>}
     <VariablesInstalacion key={assignmentId} assignmentId={assignmentId} sources={current.datos?.items||[]}/>
   </section>
 }
