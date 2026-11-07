@@ -9,6 +9,8 @@ export async function leerComandosInstalacion(id){
  const nuevo=data.contractVersion===2
  if(data.assignmentId!==id||typeof data.readOnly!=='boolean'||!Array.isArray(data.items)||data.items.some(item=>
   typeof item.requestAllowed!=='boolean'||item.dispatchAllowed!==false||!Array.isArray(item.blockers)||
+  (item.deliveryPolicy!==undefined&&(!['online_only','bounded_read_queue'].includes(item.deliveryPolicy)||
+   item.deliveryPolicy==='bounded_read_queue'&&(!nuevo||item.key!=='device.status.read'||item.physical!==false)))||
   (nuevo?(!Number.isInteger(item.instance)||item.instance<1||item.instance>32||item.requestAllowed&&item.blockers.length>0):item.requestAllowed!==false))||(!nuevo&&data.readOnly!==true))throw new Error('El contrato de comandos no es compatible con esta pantalla. Recarga antes de operar.')
  return data
 }

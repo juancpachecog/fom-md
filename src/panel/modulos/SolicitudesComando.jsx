@@ -19,8 +19,10 @@ export default function SolicitudesComando({assignmentId,availability,onChanged}
  const cancel=e=>{e.preventDefault();perform(async()=>{setSelected(await cancelarSolicitudComando(assignmentId,selected.requestId,{expectedVersion:selected.version,reason:reason.trim()}));setPhrase('')})}
  return<section className="cf-editor" aria-label="Solicitudes de comandos"><h3>Solicitudes e historial</h3>
   <p>Crear una solicitud deja una intención pendiente. Confirmarla puede iniciar un único intento si todos los requisitos siguen vigentes. Una respuesta del equipo y el efecto físico se muestran por separado.</p>
+  {availability.items.some(c=>c.deliveryPolicy==='bounded_read_queue')&&<p>Las consultas de estado compatibles pueden esperar conexión hasta su vencimiento. Los permisos y la confirmación deben seguir vigentes al enviarlas. Las actuaciones requieren conexión inmediata.</p>}
   {error&&<p role="alert" className="cf-error">{error}</p>}
   {actions.length>0&&<form onSubmit={create}><fieldset disabled={busy}><label>Acción disponible<select required value={action} onChange={e=>setAction(e.target.value)}><option value="">Selecciona una acción</option>{actions.map(c=><option key={`${c.key}:${c.instance}`} value={`${c.key}:${c.instance}`}>{c.name} · Canal {c.instance}</option>)}</select></label>
+   {current?.deliveryPolicy==='bounded_read_queue'&&<p>Esta consulta puede quedar pendiente de conexión; esperar no significa que haya sido enviada.</p>}
    <label>Motivo<input required minLength={5} maxLength={300} value={reason} onChange={e=>setReason(e.target.value)}/></label><button className="pnl-btn" disabled={!current} type="submit">Crear solicitud pendiente</button></fieldset></form>}
   {history.error?<ErrorCarga error={history.error} onReintentar={history.recargar}/>:<>
    {history.datos?.items.map(r=><p key={r.requestId}><button className="pnl-btn" disabled={busy} onClick={()=>detail(r.requestId)}>{r.commandKey} · Canal {r.instance} · {STATES[r.state]||r.state}</button> · {r.createdAt}</p>)}

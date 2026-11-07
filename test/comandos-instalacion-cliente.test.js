@@ -35,3 +35,16 @@ test('recibo sin readback no acredita la solicitud y no dispara reintento autom�
  globalThis.fetch=async(url,o)=>{if(o.method==='POST'){posts++;return new Response(JSON.stringify({requestId,version:1,commandKey:'device.status.read',instance:1}),{status:200})}return new Response(JSON.stringify({message:'No disponible'}),{status:503})}
  try{await assert.rejects(()=>api.crearSolicitudComando(id,{},'33333333-3333-4333-8333-333333333333'));assert.equal(posts,1)}finally{globalThis.fetch=old}
 })
+
+test('política de espera opcional sólo admite consultas explícitas y preserva servidores anteriores',async()=>{
+ const id='11111111-1111-4111-8111-111111111111',old=globalThis.fetch
+ let item={key:'device.status.read',physical:false,instance:1,requestAllowed:true,dispatchAllowed:false,blockers:[],deliveryPolicy:'bounded_read_queue'}
+ globalThis.fetch=async()=>new Response(JSON.stringify({assignmentId:id,contractVersion:2,readOnly:false,items:[item]}),{status:200})
+ try{
+  assert.equal((await api.leerComandosInstalacion(id)).items[0].deliveryPolicy,'bounded_read_queue')
+  for(const delta of [{key:'starter.inhibit'},{physical:true},{deliveryPolicy:'retry_forever'}]){
+   const original=item;item={...original,...delta};await assert.rejects(()=>api.leerComandosInstalacion(id),/no es compatible/);item=original
+  }
+  delete item.deliveryPolicy;assert.equal((await api.leerComandosInstalacion(id)).items[0].requestAllowed,true)
+ }finally{globalThis.fetch=old}
+})
