@@ -37,6 +37,7 @@ function patron(ruta) {
 /** Rutas con versión `/tenants/{id}/…` en fom-core, por método (relativas a /api/v1/console). */
 const ESPEJOS = {
   GET: [
+    '/gps-managed-catalog', '/gps-managed-catalog/:id', '/gps-managed-catalog/:id/history',
     '/vehicles', '/vehicles/:v', '/vehicles/:v/daily-metrics', '/vehicles/:v/position/latest', '/vehicles/:v/positions',
     '/vehicles/:v/telemetry-capabilities', '/vehicles/:v/odometer', '/vehicles/:v/archive-preflight',
     '/directory', '/notifications', '/summary', '/areas', '/drivers',
@@ -50,6 +51,7 @@ const ESPEJOS = {
     '/:coleccion/:padre/objects',
   ],
   POST: [
+    '/gps-managed-catalog',
     '/users', '/users/:u/rehire', '/users/:u/credential-reset', '/fleet-expenses',
     '/vehicles', '/vehicles/:v/drivers', '/vehicles/:v/archive', '/areas',
     '/work-orders', '/work-orders/:w/execution-events',
@@ -69,6 +71,7 @@ const ESPEJOS = {
     '/gps-devices/:d', '/gps-installations/:a/remove',
   ],
   PUT: [
+    '/gps-managed-catalog/:id',
     '/work-orders/:w/assignee', '/maintenance/plans/:p', '/maintenance/plans/:p/vehicles/:v', '/maintenance/actions/:a',
     '/gps-devices/:d/capabilities',
   ],
