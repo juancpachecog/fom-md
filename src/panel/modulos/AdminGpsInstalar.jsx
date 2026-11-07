@@ -112,7 +112,7 @@ export default function AdminGpsInstalar() {
     setUnidadId(r.vehiculoId)
   }
 
-  const ruta = [['Administración FOM'], ['Inventario GPS', RAIZ_GPS], [g?.imei ?? 'Equipo', `${RAIZ_GPS}/${id}`], ['Instalar']]
+  const ruta = [['Hardware y telemetría'], ['Equipos GPS', RAIZ_GPS], [g?.imei ?? 'Equipo', `${RAIZ_GPS}/${id}`], ['Instalar']]
 
   if (equipo.estado !== 'ok' || !g) {
     return (

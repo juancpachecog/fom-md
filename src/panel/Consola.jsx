@@ -3,6 +3,8 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Navigate, Route, Routes, UNSAFE_NavigationContext, useLocation, useNavigate } from 'react-router-dom'
 import { cerrarSesion, esAdminFom, resolverSesion, salirEmpresa, sesionActual } from './auth'
 import { areaDe, esGestor } from './roles'
+import { reorganizarMenu } from './hardware-navegacion'
+import HardwareTelemetria from './modulos/HardwareTelemetria'
 import { useSesion } from './useSesion'
 import { useApariencia } from './useApariencia'
 import { estaLeida } from './modulos/alertas-presentacion'
@@ -270,7 +272,7 @@ const MENU_POR_AREA = {
 /** Rutas alcanzables por area. Todo lo que no este aqui vuelve al inicio. */
 const RUTAS_POR_AREA = {
   admin: null, // todas
-  operativo: ['', 'mapa', 'alertas', 'seguridad', 'flota', 'funciones', 'jornadas', 'mantenimiento', 'inspecciones', 'documentos', 'personal', 'reportes'],
+  operativo: ['', 'mapa', 'alertas', 'seguridad', 'flota', 'funciones', 'etiquetas', 'jornadas', 'mantenimiento', 'inspecciones', 'documentos', 'personal', 'reportes'],
   gerencial: ['personal', 'reportes'],
   // Más el SOS y otra unidad con PIN (T-167b), que se abren desde Mi unidad y Mi perfil.
   conductor: ['', 'inspeccion', 'mapa', 'alertas', 'mantenimiento'].concat(['sos', 'otra-unidad']),
@@ -293,9 +295,9 @@ function inicioDe(area) {
 /** El menú de esta persona: el mismo para el lateral y para el teléfono. */
 function menuDe(perfil) {
   const menu = esAdminFom(perfil) && perfil.empresaGestion
-    ? [MENU_ADMIN, ...MENU]
+    ? [...MENU, MENU_ADMIN]
     : MENU_POR_AREA[areaDe(perfil)] ?? MENU_POR_AREA.conductor
-  return menu.map(g=>({...g,items:g.items.filter(item=>!item.soloGestor||esGestor(perfil))}))
+  return reorganizarMenu(menu, perfil)
 }
 
 function Lateral({ perfil, abierto, cerrar, sinLeer }) {
@@ -566,13 +568,17 @@ export default function Consola() {
               <Route path="admin/vehiculos" element={<AdminVehiculos />} />
               <Route path="admin/transferencias" element={<Transferencias />} />
               <Route path="admin/pagos" element={<AdminPagos />} />
-              <Route path="admin/funciones" element={<CatalogoFunciones />} />
+              <Route path="admin/funciones" element={<CatalogoFunciones key="variables" categoria="variable" />} />
+              <Route path="admin/etiquetas" element={<CatalogoFunciones key="etiquetas" categoria="tag" />} />
+              <Route path="admin/hardware/pruebas" element={<HardwareTelemetria vista="pruebas" />} />
+              <Route path="admin/hardware/perfiles" element={<HardwareTelemetria vista="perfiles" />} />
               <Route path="admin/gps/*" element={<AdminGps />} />
               <Route path="admin/auditoria" element={<AdminAuditoria />} />
             </>
           )}
           {esGestor(perfil) && <Route path="admin/usuarios" element={<AdminUsuarios />} />}
-          {esGestor(perfil) && <Route path="funciones" element={<CatalogoFunciones />} />}
+          {esGestor(perfil) && <Route path="funciones" element={<CatalogoFunciones key="variables" categoria="variable" />} />}
+          {esGestor(perfil) && <Route path="etiquetas" element={<CatalogoFunciones key="etiquetas" categoria="tag" />} />}
           <Route path="*" element={<Navigate to="/panel" replace />} />
         </Routes>
         </Suspense>

@@ -7,7 +7,7 @@ const uuid = id => {
   return id
 }
 export const leerFuncionesInstalacion = id => consultar(`${BASE}/gps-installations/${uuid(id)}/functions`)
-export const listarPerfilesFunciones = () => consultar(`${BASE}/gps-capability-catalog?limit=50&offset=0`)
+export const listarPerfilesFunciones = (offset = 0) => consultar(`${BASE}/gps-capability-catalog?limit=50&offset=${offset}`)
 export const leerPerfilFunciones = (id, version) => {
   if (!/^[a-z][a-z0-9_.-]{0,79}$/u.test(id) || !Number.isSafeInteger(version) || version < 1) throw new Error('Perfil inválido.')
   return consultar(`${BASE}/gps-capability-catalog/${id}/versions/${version}`)
