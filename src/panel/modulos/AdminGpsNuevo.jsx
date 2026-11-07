@@ -178,7 +178,7 @@ export default function AdminGpsNuevo() {
   return (
     <div className="gp">
       <Cabeza
-        ruta={[['Administración FOM'], ['Inventario GPS', RAIZ_GPS], ['Nuevo GPS']]}
+        ruta={[['Hardware y telemetría'], ['Equipos GPS', RAIZ_GPS], ['Nuevo GPS']]}
         titulo="Nuevo GPS"
         bajada={bajada}
         acciones={<button type="button" className="gp-btn2" onClick={salir}>{equipo ? 'Ir al equipo' : 'Descartar'}</button>}

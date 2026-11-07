@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { pestanaEquipo } from '../hardware-navegacion'
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { useSesion } from '../useSesion'
@@ -36,7 +37,9 @@ export default function AdminGpsDetalle() {
   const navegar = useNavigate()
   const { state } = useLocation()
   const ahora = useAhora()
-  const [pestana, setPestana] = useState('diagnostico')
+  const [params, setParams] = useSearchParams()
+  const pestana = pestanaEquipo(params.toString())
+  const setPestana = value => setParams(previous => { const next = new URLSearchParams(previous); next.set('vista', value); return next }, { replace: true })
   const [desmontando, setDesmontando] = useState(false)
   const [aviso, setAviso] = useState(state?.aviso ?? '')
 
@@ -50,7 +53,7 @@ export default function AdminGpsDetalle() {
   if (equipo.estado !== 'ok' || !g) {
     return (
       <div className="gp">
-        <Cabeza ruta={[['Administración FOM'], ['Inventario GPS', RAIZ_GPS], ['Equipo']]} titulo="Equipo GPS" />
+        <Cabeza ruta={[['Hardware y telemetría'], ['Equipos GPS', RAIZ_GPS], ['Equipo']]} titulo="Equipo GPS" />
         <section className="gp-card">
           {equipo.estado === 'cargando' && <Cargando filas={5} />}
           {equipo.estado === 'error' && <ErrorCarga onReintentar={equipo.recargar} error={equipo.error} />}
@@ -67,7 +70,7 @@ export default function AdminGpsDetalle() {
   return (
     <div className="gp">
       <Cabeza
-        ruta={[['Administración FOM'], ['Inventario GPS', RAIZ_GPS], [alias ?? g.imei]]}
+        ruta={[['Hardware y telemetría'], ['Equipos GPS', RAIZ_GPS], [alias ?? g.imei]]}
         titulo={`${nombreEquipo(g)} · ${alias ?? 'En inventario'}`}
         bajada={<><span className="gp-mono">IMEI {g.imei}</span>{subtitulo.length > 0 && ` · ${subtitulo.join(' · ')}`}</>}
         acciones={(

@@ -86,8 +86,8 @@ function Inventario() {
   return (
     <div className="gp">
       <Cabeza
-        ruta={[['Administración FOM'], ['Inventario GPS']]}
-        titulo="Inventario GPS"
+        ruta={[['Hardware y telemetría'], ['Equipos GPS']]}
+        titulo="Equipos GPS"
         bajada="Equipos registrados, en qué unidad están y si envían señal."
         acciones={(
           <>

@@ -233,7 +233,7 @@ export function ProbarGps() {
   return (
     <div className="gp">
       <Cabeza
-        ruta={[['Administración FOM'], ['Inventario GPS', RAIZ_GPS], [g?.vehiculoNombre?.split(' · ')[0] || g?.imei || 'Equipo', `${RAIZ_GPS}/${id}`], ['Probar señal']]}
+        ruta={[['Hardware y telemetría'], ['Equipos GPS', RAIZ_GPS], [g?.vehiculoNombre?.split(' · ')[0] || g?.imei || 'Equipo', `${RAIZ_GPS}/${id}`], ['Probar señal']]}
         titulo="Probar señal"
         bajada={g ? `${nombreEquipo(g)} · ${nombreProtocolo(g.protocolo)}. ${esMeitrack(g) ? 'Comprueba los mensajes recibidos del equipo.' : 'Envía los comandos si hace falta y espera su señal.'}` : 'Consulta la recepción del equipo.'}
         acciones={<button type="button" className="gp-btn2" onClick={() => navegar(`${RAIZ_GPS}/${id}`)}>Volver al equipo</button>}
