@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { useSesion } from '../useSesion'
 import { esAdminFom } from '../roles'
 import { useDatos } from '../useDatos'
-import { Cabecera, Cargando, ErrorCarga } from '../comp/ui'
+import { Cargando, ErrorCarga } from '../comp/ui'
+import { Cabeza } from '../comp/GpsPiezas'
 import { empresaGestionActualId } from '../datos/api'
 import { listarDefiniciones, leerDefinicion, historiaDefinicion, guardarDefinicion,
   cuerpoDefinicion, formularioDefinicion, UNIDADES_FUNCIONES } from '../datos/catalogoFunciones'
@@ -51,14 +52,16 @@ export default function CatalogoFunciones({ categoria }) {
     try { open((await leerDefinicion(selected.id)).items[0]); setSuccess('Revisión actual consultada.') }
     catch (e) { setError(e.message) } finally { lock.current = false; setBusy(false) }
   }
-  return <div className="pnl-modulo catalogo-funciones">
-    <Cabecera titulo={etiquetas ? 'Etiquetas' : 'Variables y funciones'} bajada={etiquetas ? 'Flota · Etiquetas administrativas de la empresa activa.' : 'Hardware y telemetría · Definiciones de la empresa activa para equipos de distintas marcas.'} />
+  return <div className="gp catalogo-funciones cf-page">
+    <Cabeza ruta={[[etiquetas ? 'Flota' : 'Hardware y telemetría'], [etiquetas ? 'Etiquetas' : 'Variables y funciones']]} titulo={etiquetas ? 'Etiquetas' : 'Variables y funciones'} bajada={etiquetas ? 'Etiquetas administrativas de la empresa activa.' : 'Definiciones de la empresa activa para equipos de distintas marcas.'} />
+    <section className="gp-card cf-intro">
     <p>{etiquetas ? 'Organiza los vehículos con etiquetas independientes del GPS. Sus asignaciones se administran en la ficha de cada vehículo.' : 'Define las variables aquí y configura sus entradas, sensores, pruebas y comandos en la ficha del GPS instalado.'}</p>
     <p><Link to={etiquetas ? (admin ? '/panel/admin/funciones' : '/panel/funciones') : (admin ? '/panel/admin/etiquetas' : '/panel/etiquetas')}>{etiquetas ? 'Variables y funciones' : 'Etiquetas de flota'}</Link>{admin && !etiquetas && <> · <Link to="/panel/admin/gps">Configurar funciones de un equipo</Link> · <Link to="/panel/admin/hardware/perfiles">Marcas y perfiles</Link></>}</p>
+    </section>
     <div className="cf-toolbar">
       {!categoria && <label>Mostrar<select value={category} onChange={e => { setCategory(e.target.value); setOffset(0) }}><option value="all">Variables y etiquetas</option><option value="variable">Variables</option><option value="tag">Etiquetas</option></select></label>}
       <label>Estado<select value={status} onChange={e => { setStatus(e.target.value); setOffset(0) }}><option value="all">Todos</option><option value="active">Activas</option><option value="retired">Retiradas</option></select></label>
-      <button className="pnl-btn pnl-btn--primario" disabled={busy} onClick={() => open(null)}>Crear definición</button>
+      <button className="pnl-btn primario" disabled={busy} onClick={() => open(null)}>Crear definición</button>
       <button className="pnl-btn" disabled={busy} onClick={data.recargar}>Actualizar</button>
     </div>
     {error && <p role="alert" className="cf-error">{error}</p>}{success && <p role="status">{success}</p>}
@@ -69,6 +72,7 @@ export default function CatalogoFunciones({ categoria }) {
       {!data.datos.items.length && <p>No hay definiciones con estos filtros.</p>}
       <div className="cf-toolbar"><button className="pnl-btn" disabled={offset === 0 || busy} onClick={() => setOffset(n => Math.max(0, n - 25))}>Anterior</button><span>{data.datos.total} definiciones</span><button className="pnl-btn" disabled={offset + 25 >= data.datos.total || busy} onClick={() => setOffset(n => n + 25)}>Siguiente</button></div></>}
     {form && <form className="cf-editor" onSubmit={save}>
+      <p className="gp-k">{form.category === 'tag' ? 'Etiqueta de flota' : 'Definición de variable'}</p>
       <h2>{selected ? `Editar ${selected.name}` : 'Nueva definición'}</h2>
       <fieldset disabled={busy}><div className="cf-grid">
         <label>Clase<select value={form.category} disabled={!!selected || !!categoria} onChange={e => change('category', e.target.value)}><option value="variable">Variable observada</option><option value="tag">Etiqueta administrativa</option></select></label>
@@ -87,7 +91,7 @@ export default function CatalogoFunciones({ categoria }) {
         <label>Motivo del cambio<textarea required minLength={5} maxLength={300} value={form.reason} onChange={e => change('reason', e.target.value)} /></label>
       </div>
       {form.status === 'retired' && <p>Se retirará de las opciones nuevas. Su historial y las referencias existentes se conservan.</p>}
-      <button className="pnl-btn pnl-btn--primario" type="submit">{busy ? 'Guardando…' : 'Guardar y comprobar'}</button>
+      <button className="pnl-btn primario" type="submit">{busy ? 'Guardando…' : 'Guardar y comprobar'}</button>
       <button className="pnl-btn" type="button" onClick={() => setForm(null)}>Cancelar</button>
       {selected && <button className="pnl-btn" type="button" onClick={verify}>Comprobar estado actual</button>}
       </fieldset>

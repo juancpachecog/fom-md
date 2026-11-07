@@ -78,7 +78,7 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
             </div><button type="button" className="pnl-btn" onClick={() => { setRows(items => items.filter((_, i) => i !== index)); pending.current = null }}>Quitar de esta configuración</button>
           </div>
         })}
-        <button type="submit" className="pnl-btn pnl-btn--primario">Guardar mapeo y comprobar</button><button type="button" className="pnl-btn" onClick={() => { setRows(null); setProfile(null) }}>Cancelar</button>
+        <button type="submit" className="pnl-btn primario">Guardar mapeo y comprobar</button><button type="button" className="pnl-btn" onClick={() => { setRows(null); setProfile(null) }}>Cancelar</button>
       </fieldset>
     </form>}
     {history && <section className="cf-editor"><h3>Muestras de {history.name} — últimas 24 horas</h3><p>Hasta cincuenta muestras. Un dato histórico no acredita el estado actual.</p>{history.data.items.map(item => <p key={item.observationId}>{valorFuncion(item)} · {item.observedAt || item.receivedAt} · {item.quality}</p>)}{!history.data.items.length && <p>No hay muestras en esta ventana.</p>}</section>}
