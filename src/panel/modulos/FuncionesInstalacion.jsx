@@ -54,7 +54,7 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
     <h2>Funciones de esta instalación</h2>
     <p>Contacto, motor en marcha y movimiento son señales diferentes. Seleccionar una función no envía comandos ni certifica su cableado.</p>
     <Link className="pnl-btn" to="/panel/funciones">Administrar variables y etiquetas</Link>
-    <GuiaFunciones key={`${assignmentId}:${protocolFamily}`} protocolFamily={protocolFamily}/>
+    <GuiaFunciones key={`${assignmentId}:${protocolFamily}`} protocolFamily={protocolFamily} assignmentId={assignmentId} current={current.datos} profiles={compatible} onSaved={current.recargar}/>
     <div className="cf-editor"><h3>Fuentes y cableado</h3><p>Puerta requiere un contacto instalado y una entrada con polaridad comprobada. ACC indica contacto eléctrico; el giro del motor requiere RPM o una fuente específica verificada.</p>
       {protocolFamily === 'meitrack-t399' && <p>Meitrack CCE: el perfil v2 permite mapear entradas digitales. RPM solo aparecerá si la variante CAN realmente lo transmite. No asignes un pin de puerta por su número sin revisar el montaje.</p>}
       {protocolFamily === 'coban-gps103' && <p>Coban ASCII: el perfil v2 requiere comprobar la variante del firmware. Una alarma de apertura no demuestra que la puerta se cerró después. Este perfil no interpreta RPM del motor.</p>}

@@ -1,4 +1,5 @@
 import {useState} from 'react'
+import PruebaEntradas from './PruebaEntradas'
 
 const manualMeitrack='https://www.meitrack.com/cd-download/Product_User_Guide/MEITRACK_T399_Series_User_Guide.pdf'
 const manualCoban='https://fccid.io/2ATUKBN-403/User-Manual/User-Manual-6024809.pdf'
@@ -44,11 +45,13 @@ export function pasosGuiaFunciones(family){
  ]
 }
 
-export default function GuiaFunciones({protocolFamily}){
+export default function GuiaFunciones({protocolFamily,assignmentId,current,profiles,onSaved}){
  const [step,setStep]=useState(0),steps=pasosGuiaFunciones(protocolFamily)
- return <details className="cf-editor cf-guide" open>
+ const [expanded,setExpanded]=useState(true)
+ return <details className="cf-editor cf-guide" open={expanded} onToggle={e=>setExpanded(e.currentTarget.open)}>
   <summary>Guía del instalador: puerta y contacto, paso a paso</summary>
-  <p>Ayuda de consulta para este montaje. Usa los controles de configuración y prueba que aparecen debajo; esta guía no los ejecuta.</p>
+  <p>Ayuda y prueba guiada para este montaje. El visor consulta recepción natural; configurar y registrar prueba son acciones explícitas. Avanzar por la ayuda no guarda ni certifica.</p>
+  {expanded&&assignmentId&&current&&<PruebaEntradas key={assignmentId} assignmentId={assignmentId} current={current} profiles={profiles||[]} onSaved={onSaved}/>}
   <nav aria-label="Pasos de la guía de funciones"><ol>{steps.map((s,i)=><li key={s.title}><button type="button" className="pnl-btn" aria-current={i===step?'step':undefined} onClick={()=>setStep(i)}>{i+1}. {s.title}</button></li>)}</ol></nav>
   <section aria-live="polite" aria-atomic="true" aria-label={`Paso ${step+1} de ${steps.length}`}>
    <h3>{step+1}. {steps[step].title}</h3>{steps[step].text.map(t=><p key={t}>{t}</p>)}
