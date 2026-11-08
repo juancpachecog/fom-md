@@ -23,6 +23,7 @@ export default function PruebaFuncion({assignmentId,fn,onClose,onSaved}){
   {error&&<p role="alert" className="cf-error">{error}</p>}
   {report?<p role="status">Prueba {report.result==='pass'?'conforme':'no conforme'} registrada y consultada aparte · {report.recordedAt}. Fuente: declaración del gestor. La habilitación se evalúa por separado.</p>:data.error?<ErrorCarga error={data.error} onReintentar={data.recargar}/>:data.estado==='cargando'?<Cargando filas={2}/>:<form onSubmit={save}><fieldset disabled={busy}>
    <p>Muestras de los últimos quince minutos. Las no elegibles se muestran sin permitir seleccionarlas.</p>
+   <button className="pnl-btn" type="button" disabled={busy} onClick={data.recargar}>Actualizar muestras de la prueba</button>
    {!data.datos?.items.length&&<p>No hay muestras en esta ventana. Puedes registrar el motivo de una prueba no conforme.</p>}
    {data.datos?.items.map(s=><label className="cf-toolbar" key={s.observationId}><input type="checkbox" disabled={s.commissioningEligible!==true||!form.observationIds.includes(s.observationId)&&form.observationIds.length>=8}
     checked={form.observationIds.includes(s.observationId)} onChange={e=>change('observationIds',e.target.checked?[...form.observationIds,s.observationId]:form.observationIds.filter(id=>id!==s.observationId))}/>

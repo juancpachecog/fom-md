@@ -38,6 +38,13 @@
 .cf-scroll td .pnl-btn + .pnl-btn { margin-left: 8px; }
 .cf-scroll tbody tr:hover { background: var(--e-sup-alta); }
 .cf-error { color: var(--e-peligro); }
+.cf-guide summary { cursor: pointer; color: var(--e-texto); font-weight: 600; font-size: 17px; line-height: 1.5; }
+.cf-guide summary:focus-visible { outline: 2px solid var(--e-primario); outline-offset: 4px; }
+.cf-guide nav ol { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.cf-guide nav .pnl-btn { margin: 0; white-space: normal; text-align: left; }
+.cf-guide [aria-current=step] { border-color: var(--e-primario); background: var(--e-sup-alta); color: var(--e-texto); }
+.cf-guide a { color: var(--e-activo-texto, var(--e-primario)); text-decoration: underline; }
+.cf-guide .cf-toolbar { align-items: center; }
 .cf-editor article { border-bottom: 1px solid var(--e-borde); padding: 16px 0; overflow-wrap: anywhere; }
 @media (max-width: 767px) {
   .cf-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
