@@ -4,6 +4,7 @@
 import * as f from '../datos/formato'
 import { distanciaM, puntoEnRuta } from '../datos/recorrido'
 import { mapboxDirections } from './routeDirections'
+import { gruposDeParadas, detalleParadas } from './paradasMapa'
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 
@@ -141,13 +142,12 @@ export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = AZUL_E
     }
   }
 
-  for (const parada of paradas) {
-    limites.push([parada.lng, parada.lat])
-    const m = marcadorHtml(gl, pin('parada', 'P', f.duracion(parada.minutos)), [parada.lng, parada.lat], { zIndex: 3 })
-      .setPopup(popup(gl, `<strong>Estacionada ${esc(f.duracion(parada.minutos))}</strong>` +
-        `<span>${esc(f.hora(parada.desde))} → ${esc(f.hora(parada.hasta))}</span>` +
-        `<span>${esc(f.fechaCorta(parada.desde))}</span>`, { offset: 18 }))
+  for (const parada of gruposDeParadas(paradas)) {
+    limites.push(...parada.paradas.map(p => [p.lng, p.lat]))
+    const m = marcadorHtml(gl, pin(parada.clase, parada.numeros, parada.texto), [parada.lng, parada.lat], { zIndex: 3 })
+      .setPopup(popup(gl, detalleParadas(parada), { offset: 18 }))
       .addTo(mapa)
+    m.getElement().setAttribute('aria-label', `Parada ${parada.numeros}`)
     marcadores.push(m)
   }
 

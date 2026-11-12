@@ -12,7 +12,7 @@ export default function PanelRecorrido({ analisis, horas, alCambiarHoras, cargan
   const linea = useMemo(() => {
     if (!analisis) return []
     const viajes = analisis.viajes.map((v) => ({ clave: `v${v.numero}`, tipo: 'viaje', desde: v.inicio.hora, v }))
-    const paradas = analisis.paradas.map((p, i) => ({ clave: `p${i}`, tipo: 'parada', desde: p.desde, p }))
+    const paradas = analisis.paradas.map((p) => ({ clave: `p${p.numero}`, tipo: 'parada', desde: p.desde, p }))
     return [...viajes, ...paradas].sort((a, b) => Date.parse(b.desde) - Date.parse(a.desde))
   }, [analisis])
   const r = analisis ? resumen(analisis) : null
@@ -52,9 +52,9 @@ export default function PanelRecorrido({ analisis, horas, alCambiarHoras, cargan
           ) : (
             <li key={it.clave}>
               <button type="button" className="ruta-item parada" onClick={() => alEnfocar?.({ lat: it.p.lat, lng: it.p.lng })}>
-                <i aria-hidden="true">P</i>
+                <i aria-hidden="true">{it.p.numero}</i>
                 <span>
-                  <b>Estacionada {f.duracion(it.p.minutos)}</b>
+                  <b>Parada {it.p.numero} · {f.duracion(it.p.minutos)}</b>
                   <small>
                     {f.hora(it.p.desde)} → {f.hora(it.p.hasta)}
                   </small>
@@ -65,6 +65,7 @@ export default function PanelRecorrido({ analisis, horas, alCambiarHoras, cargan
         )}
       </ol>
       <p className="ruta-ayuda">Pasa el cursor por la línea para ver la hora de cada punto; haz clic para fijarla.</p>
+      <p className="ruta-ayuda">Las paradas se numeran desde la más antigua (1) hasta la más reciente del rango.</p>
     </section>
   )
 }

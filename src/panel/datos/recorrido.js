@@ -134,6 +134,7 @@ export function detectarParadas(puntos, { minParadaMin = MIN_PARADA_MIN, radioM 
       const lat = tramo.reduce((s, x) => s + x.lat, 0) / tramo.length
       const lng = tramo.reduce((s, x) => s + x.lng, 0) / tramo.length
       paradas.push({
+        numero: paradas.length + 1,
         lat,
         lng,
         desde: p[i].hora,
