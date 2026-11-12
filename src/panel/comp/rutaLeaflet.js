@@ -3,6 +3,7 @@
 import * as f from '../datos/formato'
 import { distanciaM, puntoEnRuta } from '../datos/recorrido'
 import { leafletDirections } from './routeDirections'
+import { gruposDeParadas, detalleParadas } from './paradasMapa'
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 
@@ -91,16 +92,15 @@ export function pintarRuta(L, mapa, { viajes = [], paradas = [], color = '#349bf
     }
   }
 
-  for (const parada of paradas) {
-    limites.push([parada.lat, parada.lng])
+  for (const parada of gruposDeParadas(paradas)) {
+    limites.push(...parada.paradas.map(p => [p.lat, p.lng]))
     L.marker([parada.lat, parada.lng], {
-      icon: icono(L, pin('parada', 'P', f.duracion(parada.minutos)), 100),
+      icon: icono(L, pin(parada.clase, parada.numeros, parada.texto), 100),
+      title: `Parada ${parada.numeros}`,
       zIndexOffset: 300,
     })
       .bindPopup(
-        `<strong>Estacionada ${esc(f.duracion(parada.minutos))}</strong>` +
-          `<span>${esc(f.hora(parada.desde))} → ${esc(f.hora(parada.hasta))}</span>` +
-          `<span>${esc(f.fechaCorta(parada.desde))}</span>`,
+        detalleParadas(parada),
         { className: 'ruta-popup', autoPan: false },
       )
       .addTo(grupo)
