@@ -788,7 +788,7 @@ export default function MapaMapbox({
     ruta.current = null
     if (!m || !mapboxgl || !listo || !estiloListo.current) return undefined
     if (!viajes?.length && !paradas?.length) return undefined
-    const color = leerTokens().primario
+    const color = AZUL_ESTELA_FOM
     // Se pinta de una vez tal como vino del GPS y, cuando Mapbox lo pega a las calles, solo
     // se le cambia el trazo (sin quitar ni volver a crear capas y pines).
     const r = pintarRuta(mapboxgl, m, { viajes: viajes ?? [], paradas: paradas ?? [], color, alElegirViaje: (n) => alElegirViajeRef.current?.(n) })
