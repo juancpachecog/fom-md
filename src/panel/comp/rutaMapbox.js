@@ -3,6 +3,7 @@
 // Es el mismo dibujo que `rutaLeaflet.js`, con capas GeoJSON en vez de polilíneas.
 import * as f from '../datos/formato'
 import { distanciaM, puntoEnRuta } from '../datos/recorrido'
+import { mapboxDirections } from './routeDirections'
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 
@@ -68,6 +69,7 @@ export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = AZUL_E
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: { 'line-color': color, 'line-width': 24, 'line-opacity': 0.01 },
   })
+  const sentido = mapboxDirections(mapa, ID)
 
   // La sonda: un punto que sigue el cursor por el trazado con la hora de ese punto.
   const sondaEl = document.createElement('div')
@@ -151,6 +153,7 @@ export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = AZUL_E
 
   /** Resalta un viaje (`numero`) y aclara los demás; sin número, todos vuelven a su estilo normal. */
   const resaltar = (numero) => {
+    sentido.highlight(numero)
     if (!mapa.getLayer(`${ID}-linea`)) return
     const hay = numero != null
     mapa.setPaintProperty(`${ID}-linea`, 'line-opacity', hay ? ['case', ['==', ['get', 'numero'], numero], 0.95, 0.2] : 0.95)
@@ -173,6 +176,7 @@ export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = AZUL_E
   }
 
   const quitar = () => {
+    sentido.remove()
     mapa.off('mousemove', `${ID}-zona`, alMover)
     mapa.off('mouseleave', `${ID}-zona`, alSalir)
     mapa.off('click', `${ID}-zona`, alClic)

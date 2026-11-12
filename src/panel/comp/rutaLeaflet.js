@@ -2,6 +2,7 @@
 // cada punto al pasar el cursor o hacer clic, y la cola de los últimos minutos.
 import * as f from '../datos/formato'
 import { distanciaM, puntoEnRuta } from '../datos/recorrido'
+import { leafletDirections } from './routeDirections'
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 
@@ -24,6 +25,8 @@ function textoPunto(p, viaje) {
  */
 export function pintarRuta(L, mapa, { viajes = [], paradas = [], color = '#349bfa', alElegirViaje }) {
   const grupo = L.layerGroup().addTo(mapa)
+  const sentido = leafletDirections(L, mapa, viajes, grupo)
+  grupo.once('remove', () => sentido.remove())
   const limites = []
   const lineas = new Map()
   const marcas = new Map()
@@ -104,6 +107,7 @@ export function pintarRuta(L, mapa, { viajes = [], paradas = [], color = '#349bf
   }
   /** Resalta un viaje (`numero`) y aclara los demás; sin número, todos vuelven a su estilo normal. */
   const resaltar = (numero) => {
+    sentido.highlight(numero)
     const hay = numero != null
     for (const [n, linea] of lineas) {
       const es = n === numero
