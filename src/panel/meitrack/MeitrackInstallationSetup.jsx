@@ -7,7 +7,7 @@ import { parseSetupCapture } from './meitrack-setup.js'
 import { MeitrackClockReadback } from './MeitrackClockReadback.jsx'
 
 const request = (path, body, signal) => pedir(`/api/v1/console/meitrack-setup/${path}`, { metodo:'POST', cuerpo:body, señal:signal, empresaContexto:null })
-export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdentityChange, onCapture, onLockChange, onSelect, selected=false, canRegister=false, onRegister, registered=false, registering=false, registrationError='' }) {
+export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdentityChange, onCapture, onLockChange, onSelect, selected=false, canRegister=false, onRegister, registered=false, registering=false, registrationError='', soloPrueba=false }) {
   const [identityText,setIdentityText]=useState(''), [commandsText,setCommandsText]=useState(''), [pendingText,setPendingText]=useState('')
   const [okText,setOkText]=useState(''), [readback,setReadback]=useState(''), [sent,setSent]=useState(false), [noAuth,setNoAuth]=useState(false)
   const [availability,setAvailability]=useState(null), [capture,setCapture]=useState(null), [search,setSearch]=useState(0), [looking,setLooking]=useState(false)
@@ -77,13 +77,13 @@ export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdent
     {configured&&<MeitrackClockReadback key={imei+firmware} imei={imei} firmware={firmware} readback={readback}/>}
     <section className="gp-card gp-col" aria-label="Detectados sin registrar Meitrack">
       <h2 className="gp-st">Detectados sin registrar · confirmar al final</h2>
-      <p>Después de configurar, busca si el GPS ya está reportando. Compara su IMEI y selecciona la señal coincidente para registrarlo.</p>
+      <p>{soloPrueba ? 'Comprueba la configuración y busca la recepción coincidente sin registrar el equipo.' : 'Después de configurar, busca si el GPS ya está reportando. Compara su IMEI y selecciona la señal coincidente para registrarlo.'}</p>
       <button type="button" className="gp-btn2" disabled={!configured || looking || registered} onClick={()=>setSearch(n=>n+1)}>{looking ? 'Buscando…' : search ? 'Actualizar lista' : 'Buscar GPS reportando'}</button>
       {!configured && <p>Primero comprueba la configuración con DB4.</p>}
       {search > 0 && !eligible && <p role="status">{receiver ? 'Todavía no hay recepción reciente comprobada de este GPS. La búsqueda se actualiza automáticamente.' : 'El servicio no está disponible. Conserva la pantalla y vuelve a consultar.'}</p>}
       {eligible && !registered && <div className="gp-cmd"><div className="tx"><b>Detectado: {imei}</b><span className="gp-hint">Meitrack T399L · TCP · recepción reciente coincidente</span></div><button type="button" className="gp-btn2" onClick={onSelect}>{selected ? 'Coincidencia seleccionada' : 'Seleccionar este dispositivo'}</button></div>}
       {registrationError && <p role="alert">{registrationError}</p>}
-      {registered ? <p role="status">Registro comprobado en inventario. La instalación y activación son pasos separados.</p> : <button type="button" className="gp-btn" disabled={!eligible || !selected || !canRegister || registering} onClick={onRegister}>{registering ? 'Comprobando registro…' : 'Registrar sin activar'}</button>}
+      {!soloPrueba && (registered ? <p role="status">Registro comprobado en inventario. La instalación y activación son pasos separados.</p> : <button type="button" className="gp-btn" disabled={!eligible || !selected || !canRegister || registering} onClick={onRegister}>{registering ? 'Comprobando registro…' : 'Registrar sin activar'}</button>)}
     </section>
   </>
 }
