@@ -77,14 +77,14 @@ export function MovilEncabezado({ seccion, nombre, sinLeer, etiquetaCampana, ini
  * el botón atrás en un círculo y el título corto en la cápsula, con el logo a
  * la derecha como adorno.
  */
-export function MovilPantalla({ titulo, alVolver }) {
+export function MovilPantalla({ titulo, nombreEmpresa, alVolver }) {
   return (
     <header className="mv-barra mv-pila">
       <button type="button" className="mv-circulo" aria-label="Volver" onClick={alVolver}>
         <Icono nombre="volver" tam={22} />
       </button>
       <div className="mv-capsula">
-        <b className="mv-titulo">{titulo}</b>
+        <span className="mv-textos"><b className="mv-titulo">{titulo}</b>{nombreEmpresa && <small className="mv-empresa-activa" title={nombreEmpresa}>{nombreEmpresa}</small>}</span>
         <LogoFom decorativo className="mv-logo" />
       </div>
     </header>

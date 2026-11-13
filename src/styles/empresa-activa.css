@@ -1,0 +1,17 @@
+.pnl .pnl-topbar { position:sticky; top:0; z-index:18; background:var(--e-bg,#090d11); }
+.pnl .pnl-empresa-activa { display:grid; gap:2px; min-width:0; max-width:min(42vw,520px); padding:5px 11px; border:1px solid var(--e-borde,#263b4d); border-radius:10px; background:var(--e-sup-baja,#101820); text-align:left; flex-shrink:1; }
+.pnl .pnl-empresa-activa small { color:var(--e-texto-2,#b7c7d9); font-size:10px; line-height:1.2; }
+.pnl .pnl-empresa-activa b { color:var(--e-texto,#f3f7fc); font-size:13px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pnl .pnl-topbar-contexto { gap:12px; }
+.pnl .pnl-topbar-contexto > .pnl-contexto { min-width:0; }
+.pnl .control-titulo-empresa { display:flex; align-items:center; gap:12px; min-width:0; }
+.pnl .control-titulo-empresa h1 { flex-shrink:0; }
+.pnl .control-titulo-empresa .pnl-empresa-activa { max-width:22vw; }
+.pnl .mv-empresa-activa { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--app-texto-2,#b7c7d9); font-size:11px; }
+@media(max-width:1100px) and (min-width:768px) {
+  .pnl .control-titulo-empresa { gap:7px; }
+  .pnl .control-titulo-empresa h1 { font-size:16px; }
+  .pnl .control-titulo-empresa .pnl-empresa-activa { max-width:18vw; padding:4px 7px; }
+  .pnl .control-titulo-empresa .pnl-empresa-activa b { font-size:11px; }
+}
+@media(max-width:767px) { .pnl .control-titulo-empresa .pnl-empresa-activa { display:none; } }

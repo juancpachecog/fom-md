@@ -9,6 +9,9 @@ import { useSesion } from './useSesion'
 import { useApariencia } from './useApariencia'
 import { estaLeida } from './modulos/alertas-presentacion'
 import { Icono } from './Iconos'
+import { EmpresaActiva } from './comp/EmpresaActiva'
+import { empresaActiva } from './datos/empresaActiva.js'
+import '../styles/empresa-activa.css'
 import repo, { alCambiarAvisosGps, alCambiarDatos, CONECTADO } from './datos/repo'
 import { useAvisosConductor } from './datos/useAvisosConductor'
 import '../styles/apariencia.css'
@@ -500,7 +503,7 @@ export default function Consola() {
 
       <main className="pnl-main" id="contenido" ref={principal}>
         <div className="pnl-topbar">
-          <div className="pnl-topbar-contexto"><span className="pnl-contexto"><Icono nombre={esAdminFom(perfil) ? 'empresa' : 'camion'} tam={18} />{esAdminFom(perfil) && pathname.includes('/admin/') ? 'Administración global FOM' : perfil.empresa || 'FOM · Administración'}</span><span className="pnl-fuente">{CONECTADO ? 'Operación conectada' : 'Datos de demostración'}</span></div>
+          <div className="pnl-topbar-contexto"><span className="pnl-contexto"><Icono nombre={esAdminFom(perfil) ? 'empresa' : 'camion'} tam={18} />{esAdminFom(perfil) && pathname.includes('/admin/') ? 'Administración global FOM' : perfil.empresa || 'FOM · Administración'}</span><EmpresaActiva perfil={perfil} admin={esAdminFom(perfil)} />{!CONECTADO && <span className="pnl-fuente">Demostración</span>}</div>
           <div className="pnl-topbar-derecha">
             <Link to="/panel/alertas" className="pnl-notificaciones" aria-label={etiquetaCampana}>
               <Icono nombre="campana" tam={21} />
@@ -524,12 +527,12 @@ export default function Consola() {
               seccion={titulo}
               // Como encabezado-fom de la app: el conductor ve solo la sección
               // (su empresa ya está en Mi perfil); los demás, la empresa.
-              nombre={area === 'conductor' ? '' : perfil.empresaGestion?.nombre || (esAdminFom(perfil) ? '' : perfil.empresa)}
+              nombre={empresaActiva(perfil, esAdminFom(perfil))}
               sinLeer={avisos}
               etiquetaCampana={etiquetaCampana}
               iniciales={perfil.iniciales}
             />
-          : <MovilPantalla titulo={titulo} alVolver={volver} />)}
+          : <MovilPantalla titulo={titulo} nombreEmpresa={empresaActiva(perfil, esAdminFom(perfil))} alVolver={volver} />)}
 
         {/* Cada pantalla llega en su propio trozo; mientras baja, el esqueleto de siempre
             (espera 120 ms antes de asomarse, ver movimiento.css). */}
