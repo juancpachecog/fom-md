@@ -4,16 +4,32 @@ import { useDatos } from '../useDatos'
 import { Modal } from './ui'
 import { haceCuanto } from '../datos/gps'
 import { useAhora } from './GpsPiezas'
+import { cobanIdentificationSms, receivedCobanCandidate } from '../datos/coban-identification.js'
+import { validarTelefono } from '../datos/gps'
 
 const fecha = v => Number.isFinite(Date.parse(v)) ? new Date(v).toLocaleString('es-VE', {dateStyle:'medium',timeStyle:'medium'}) : 'No disponible'
 /** Sólo metadatos de recepción; no concluye apagado ni identidad física. */
 export default function DetalleDetectado({ inicial, alCerrar }) {
   const ahora = useAhora(1000)
   const [referencia, setReferencia] = useState(null)
+  const [clave, setClave] = useState('')
+  const [telefono, setTelefono] = useState('')
+  const [correspondencia, setCorrespondencia] = useState(false)
+  const [retornoPreparado, setRetornoPreparado] = useState(false)
+  const [aviso, setAviso] = useState('')
+  const [referenciaReactivar, setReferenciaReactivar] = useState(null)
   const listado = useDatos(() => repo.admin.gps.sinEmparejar(), [], 5000)
   const actual = listado.estado === 'ok' ? listado.datos.find(d => d.imei === inicial.imei) : null
   const d = actual ?? inicial
   const nuevo = referencia && actual && Date.parse(actual.ultimaVez) > Date.parse(referencia)
+  const comandos = cobanIdentificationSms(clave, inicial.transporte)
+  const coban = inicial.origenIdentidad === 'coban_imei_field' && inicial.protocolo === 'coban-gps103'
+  const fresco = receivedCobanCandidate(actual, {transport:inicial.transporte,knownImei:inicial.imei,now:ahora})
+  const copiar = async tipo => {
+    if (!comandos || !coban || (tipo === 'pause' && (!fresco || !correspondencia || !retornoPreparado || validarTelefono(telefono).error))) return
+    try { await navigator.clipboard.writeText(comandos[tipo]); setAviso(tipo === 'pause' ? 'Pausa copiada. Envíala manualmente sólo a la SIM indicada; copiar no acredita envío ni ejecución.' : 'Reactivación copiada. Envíala a la misma SIM y comprueba la recepción posterior.') }
+    catch { setAviso('No se pudo copiar. Conserva la pantalla y vuelve a copiar la reactivación antes de cerrar.') }
+  }
   return <Modal titulo="Comunicación del dispositivo sin registrar" abierto alCerrar={alCerrar} ancho={660}>
     <div className="gp gp-ventana">
       <p className="gp-mono">IMEI observado: {d.imei}</p>
@@ -31,6 +47,20 @@ export default function DetalleDetectado({ inicial, alCerrar }) {
       <div className="gp-pie"><button className="gp-btn2" type="button" onClick={listado.recargar}>Actualizar comunicación</button><button className="gp-btn2" type="button" disabled={!actual} onClick={() => setReferencia(actual.ultimaVez)}>Marcar referencia para comparar</button></div>
       {referencia && <p role="status">Referencia: {fecha(referencia)}. {!actual ? 'La comparación no está disponible con una lectura actual.' : nuevo ? 'Se recibieron mensajes nuevos después de la referencia.' : 'No se ha observado un mensaje posterior.'} Comprueba físicamente qué equipo corresponde antes de registrarlo.</p>}
       {listado.estado === 'error' && <p role="alert">No se pudo actualizar la recepción. La lectura anterior no acredita el estado actual.</p>}
+      {coban && <section className="gp-card gp-col" aria-label="Identificar Coban sin respuesta SMS">
+        <h3>Identificar Coban GPS-403 sin respuesta SMS</h3>
+        <p>Copia los mensajes y envíalos desde tu teléfono. El modo SMS suspende la comunicación por datos; al terminar vuelve a GPRS. Las respuestas SMS son opcionales: observa la última recepción y los mensajes posteriores.</p>
+        <label>Teléfono de la SIM que estás configurando<input value={telefono} onChange={e=>{setTelefono(e.target.value);setCorrespondencia(false)}} autoComplete="off" inputMode="tel"/></label>
+        <label>Clave SMS actual del GPS-403<input type="password" value={clave} onChange={e=>{setClave(e.target.value);setRetornoPreparado(false)}} autoComplete="new-password" maxLength={6}/></label>
+        <p>La clave sólo permanece en esta pantalla y en el mensaje que copies. No se guarda ni se envía al servidor.</p>
+        <div><code>SMS······</code><button type="button" className="gp-btn2" disabled={!comandos || !fresco || !correspondencia || !retornoPreparado || !!validarTelefono(telefono).error} onClick={()=>copiar('pause')}>Copiar pausa de reportes</button></div>
+        <div><code>GPRS······,{inicial.transporte === 'udp' ? '1,1' : '0,0'}</code><button type="button" className="gp-btn2" disabled={!comandos} onClick={()=>copiar('resume')}>Copiar reactivación</button></div>
+        <label><input type="checkbox" checked={correspondencia} onChange={e=>setCorrespondencia(e.target.checked)}/>Confirmo que el equipo es un GPS-403 compatible con el cambio SMS/GPRS y que estoy trabajando con la SIM indicada.</label>
+        <label><input type="checkbox" checked={retornoPreparado} onChange={e=>setRetornoPreparado(e.target.checked)}/>Tengo preparada la reactivación para la misma SIM y puedo restablecer sus reportes.</label>
+        <button type="button" className="gp-btn2" disabled={!actual} onClick={()=>setReferenciaReactivar(actual.ultimaVez)}>Ya envié la reactivación: observar mensajes nuevos</button>
+        {referenciaReactivar && <p role="status">{!actual ? 'La observación actual no está disponible.' : Date.parse(actual.ultimaVez)>Date.parse(referenciaReactivar) ? 'Se recibieron comunicaciones posteriores a la referencia de reactivación. Confirma qué equipo corresponde antes del alta.' : 'Todavía no se recibió una comunicación posterior a la referencia de reactivación.'}</p>}
+        {aviso && <p role="status">{aviso}</p>}
+      </section>}
       <h3>Últimas comunicaciones disponibles</h3>
       {(d.comunicaciones ?? []).length ? <table><thead><tr><th>Recepción</th><th>Transporte</th><th>Bytes</th></tr></thead><tbody>{d.comunicaciones.map((m,i) => <tr key={`${m.recibido}-${i}`}><td>{fecha(m.recibido)}</td><td>{m.transporte?.toUpperCase()}</td><td>{m.bytes}</td></tr>)}</tbody></table> : <p>El servicio todavía no publica el detalle de mensajes de este candidato.</p>}
     </div>

@@ -529,7 +529,11 @@ function detectadosDemo(ahora = Date.now()) {
   return [
     { imei: '868166051450012', primeraVez: new Date(ahora - 3 * 60 * MIN).toISOString(), ultimaVez: new Date(ahora - 12_000).toISOString(), mensajes: 38, transporte: 'tcp', reportando: true, bytesUltimo: 212 },
     { imei: '868166051441275', primeraVez: new Date(ahora - 26 * 60 * MIN).toISOString(), ultimaVez: new Date(ahora - 25 * MIN).toISOString(), mensajes: 6, transporte: 'udp', reportando: false, bytesUltimo: 96 },
-  ].filter((d) => !registrados.has(d.imei))
+  ].filter((d) => !registrados.has(d.imei)).map(d => ({...d,
+    origenIdentidad:'coban_imei_field',protocolo:'coban-gps103',ultimaIdentidad:d.ultimaVez,
+    diasMuestra:30,limiteMuestra:5000,
+    comunicaciones:[{recibido:d.ultimaVez,transporte:d.transporte,bytes:d.bytesUltimo}],
+  }))
 }
 function todaAuditoria() {
   return [...agregados('auditoria'), ...AUDITORIA]
