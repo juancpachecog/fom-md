@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import repo from '../datos/repo'
+import { firmaFlota } from '../datos/firmaFlota.js'
 import { useDatos } from '../useDatos'
 import {
   Buscador, Cargando, Chips, ErrorCarga, Vacio,
@@ -40,7 +41,6 @@ function coincide(v, texto) {
 }
 
 // El conductor entra en la firma: el buscador también filtra por su nombre.
-const firmaFlota = (lista) => lista.map((v) => `${v.id}:${v.lat}:${v.lng}:${v.estadoMarcha}:${v.velocidadKmh}:${v.ultimoReporte}:${v.conectado}:${v.soloRecepcion}:${v.conductorNombre}`).join('|') + (lista.incompleta ? '|incompleta' : '')
 const firmaPuntos = (p) => `${p.length}|${p[0]?.hora}|${p.at(-1)?.hora}|${p.at(-1)?.lat}|${p.at(-1)?.lng}`
 const firmaAnalisis = (a) => `${firmaPuntos(a.puntos)}|${a.viajes.length}|${a.paradas.length}`
 
