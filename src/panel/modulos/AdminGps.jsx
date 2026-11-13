@@ -34,6 +34,7 @@ export default function AdminGps() {
     <Routes>
       <Route index element={<Inventario />} />
       <Route path="nuevo" element={<AdminGpsNuevo />} />
+      <Route path="pruebas" element={<AdminGpsNuevo soloPrueba />} />
       <Route path=":id" element={<AdminGpsDetalle />} />
       <Route path=":id/instalar" element={<AdminGpsInstalar />} />
       <Route path=":id/probar" element={<ProbarGps />} />
@@ -82,6 +83,7 @@ function Inventario() {
   const lista = detectados.datos ?? []
 
   const registrar = (imei) => navegar('nuevo', imei ? { state: { imei } } : undefined)
+  const probar = (imei) => navegar('pruebas', imei ? { state: { imei } } : undefined)
 
   return (
     <div className="gp">
@@ -91,6 +93,7 @@ function Inventario() {
         bajada="Equipos registrados, en qué unidad están y si envían señal."
         acciones={(
           <>
+            <button type="button" className="gp-btn2" onClick={() => probar()}>Probar comunicación</button>
             {lista.length > 0 && (
               <button type="button" className="gp-btn2" onClick={() => document.getElementById('gp-detectados')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
                 <IcoGps nombre="senal" />Detectados sin registrar · {lista.length}
@@ -177,15 +180,17 @@ function Inventario() {
               <section className="gp-card gp-col" id="gp-detectados" aria-labelledby="gp-det-t">
                 <div className="gp-titulo">
                   <h2 className="gp-st" id="gp-det-t">Detectados sin registrar</h2>
-                  <span className="gp-hint">Son recepciones del GPS, todavía sin ficha de inventario. Registra el equipo para editar sus datos. Las recepciones originales se conservan como historial.</span>
+                  <span className="gp-hint">Puedes configurar y observar la comunicación sin crear una ficha de inventario. Las recepciones originales se conservan como historial.</span>
                 </div>
+                <button type="button" className="gp-btn2 ancho" onClick={() => probar()}>Configurar y probar sin registrar</button>
                 {detectados.estado === 'cargando' && <span className="gp-hint">Buscando…</span>}
                 {detectados.estado === 'error' && <span className="gp-hint">{detectados.error?.message}</span>}
                 {detectados.estado === 'ok' && lista.length === 0 && (
-                  <span className="gp-hint">Nada sin registrar: todo IMEI que llega al receptor ya está en alguna empresa.</span>
+                  <span className="gp-hint">No hay candidatos sin registrar en la muestra actual. Puedes abrir una prueba y esperar nuevas comunicaciones.</span>
                 )}
                 {lista.map((d) => (
                   <Detectado key={d.imei} d={d} ahora={ahora}>
+                    <button type="button" className="gp-btn2 chico" onClick={() => probar(d.imei)}>Probar este GPS</button>
                     <button type="button" className="gp-btn2 chico" onClick={() => registrar(d.imei)}>Registrar este</button>
                   </Detectado>
                 ))}
