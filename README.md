@@ -5,6 +5,9 @@
 `npm run build` exige el perfil de producción: API del mismo origen (`/fom-api`)
 y mapas configurados. En un worktree limpio, indicar el directorio del perfil
 nominal existente: `node scripts/build-fom-production.mjs <directorio>`.
+También exige `VITE_GPS_RECEPTOR` con la IPv4 pública revisada del receptor del
+ambiente. El build falla si falta o es inválida; su identidad forma parte del
+perfil publicado. Puede suministrarse como variable del proceso de publicación.
 No copiar archivos `.env`, claves ni tokens al repositorio o a registros.
 `npm run build:demo` es sólo para demostraciones y no se publica como panel FOM.
 

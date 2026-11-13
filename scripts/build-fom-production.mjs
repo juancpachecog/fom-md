@@ -4,13 +4,15 @@ import { writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { revisar } from './bajar-modelo.mjs'
+import { validReceiverIp } from '../src/panel/datos/gpsReceiver.js'
 
 export function productionProfile(env) {
   if (env.VITE_FOM_API !== '/fom-api') throw Error('La publicación FOM requiere la API real del mismo origen; modo demostración rechazado.')
   if (!/^pk\.[A-Za-z0-9_.-]+$/.test(env.VITE_MAPBOX_TOKEN || '')) throw Error('La publicación FOM requiere el perfil de mapas configurado.')
-  const keys = ['VITE_FOM_API', 'VITE_MAPBOX_TOKEN', 'VITE_MAPA_ESTILO', 'VITE_MAPA_ATRIBUCION', 'VITE_CLOUDINARY_CLOUD_NAME', 'VITE_CLOUDINARY_UPLOAD_PRESET']
+  if (!validReceiverIp(env.VITE_GPS_RECEPTOR)) throw Error('La publicación FOM requiere la IP del receptor GPS configurada.')
+  const keys = ['VITE_FOM_API', 'VITE_MAPBOX_TOKEN', 'VITE_MAPA_ESTILO', 'VITE_MAPA_ATRIBUCION', 'VITE_CLOUDINARY_CLOUD_NAME', 'VITE_CLOUDINARY_UPLOAD_PRESET', 'VITE_GPS_RECEPTOR']
   const values = Object.fromEntries(keys.map(k => [k, env[k] || '']))
-  return { version: 1, application: 'fom-panel', mode: 'connected', apiBase: '/fom-api', mapboxConfigured: true,
+  return { version: 1, application: 'fom-panel', mode: 'connected', apiBase: '/fom-api', mapboxConfigured: true, gpsReceiverConfigured: true,
     publicConfigSha256: createHash('sha256').update(JSON.stringify(values)).digest('hex') }
 }
 
