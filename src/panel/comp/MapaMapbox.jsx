@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import FichaUnidad, { estadoUnidad } from './FichaUnidad'
-import { vehicleMarkerSvg, MARKER_SIZE, MARKER_ANCHOR, validPosition } from './vehicleMarker'
+import { vehicleMarkerSvg, vehicleRotation, MARKER_SIZE, MARKER_ANCHOR, validPosition } from './vehicleMarker'
 import { AZUL_ESTELA_FOM, pintarCola, pintarRuta } from './rutaMapbox'
 import { textoSinSenal } from '../datos/sinSenal'
 import CapasMapa from './CapasMapa'
@@ -109,7 +109,13 @@ function elementoUnidad() {
  * Pone el dibujo y los textos de una unidad en su marcador, solo si cambió algo que se ve
  * (placa, rumbo, estado o si está elegida): antes se regeneraba el SVG de todas en cada render.
  */
-function pintarUnidad(el, v, sel) {
+function orientarUnidad(el, bearing) {
+  const rumbo = el.dataset.rumbo
+  const giro = rumbo === undefined ? null : vehicleRotation(Number(rumbo), bearing)
+  el.querySelector('.fleet-marker-vehicle')?.setAttribute('transform', `rotate(${giro ?? 0} 26 40)`)
+}
+
+function pintarUnidad(el, v, sel, bearing) {
   const estado = estadoUnidad(v)
   // Sin señal, el texto accesible y el globo del cursor dicen cuánto lleva callada.
   const sinSenal = estado.clave === 'sin_senal'
@@ -117,7 +123,10 @@ function pintarUnidad(el, v, sel) {
   const firma = [sel ? 1 : 0, v.placa ?? '', v.alias ?? '', v.rumbo ?? '', estado.clave, texto].join('|')
   if (el.dataset.firma === firma) return
   el.dataset.firma = firma
+  if (Number.isFinite(v.rumbo)) el.dataset.rumbo = String(v.rumbo)
+  else delete el.dataset.rumbo
   el.innerHTML = vehicleMarkerSvg(v, sel)
+  orientarUnidad(el, bearing)
   el.classList.toggle('selected', sel)
   el.style.zIndex = sel ? '1000' : '0'
   el.title = `${v.alias} · ${v.placa}${sinSenal ? ` · ${texto}` : ''}`
@@ -467,6 +476,11 @@ export default function MapaMapbox({
         raiz.style.setProperty('--marcador-k', String(k))
         raiz.dataset.zoom = z <= 12 ? 'lejos' : 'cerca'
       }
+      // Sólo gira el dibujo: placa y estado siguen horizontales al rotar el mapa.
+      const orientarMarcadores = () => {
+        const bearing = m.getBearing()
+        marcadores.current.forEach(mk => orientarUnidad(mk.getElement(), bearing))
+      }
       // Eligiendo destino: un toque en el mapa es el destino.
       const alClic = (e) => {
         if (modoDestino.current) elegirDestinoRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng })
@@ -475,6 +489,7 @@ export default function MapaMapbox({
       m.on('load', alCargar)
       m.on('style.load', alEstilo)
       m.on('zoomend', ajustarMarcadores)
+      m.on('rotate', orientarMarcadores)
       m.on('click', alClic)
       ajustarMarcadores()
       return () => {
@@ -483,6 +498,7 @@ export default function MapaMapbox({
         m.off('load', alCargar)
         m.off('style.load', alEstilo)
         m.off('zoomend', ajustarMarcadores)
+        m.off('rotate', orientarMarcadores)
         m.off('click', alClic)
       }
     }
@@ -740,7 +756,7 @@ export default function MapaMapbox({
             deslizador.current.mover(v.id, mk, [v.lng, v.lat])
           }
         }
-        pintarUnidad(mk.getElement(), v, sel)
+        pintarUnidad(mk.getElement(), v, sel, m.getBearing())
       })
 
     marcadores.current.forEach((mk, id) => {

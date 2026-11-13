@@ -6,6 +6,11 @@ export const MARKER_ANCHOR = [26, 40]
 const COLORS = { verde: '#35e888', ambar: '#ffbf43', gris: '#a1afbf' }
 export const escapeXml = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]))
 
+// El rumbo GPS está referido al norte; la cámara puede girar de forma independiente.
+export function vehicleRotation(heading, bearing = 0) {
+  return Number.isFinite(heading) ? ((heading - (Number.isFinite(bearing) ? bearing : 0)) % 360 + 360) % 360 : null
+}
+
 /** SVG shared by Leaflet, Google Maps and the schematic fallback. No HTML from API. */
 export function vehicleMarkerSvg(vehicle, selected = false, ahora = Date.now()) {
   const status = estadoUnidad(vehicle)
@@ -15,7 +20,7 @@ export function vehicleMarkerSvg(vehicle, selected = false, ahora = Date.now()) 
   const tiempo = callada ? escapeXml(tiempoSinSenal(vehicle?.ultimoReporte, ahora)) : ''
   const color = COLORS[status.color]
   const accent = selected ? '#168fff' : color
-  const heading = Number.isFinite(vehicle.rumbo) ? ((vehicle.rumbo % 360) + 360) % 360 : null
+  const heading = vehicleRotation(vehicle.rumbo)
   const plate = escapeXml(String(vehicle.placa || vehicle.alias || 'Sin placa').slice(0, 22))
   const labelSize = plate.length > 11 ? 10 : 13
   // La sombra va dibujada dentro del SVG (formas negras translúcidas, sin <filter>): un
@@ -30,7 +35,7 @@ export function vehicleMarkerSvg(vehicle, selected = false, ahora = Date.now()) 
       <text x="69" y="${callada ? 32 : 39}" fill="${color}" font-family="Arial,sans-serif" font-size="11">${status.texto}</text>
       ${callada ? `<text x="69" y="44" fill="#b7c7d9" font-family="Arial,sans-serif" font-size="9">${tiempo}</text>` : ''}
     </g>
-    <g transform="rotate(${heading ?? 0} 26 40)">
+    <g class="fleet-marker-vehicle" transform="rotate(${heading ?? 0} 26 40)">
       <rect x="13" y="19" width="26" height="47" rx="9" fill="#000" fill-opacity=".14"/>
       <rect x="14" y="20" width="24" height="45" rx="8" fill="#000" fill-opacity=".2"/>
       ${selected ? '<rect x="12" y="14" width="28" height="52" rx="9" fill="#0c2e4f" stroke="#168fff" stroke-width="2"/>' : ''}

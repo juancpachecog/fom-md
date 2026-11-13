@@ -1,7 +1,29 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { estadoUnidad } from '../src/panel/datos/estadoUnidad.js'
-import { vehicleMarkerSvg, validPosition } from '../src/panel/comp/vehicleMarker.js'
+import { vehicleMarkerSvg, vehicleRotation, validPosition } from '../src/panel/comp/vehicleMarker.js'
+import { firmaFlota } from '../src/panel/datos/firmaFlota.js'
+
+test('el carro sigue los cuatro rumbos y la etiqueta queda fuera del grupo que gira', () => {
+  for (const rumbo of [0, 90, 180, 270]) {
+    const svg = vehicleMarkerSvg({ placa: 'PRUEBA', rumbo })
+    const car = svg.slice(svg.indexOf('<g class="fleet-marker-vehicle"'))
+    assert.ok(car.includes(`rotate(${rumbo} 26 40)`))
+    assert.ok(!car.includes('<text'))
+    assert.ok(svg.indexOf('fleet-marker-label') < svg.indexOf('fleet-marker-vehicle'))
+  }
+  assert.equal(vehicleRotation(90, 90), 0)
+  assert.equal(vehicleRotation(0, 90), 270)
+  assert.equal(vehicleRotation(270, -90), 0)
+  for (const heading of [null, undefined, NaN, Infinity, '90']) assert.equal(vehicleRotation(heading, 45), null)
+});
+
+test('un cambio sólo de rumbo invalida la flota estable, incluido norte cero y ausencia', () => {
+  const v = { id: 'synthetic', lat: 1, lng: 2, rumbo: null }
+  assert.equal(firmaFlota([v]), firmaFlota([{ ...v }]))
+  const firmas = [null, 0, 90, 180, 270].map(rumbo => firmaFlota([{ ...v, rumbo }]))
+  assert.equal(new Set(firmas).size, 5)
+});
 
 test('GPS sin señal prevalece sobre la última velocidad y el encendido', () => {
   assert.equal(estadoUnidad({ conectado: false, ignition: true, velocidadKmh: 54 }).clave, 'sin_senal')
