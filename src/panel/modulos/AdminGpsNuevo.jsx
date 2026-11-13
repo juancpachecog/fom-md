@@ -177,8 +177,8 @@ export default function AdminGpsNuevo() {
     if (seguro) navegar(equipo ? `${RAIZ_GPS}/${equipo.id}` : RAIZ_GPS)
   }
   const bajada = paso === 3
-    ? meitrack ? 'Configura por SMS y busca la señal coincidente al final para registrar sin activar.' : 'Envía los comandos por SMS a la línea del equipo y espera su primera señal.'
-    : 'Prepara el equipo y su línea, configura por SMS y confirma la identidad recibida antes de registrarlo.'
+    ? meitrack ? 'Configura por SMS y busca la señal coincidente al final para registrar sin activar.' : porDatos ? 'Identifica el Coban mediante su recepción y confirma la correspondencia antes de registrar sin activar.' : 'Envía los comandos por SMS a la línea del equipo y espera su primera señal.'
+    : 'Prepara el equipo y su línea. Confirma la identidad antes del alta; el Coban también admite identificación por datos cuando no responde los SMS.'
 
   // La vista del equipo para los comandos y la prueba: lo escrito aquí, con el id del registro.
   const equipoVista = {
@@ -222,7 +222,7 @@ export default function AdminGpsNuevo() {
             <div className="gp-titulo">
               <p className="gp-k">Paso 1 de 3</p>
               <h2 className="gp-st" id="gp-p1">Datos del equipo</h2>
-              <span className="gp-lbl">Elige marca y modelo. Si aún no conoces el IMEI, podrás consultarlo por SMS y compararlo con la señal al final.</span>
+              <span className="gp-lbl">Elige marca y modelo. Si no conoces el IMEI, podrás identificar el Coban por sus comunicaciones o consultar la identidad por SMS.</span>
             </div>
             <div className="gp-campos">
               <Campo id="n-marca" etiqueta="Marca *" error={errores.marca}>
@@ -253,7 +253,7 @@ export default function AdminGpsNuevo() {
                 </div>
                 <span className="gp-hint">{meitrack ? 'Esta preparación admite TCP; no acredita el estado de fábrica del equipo.' : `${(modelo?.transporte ?? 'tcp').toUpperCase()} es el de fábrica del ${datos.modelo}.`}</span>
               </div>
-              <Campo id="n-imei" etiqueta="IMEI conocido (opcional)" todo error={errores.imei} ayuda={equipo ? 'Ya registrado: el IMEI no se corrige.' : 'Déjalo vacío si no lo conoces. El registro esperará la coincidencia entre el SMS y la señal recibida.'}>
+              <Campo id="n-imei" etiqueta="IMEI conocido (opcional)" todo error={errores.imei} ayuda={equipo ? 'Ya registrado: el IMEI no se corrige.' : 'Déjalo vacío si no lo conoces. La identidad se confirma al final: por SMS o, para Coban, por datos y comprobación del operador.'}>
                 <div className={`gp-field${errores.imei ? ' mal' : imeiDeSenal ? ' ok' : ''}${equipo ? ' ro' : ''}`}>
                   <input id="n-imei" className="gp-mono" inputMode="numeric" autoComplete="off" maxLength={20} value={datos.imei} readOnly={Boolean(equipo)} onChange={(e) => poner('imei', e.target.value)} aria-invalid={Boolean(errores.imei)} />
                   {imeiDeSenal && <TomadoDeLaSenal d={(detectados.datos ?? []).find((x) => x.imei === imeiDeSenal)} ahora={ahora} />}
@@ -276,7 +276,7 @@ export default function AdminGpsNuevo() {
 
           <section className="gp-card gp-col">
             <h2 className="gp-st">Primero configura, después identifica</h2>
-            <p>En el último paso tendrás los comandos SMS y los dispositivos detectados sin registrar. Compara el IMEI que responda tu GPS, selecciona su señal y registra el equipo.</p>
+            <p>En el último paso tendrás los comandos SMS y los dispositivos detectados sin registrar. Podrás comparar la respuesta SMS o identificar el Coban mediante su recepción de datos.</p>
             <p>No se crea ningún registro al avanzar por estas pantallas.</p>
           </section>
 
@@ -367,7 +367,7 @@ export default function AdminGpsNuevo() {
         <section className="gp-card" aria-label="Identidad consultada por SMS">
           <h2 className="gp-st">Configura y confirma la identidad</h2>
           <label><input type="checkbox" checked={porDatos} disabled={!!equipo} onChange={e => {setPorDatos(e.target.checked);setSeleccionado(null);setIdentidadFisicaConfirmada(false)}}/>No recibo respuesta SMS: identificar por datos</label>
-          {porDatos ? <p>Selecciona abajo el IMEI observado en las comunicaciones de tu Coban GPS-403. Abre «Ver comunicación» para comparar recepción, pausa y reactivación. No necesitas inventar una respuesta SMS.</p> : <>
+          {porDatos ? <p>Selecciona abajo el IMEI observado en las comunicaciones de tu Coban GPS-403. Abre «Ver comunicación» para comparar recepción, pausa y reactivación. En este modo el alta no exige respuesta SMS.</p> : <>
           <p>Envía los comandos desde tu teléfono. La consulta de identidad no requiere conocer el IMEI de antemano. Compara la respuesta del mismo GPS con la señal recibida antes de registrar.</p>
           <Campo id="n-imei-sms" etiqueta="IMEI consultado por SMS" ayuda="Puede quedar pendiente mientras envías las consultas de abajo. Después introduce sólo sus 15 dígitos, sin contraseñas ni respuestas completas.">
             <div className="gp-field"><input id="n-imei-sms" inputMode="numeric" autoComplete="off" value={imeiSms} readOnly={!!equipo} onChange={e => { setImeiSms(e.target.value); setSeleccionado(null) }} /></div>
@@ -379,9 +379,9 @@ export default function AdminGpsNuevo() {
       )}
       {paso === 3 && !meitrack && (
         <>
-          <div className="gp-aviso" role="status">{equipo ? 'Registro comprobado en inventario; instalar y activar son pasos separados.' : 'Preparación sin registro. Configura por SMS, consulta el IMEI y elige la señal coincidente al final.'}</div>
+          <div className="gp-aviso" role="status">{equipo ? 'Registro comprobado en inventario; instalar y activar son pasos separados.' : porDatos ? 'Preparación sin registro. Elige la recepción del Coban y confirma qué equipo corresponde. No se exige respuesta SMS.' : 'Preparación sin registro. Configura por SMS, consulta el IMEI y elige la señal coincidente al final.'}</div>
           <div className="gp-grid l400">
-            <ComandosSms equipo={equipoVista} clave={clave} alCambiarClave={setClave} />
+            {porDatos ? <details className="gp-card"><summary>Configuración por SMS (opcional)</summary><p>Si el equipo ya transmite al receptor, no hace falta repetir APN ni dirección para identificarlo.</p><ComandosSms equipo={equipoVista} clave={clave} alCambiarClave={setClave}/></details> : <ComandosSms equipo={equipoVista} clave={clave} alCambiarClave={setClave} />}
             {equipo && <PruebaSenal equipo={equipoVista} />}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
