@@ -1263,13 +1263,14 @@ export const repoApi = {
       }
       return true
     },
-    async registrar({ imei, modelo, protocolo, fabricante, serie, linea, ...metadata }) {
+    async registrar({ imei, modelo, protocolo, fabricante, serie, linea, registrationMethod, identityConfirmedByOperator, ...metadata }) {
       const r = await api.registrarEquipoGps({
         imei,
         model: modelo,
         protocolFamily: protocolo || 'coban-gps103',
         manufacturer: fabricante || undefined,
         serialNumber: serie || undefined,
+        ...(registrationMethod ? {registrationMethod,identityConfirmedByOperator} : {}),
         ...cambiosGps({ ...metadata, simPhone: linea || metadata.simPhone }),
       })
       return { id: r?.gpsDevice?.id ?? r?.device?.id ?? r?.id ?? null }
@@ -2514,6 +2515,12 @@ repoApi.gpsEscritura.sinEmparejar = async function sinEmparejar() {
     transporte: d.transport,
     reportando: Boolean(d.isReporting),
     bytesUltimo: d.lastMessageBytes ?? null,
+    origenIdentidad: d.identitySource ?? 'unverified_digits',
+    ultimaIdentidad: d.identityLastSeenAt ?? null,
+    protocolo: d.protocolFamily ?? null,
+    comunicaciones: (d.recentMessages ?? []).map(m => ({recibido:m.receivedAt,transporte:m.transport,bytes:m.bytes})),
+    diasMuestra: d.windowDays ?? 30,
+    limiteMuestra: d.scanLimit ?? 5000,
   }))
 }
 
