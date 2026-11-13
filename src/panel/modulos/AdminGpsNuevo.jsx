@@ -85,7 +85,7 @@ export default function AdminGpsNuevo() {
   // Lo que se manda al servidor: los mismos nombres de campo que «Editar» (metadatosGps).
   const metadatos = () => ({
     simPhone: datos.telefono.trim(),
-    iccid: validarIccid(datos.iccid).valor,
+    ...(validarIccid(datos.iccid).valor ? { iccid: validarIccid(datos.iccid).valor } : {}),
     carrier: datos.operador.trim(),
     apn: datos.apn.trim(),
     simStatus: datos.estadoSim,
@@ -276,7 +276,7 @@ export default function AdminGpsNuevo() {
               <Campo id="n-tel" etiqueta="Teléfono de la línea *" error={errores.telefono}>
                 <div className={`gp-field${errores.telefono ? ' mal' : ''}`}><input id="n-tel" type="tel" placeholder="0414-5523187" maxLength={30} value={datos.telefono} onChange={(e) => poner('telefono', e.target.value)} /></div>
               </Campo>
-              <Campo id="n-iccid" etiqueta="ICCID *" error={errores.iccid} ayuda="De 18 a 22 dígitos, impreso en la tarjeta.">
+              <Campo id="n-iccid" etiqueta="ICCID (opcional)" error={errores.iccid} ayuda="Puedes dejarlo en blanco. Si lo indicas, debe tener de 18 a 22 dígitos, impreso en la tarjeta.">
                 <div className={`gp-field${errores.iccid ? ' mal' : ''}`}><input id="n-iccid" className="gp-mono" inputMode="numeric" autoComplete="off" maxLength={26} value={datos.iccid} onChange={(e) => poner('iccid', e.target.value)} /></div>
               </Campo>
               <Campo id="n-op" etiqueta="Operador *" error={errores.operador}>
