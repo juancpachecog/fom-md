@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { revisar } from './bajar-modelo.mjs'
 import { validReceiverIp } from '../src/panel/datos/gpsReceiver.js'
+import { execFileSync } from 'node:child_process'
 
 export function productionProfile(env) {
   if (env.VITE_FOM_API !== '/fom-api') throw Error('La publicación FOM requiere la API real del mismo origen; modo demostración rechazado.')
@@ -21,11 +22,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const profile = productionProfile(loadEnv('production', envDir, 'VITE_'))
   const problems = await revisar()
   if (problems.length) throw Error(problems.join('; '))
+  execFileSync(process.execPath, ['--test', ...[
+    'gps-panel', 'gps-discovery', 'gps-inventory', 'gps-meitrack', 'meitrack-wizard',
+    'meitrack-operational', 'meitrack-guided', 'meitrack-clock-readback', 'production-profile',
+  ].map(name => `test/${name}.test.js`)], { stdio: 'inherit' })
   await build({ mode: 'production', envDir, plugins: [{ name: 'fom-connected-build-witness',
     configResolved(config) {
       if (productionProfile(config.env).publicConfigSha256 !== profile.publicConfigSha256)
         throw Error('El perfil efectivo de Vite no coincide con el perfil revisado.')
     },
-    closeBundle() { writeFileSync(resolve('dist/fom-build-profile.json'), JSON.stringify(profile)) } }] })
+    closeBundle() { writeFileSync(resolve('dist/fom-build-profile.json'), JSON.stringify({ ...profile, gpsFlowVerified: true })) } }] })
   console.log('FOM_PRODUCTION_CONNECTED_PROFILE=PASS')
 }

@@ -394,6 +394,8 @@ export const api = {
     pedir(`${CONSOLA}/meitrack-setup/register`, { metodo: 'POST', cuerpo, empresaContexto: null }),
   actualizarEquipoGps: (equipoId, cuerpo) =>
     pedir(`${CONSOLA}/gps-devices/${equipoId}`, { metodo: 'PATCH', cuerpo }),
+  archivarEquipoGps: (equipoId, reason) =>
+    pedir(`${CONSOLA}/gps-devices/${equipoId}/archive`, { metodo: 'POST', cuerpo: { reason }, empresaContexto: null }),
   // `empresaId`: sin dato, la ruta normal (la de la empresa en gestión, si hay); un id, la ruta
   // `/tenants/{id}` de esa empresa; `null`, la ruta propia aunque se esté dentro de otra empresa.
   instalarEquipoGps: (equipoId, cuerpo, empresaId) =>

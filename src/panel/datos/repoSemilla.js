@@ -1297,7 +1297,7 @@ export const repo = {
       async listar({ q = '' } = {}) {
         const empresas = todasEmpresas()
         const ahora = Date.now()
-        let lista = inventarioGps().map((g) => ({
+        let lista = inventarioGps().filter(g => g.estado !== 'archived').map((g) => ({
           ...alDiaDemo(g, ahora),
           empresaNombre: g.empresaId ? (empresas.find((e) => e.id === g.empresaId)?.nombre ?? '—') : 'Sin asociar',
         }))
@@ -1309,7 +1309,7 @@ export const repo = {
       },
 
       async obtener(id) {
-        const g = inventarioGps().find((x) => x.id === id)
+        const g = inventarioGps().find((x) => x.id === id && x.estado !== 'archived')
         if (!g) return fallo('Ese GPS no está en el inventario.')
         const empresa = todasEmpresas().find((e) => e.id === g.empresaId)
         return responder({ ...alDiaDemo(g), empresaNombre: empresa?.nombre ?? '—' })
@@ -1403,6 +1403,14 @@ export const repo = {
       },
 
       /** Corrige datos del equipo. El IMEI no se corrige. */
+      async archivar(id, motivo, actor) {
+        const g = todosGps().find(x => x.id === id)
+        if (!g || g.vehiculoId || g.instalacionId || g.estado === 'active') return fallo('Desmonta el equipo antes de archivarlo.')
+        if (!motivo?.trim()) return fallo('Indica el motivo del retiro.')
+        guardarParche('gps', id, { estado: 'archived' })
+        auditar('archivar_gps', { actor, objetivo: id, detalle: motivo.trim() })
+        return responder(true)
+      },
       async set(id, { estado, fabricante, serie, metadatos = {} }) {
         const g = todosGps().find((x) => x.id === id)
         if (!g) return fallo('Ese GPS no está en el inventario.')
