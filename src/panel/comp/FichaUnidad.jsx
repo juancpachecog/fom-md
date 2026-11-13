@@ -4,6 +4,7 @@ import { Icono } from '../Iconos'
 import { estadoUnidad } from '../datos/estadoUnidad'
 import { conSenalAlDia, textoSinSenal, textoUltimoReporte, useMinuto } from '../datos/sinSenal'
 import FotoUnidad from './FotoUnidad'
+import { KmHoy } from './KmHoy'
 import { PastillaConductor } from './ManejoConductor'
 import { useSesion } from '../useSesion'
 import { esGestor } from '../roles'
@@ -37,7 +38,7 @@ function datosDe(v) {
   return filas.filter(([, valor]) => valor != null && valor !== '')
 }
 
-export default function FichaUnidad({ unidad, variante = 'panel', conCabecera = true, alCerrar, conEnlace = true, alVerRecorrido, viendoRecorrido = false, alVerManejo, viendoManejo = false, children }) {
+export default function FichaUnidad({ unidad, kmHoy, variante = 'panel', conCabecera = true, alCerrar, conEnlace = true, alVerRecorrido, viendoRecorrido = false, alVerManejo, viendoManejo = false, children }) {
   const puedeEditar = esGestor(useSesion()?.perfil)
   // Con la ficha abierta, «hace 12 min» avanza solo cada minuto y la unidad pasa sola a
   // «Sin señal» a los 5 min sin reportar, sin esperar otra lectura del servidor.
@@ -68,7 +69,7 @@ export default function FichaUnidad({ unidad, variante = 'panel', conCabecera = 
     {ultimo && <small className="fleet-status-nota">{ultimo}</small>}
     {v.soloRecepcion && v.conectado && v.posicionEn && Number.isFinite(v.lat) && Number.isFinite(v.lng) && <p role="status" className="fleet-status-nota">El GPS está reportando. La posición del mapa es histórica: recibida el {f.fechaHora(v.posicionEn)}. No hay una posición reciente para confirmar el movimiento.</p>}
     {ubicacionGps && !ubicacionGps.available && <div role="status" className="fleet-status-nota"><strong>{ubicacionGps.title}</strong><p>{ubicacionGps.detail}</p></div>}
-    <h3 className="fleet-plate">{v.placa || 'Sin placa'}</h3>
+    <div className="fleet-plate-dia"><h3 className="fleet-plate">{v.placa || 'Sin placa'}</h3>{kmHoy && <KmHoy lectura={kmHoy}/>}</div>
     {descripcion && <p className="fleet-description">{descripcion}</p>}
     <FotoUnidad key={v.id} unidad={v} puedeEditar={puedeEditar} />
     <div className="fleet-speed"><Icono nombre="velocidad" tam={25} /><strong>{v.velocidadKmh == null ? 'Sin velocidad GPS' : f.numero(v.velocidadKmh)}{v.velocidadKmh != null && <small> km/h</small>}</strong></div>

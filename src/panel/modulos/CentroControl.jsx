@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import repo from '../datos/repo'
 import { EmpresaActiva } from '../comp/EmpresaActiva'
+import { lecturaKmSeleccionado } from '../datos/kmHoy.js'
 import { useSesion } from '../useSesion'
 import { esAdminFom } from '../auth'
 import { firmaFlota } from '../datos/firmaFlota.js'
@@ -73,6 +74,10 @@ export default function CentroControl() {
   // Se pide la flota entera y el buscador, el área y el estado filtran aquí lo
   // ya cargado: antes cada letra escrita era un pedido al servidor.
   const flota = useDatos(() => repo.vehiculos.listar({}), [], 15000)
+  const kmDia = useDatos(async () => ({ vehiculoId: seleccionado,
+    metrica: seleccionado && repo.vehiculos.kmHoy ? await repo.vehiculos.kmHoy(seleccionado) : null,
+  }), [seleccionado], 60000)
+  const kmHoy = lecturaKmSeleccionado(kmDia, seleccionado)
   // La ficha solo necesita de más el IMEI del equipo, que la flota no trae: se saca del inventario
   // de equipos GPS (un solo pedido) al elegir la unidad. Antes se pedía el expediente entero (~8
   // pedidos, todas las páginas de ODT). Lo vivo (posición, velocidad, señal) ya llega con la
@@ -276,7 +281,7 @@ export default function CentroControl() {
         <ListaUnidades vehiculos={lista} seleccionado={seleccionado} alSeleccionar={elegirUnidad} />
       </aside>}
       {seleccionado && <aside className={`control-panel control-unit${enModo ? ' con-ruta' : ''}`} aria-label="Detalle de la unidad">
-        <FichaUnidad unidad={unidad} alCerrar={() => setSeleccionado(null)} alVerRecorrido={alternarRecorrido} viendoRecorrido={viendoRecorrido}
+        <FichaUnidad unidad={unidad} kmHoy={kmHoy} alCerrar={() => setSeleccionado(null)} alVerRecorrido={alternarRecorrido} viendoRecorrido={viendoRecorrido}
           alVerManejo={alternarManejo} viendoManejo={viendoManejo} />
         {viendoManejo && <BloqueManejoBrusco m={manejo} />}
         {!enModo && colaPuntos.length > 1 && <p className="control-detail-note ruta-cola-nota" role="status">{colaInfo?.ampliada ? 'Línea punteada: su último trayecto (ahora está detenida).' : `Línea punteada: los últimos ${COLA_MIN} min de camino.`} Pulsa «Ver recorrido» para el día completo.</p>}
