@@ -1,6 +1,9 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import repo from '../datos/repo'
+import { EmpresaActiva } from '../comp/EmpresaActiva'
+import { useSesion } from '../useSesion'
+import { esAdminFom } from '../auth'
 import { firmaFlota } from '../datos/firmaFlota.js'
 import { useDatos } from '../useDatos'
 import {
@@ -45,6 +48,7 @@ const firmaPuntos = (p) => `${p.length}|${p[0]?.hora}|${p.at(-1)?.hora}|${p.at(-
 const firmaAnalisis = (a) => `${firmaPuntos(a.puntos)}|${a.viajes.length}|${a.paradas.length}`
 
 export default function CentroControl() {
+  const contexto = useSesion()
   const [q, setQ] = useState('')
   const [estadoMarcha, setEstadoMarcha] = useState('')
   const [areaId, setAreaId] = useState('')
@@ -240,7 +244,7 @@ export default function CentroControl() {
           alto="100%" ficha={false} leyenda={false} espacioFicha herramientas />
       </div>
       <div className="control-search">
-        <div className="control-search-heading"><div><h1>Centro de control</h1><p>{bajada}{sinPunto > 0 && <> · <button type="button" className="control-sin-posicion" onClick={() => { setListaAbierta(true); setSeleccionado(null) }}>{sinPunto} sin posición · Ver unidades</button></>}</p>{incompleta && <p role="status">Lista incompleta: la flota es más grande de lo que se pudo leer.</p>}</div>
+        <div className="control-search-heading"><div><div className="control-titulo-empresa"><h1>Centro de control</h1><EmpresaActiva perfil={contexto?.perfil} admin={esAdminFom(contexto?.perfil)} /></div><p>{bajada}{sinPunto > 0 && <> · <button type="button" className="control-sin-posicion" onClick={() => { setListaAbierta(true); setSeleccionado(null) }}>{sinPunto} sin posición · Ver unidades</button></>}</p>{incompleta && <p role="status">Lista incompleta: la flota es más grande de lo que se pudo leer.</p>}</div>
           <div className="control-acciones">
             <button className="pnl-btn" type="button" aria-label="Unidades" aria-expanded={listaAbierta} aria-controls="control-unidades" onClick={() => { setListaAbierta(v => !v); setSeleccionado(null) }}><Icono nombre="camion" tam={18} />Unidades</button>
           </div>
