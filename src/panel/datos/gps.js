@@ -8,6 +8,7 @@
 // últimos 5 minutos (`transmitiendo` de sinSenal.js, igual que la app).
 // ============================================================
 import { tiempoSinSenal, transmitiendo } from './sinSenal.js'
+import { validReceiverIp } from './gpsReceiver.js'
 
 /**
  * Marcas y modelos que el receptor FOM sabe leer. El modelo elige el
@@ -136,7 +137,8 @@ export function armarComandos({ clave = '', apn = '', ip = '', puerto = PUERTO_R
   return lista.map(({ titulo, cuerpo, respuesta }, i) => ({
     n: String(i + 1).padStart(2, '0'),
     titulo,
-    texto: cuerpo(c),
+    texto: i === 1 && !validReceiverIp(ip) ? null : cuerpo(c),
+    falta: i === 1 && !validReceiverIp(ip) ? 'El receptor no está configurado. No se puede copiar este comando.' : '',
     visible: cuerpo(PUNTOS_CLAVE),
     respuesta,
   }))

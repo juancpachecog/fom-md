@@ -73,7 +73,12 @@ test('comandos SMS: UDP, clave de fábrica y receptor sin configurar', () => {
   const c = armarComandos({ apn: 'gprsweb.digitel.ve', transporte: 'udp' })
   assert.equal(c[2].texto, 'GPRS123456,1,1')
   assert.equal(c[2].titulo, 'Encender datos por UDP')
-  assert.equal(c[1].texto, 'adminip123456 [IP del receptor] 5001')
+  assert.equal(c[1].texto, null)
+  assert.match(c[1].falta, /no está configurado/u)
+  for (const ip of ['', '999.1.1.1', '[IP del receptor]', 'host.invalid', '1.2.3.4\nSMS']) {
+    assert.equal(armarComandos({ ip })[1].texto, null)
+  }
+  assert.equal(armarComandos({ ip: ' 192.0.2.24 ' })[1].texto, 'adminip123456 192.0.2.24 5001')
   assert.equal(c[3].respuesta, 'Debe decir GPRS ON y PORT 5001')
 })
 
