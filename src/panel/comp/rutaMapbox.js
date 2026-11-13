@@ -41,7 +41,7 @@ const coleccionDe = (viajes) => ({
  * cambiarles el trazo sin volver a crear capas (`actualizar`).
  * Cada viaje es una línea visible y otra casi invisible, más ancha, que recibe el cursor.
  */
-export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = '#349bfa', alElegirViaje }) {
+export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = AZUL_ESTELA_FOM, alElegirViaje }) {
   const ID = `ruta-${Date.now().toString(36)}`
   const limites = []
   const marcadores = []
@@ -58,7 +58,7 @@ export function pintarRuta(gl, mapa, { viajes = [], paradas = [], color = '#349b
     source: ID,
     slot: 'top',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
-    paint: { 'line-color': color, 'line-width': 5, 'line-opacity': 0.95 },
+    paint: { 'line-color': color, 'line-width': 5, 'line-opacity': 0.95, 'line-emissive-strength': 1 },
   })
   mapa.addLayer({
     id: `${ID}-zona`,

@@ -1,5 +1,20 @@
 # FOM — Fleet Operations & Maintenance · Landing cinematográfica
 
+## Publicación del panel conectado
+
+`npm run build` exige el perfil de producción: API del mismo origen (`/fom-api`)
+y mapas configurados. En un worktree limpio, indicar el directorio del perfil
+nominal existente: `node scripts/build-fom-production.mjs <directorio>`.
+No copiar archivos `.env`, claves ni tokens al repositorio o a registros.
+`npm run build:demo` es sólo para demostraciones y no se publica como panel FOM.
+
+Antes de sustituir la web publicada, comprobar `dist/fom-build-profile.json`,
+su configuración efectiva y el manifiesto. El publicador debe rechazar perfiles
+ausentes o de demostración. Contrastar también el módulo de autenticación con
+la versión funcional y comprobar por separado acceso real, proveedor del mapa,
+botón Capas y selección de tema. Un HTTP 401 del backend no demuestra que el
+cliente esté conectado a esa API. Conservar la versión anterior y el retorno.
+
 > **Relevo del rediseño v7 (25/09/2026):** leer [CONTINUAR-REDISENO.md](CONTINUAR-REDISENO.md) y el [plan de las 90 secciones](output/PLAN-IMPLEMENTACION-V7.md). En la rama `codex/rediseno-v6-fiel`, Inicio está implementado; las otras diez páginas siguen pendientes de aplicar. La descripción histórica de abajo no describe íntegramente el Inicio actual.
 
 Experiencia web 3D controlada por scroll para presentar **FOM**, la plataforma de
