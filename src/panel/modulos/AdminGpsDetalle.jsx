@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { pestanaEquipo } from '../hardware-navegacion'
 import repo from '../datos/repo'
@@ -7,6 +7,8 @@ import { useSesion } from '../useSesion'
 import { Cargando, ErrorCarga, Modal, Vacio } from '../comp/ui'
 import { Cabeza, IcoGps, Pastilla, RAIZ_GPS, useAhora } from '../comp/GpsPiezas'
 import { CAMPOS_GPS, cambiosGps } from '../datos/metadatosGps'
+import { canArchiveGps, gpsEditChanges } from '../datos/gpsInventory.js'
+import { esAdminFom } from '../roles'
 import {
   ESTADOS_SIM, PUNTOS_CLAVE, calidadRecepcion, coordenadasTexto, estadoEquipo,
   haceCuanto, intervaloTexto, lecturaTrama, nombreEquipo, nombreProtocolo, senalDe, unirTramasConPosiciones,
@@ -41,6 +43,8 @@ export default function AdminGpsDetalle() {
   const pestana = pestanaEquipo(params.toString())
   const setPestana = value => setParams(previous => { const next = new URLSearchParams(previous); next.set('vista', value); return next }, { replace: true })
   const [desmontando, setDesmontando] = useState(false)
+  const [archivando, setArchivando] = useState(false)
+  const sesion = useSesion()
   const [aviso, setAviso] = useState(state?.aviso ?? '')
 
   const equipo = useDatos(() => repo.admin.gps.obtener(id), [id], 30_000)
@@ -76,6 +80,7 @@ export default function AdminGpsDetalle() {
         acciones={(
           <>
             <button type="button" className="gp-btn2" onClick={() => setPestana('datos')}><IcoGps nombre="editar" />Editar</button>
+            {esAdminFom(sesion?.perfil) && canArchiveGps(g) && <button type="button" className="gp-btn3" onClick={() => setArchivando(true)}>Retirar del inventario</button>}
             {g.vehiculoId
               ? <button type="button" className="gp-btn2" onClick={() => setDesmontando(true)}>Desmontar</button>
               : <button type="button" className="gp-btn2" onClick={() => navegar(`${RAIZ_GPS}/${g.id}/instalar`)}><IcoGps nombre="enlace" />Instalar en una unidad</button>}
@@ -110,6 +115,8 @@ export default function AdminGpsDetalle() {
         alCerrar={() => setDesmontando(false)}
         alTerminar={() => navegar(RAIZ_GPS, { state: { aviso: `Equipo desmontado de ${alias ?? 'la unidad'}: vuelve al inventario con su historial.` } })}
       />
+      <VentanaArchivar g={g} abierta={archivando} alCerrar={() => setArchivando(false)}
+        alTerminar={() => navegar(RAIZ_GPS, { state: { aviso: 'Equipo archivado: salió del inventario conservando su historial.' } })} />
     </div>
   )
 }
@@ -275,11 +282,13 @@ function DatosEditables({ g, alGuardar }) {
     setGuardando(true)
     setError('')
     try {
+      const cambios = gpsEditChanges(datos, inicial)
+      if (!Object.keys(cambios).length) { setGuardando(false); return }
       const metadatos = cambiosGps(datos, inicial)
       await repo.admin.gps.set(g.id, {
         estado: datos.estado !== inicial.estado ? datos.estado : undefined,
-        fabricante: datos.fabricante.trim() !== inicial.fabricante ? datos.fabricante.trim() || undefined : undefined,
-        serie: datos.serie.trim() !== inicial.serie ? datos.serie.trim() || undefined : undefined,
+        fabricante: datos.fabricante.trim() !== inicial.fabricante ? datos.fabricante.trim() || null : undefined,
+        serie: datos.serie.trim() !== inicial.serie ? datos.serie.trim() || null : undefined,
         metadatos,
       })
       await alGuardar()
@@ -341,7 +350,7 @@ function DatosEditables({ g, alGuardar }) {
       </div>
       {error && <div className="gp-aviso error" role="alert">{error}</div>}
       <div className="gp-pie">
-        <button type="button" className="gp-btn" onClick={guardar} disabled={guardando}><IcoGps nombre="check" />{guardando ? 'Guardando…' : 'Guardar cambios'}</button>
+        <button type="button" className="gp-btn" onClick={guardar} disabled={guardando || JSON.stringify(datos) === JSON.stringify(inicial)}><IcoGps nombre="check" />{guardando ? 'Guardando…' : 'Guardar cambios'}</button>
       </div>
     </section>
   )
@@ -396,6 +405,28 @@ function Historial({ g, posiciones }) {
       </section>
     </div>
   )
+}
+
+export function VentanaArchivar({ g, abierta, alCerrar, alTerminar }) {
+  const [motivo, setMotivo] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+  const inFlight = useRef(false)
+  const archivar = async () => {
+    if (inFlight.current || !canArchiveGps(g) || !motivo.trim()) return
+    inFlight.current = true; setGuardando(true); setError('')
+    try { await repo.admin.gps.archivar(g.id, motivo.trim()); alTerminar() }
+    catch (e) { setError(e.message) }
+    finally { inFlight.current = false; setGuardando(false) }
+  }
+  return <Modal titulo="Retirar equipo del inventario" abierto={abierta} alCerrar={guardando ? () => {} : alCerrar} ancho={460}>
+    <div className="gp gp-ventana">
+      <p>El equipo {nombreEquipo(g)} dejará de aparecer en el inventario. Se conservan su identidad, instalaciones anteriores y mensajes recibidos. Un equipo instalado debe desmontarse primero.</p>
+      <div className="gp-f"><label htmlFor="a-motivo">Motivo del retiro</label><div className="gp-field"><input id="a-motivo" maxLength={500} value={motivo} onChange={e => setMotivo(e.target.value)} disabled={guardando}/></div></div>
+      {error && <p className="gp-error" role="alert">{error}</p>}
+      <div className="gp-pie"><button type="button" className="gp-btn2" onClick={alCerrar} disabled={guardando}>Cancelar</button><button type="button" className="gp-btn3" onClick={archivar} disabled={guardando || !motivo.trim() || !canArchiveGps(g)}>{guardando ? 'Comprobando retiro…' : 'Archivar equipo'}</button></div>
+    </div>
+  </Modal>
 }
 
 function VentanaDesmontar({ g, abierta, alCerrar, alTerminar }) {
