@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { haceCuanto } from '../datos/gps'
+import DetalleDetectado from './DetalleDetectado'
 import '../modulos/admin-gps.css'
 
 // ============================================================
@@ -78,6 +79,7 @@ export function Cabeza({ ruta = [], titulo, bajada, acciones }) {
 
 /** Un IMEI detectado: «Reportando ahora» o «Visto hace 25 min». */
 export function Detectado({ d, ahora, elegido = false, detallado = false, children }) {
+  const [detalle, setDetalle] = useState(false)
   return (
     <div className={`gp-det${elegido ? ' sel' : ''}`}>
       <span className="gp-ibox"><IcoGps nombre="senal" /></span>
@@ -93,6 +95,8 @@ export function Detectado({ d, ahora, elegido = false, detallado = false, childr
         )}
         {!detallado && <EstadoDetectado d={d} ahora={ahora} />}
         {children}
+          <button type="button" className="gp-btn2 chico" onClick={() => setDetalle(true)}>Ver comunicación</button>
+        {detalle && <DetalleDetectado inicial={d} alCerrar={() => setDetalle(false)} />}
       </div>
     </div>
   )

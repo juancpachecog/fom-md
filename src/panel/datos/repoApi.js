@@ -2514,6 +2514,11 @@ repoApi.gpsEscritura.sinEmparejar = async function sinEmparejar() {
     transporte: d.transport,
     reportando: Boolean(d.isReporting),
     bytesUltimo: d.lastMessageBytes ?? null,
+    origenIdentidad: d.identitySource ?? 'unverified_digits',
+    protocolo: d.protocolFamily ?? null,
+    comunicaciones: (d.recentMessages ?? []).map(m => ({recibido:m.receivedAt,transporte:m.transport,bytes:m.bytes})),
+    diasMuestra: d.windowDays ?? 30,
+    limiteMuestra: d.scanLimit ?? 5000,
   }))
 }
 
