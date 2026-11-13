@@ -24,6 +24,7 @@ import { leerRecepcionGps } from './leerRecepcionGps.js'
 import { coleccionDePersona, indiceDePersona } from './perfilUsuario'
 import { cuerpoCredencial, credencialesVigentes } from './credencialesPersona'
 import { cambiosGps } from './metadatosGps'
+import { leerKmHoy } from './kmHoy.js'
 import { MEITRACK, cuerpoAltaMeitrack } from './gpsMeitrack'
 import { buscarEquipoGps, empresaDeInstalacion, empresaPropia, equiposParaNuevaUnidad, mensajeInstalarGps } from './instalarGps'
 import { empresaDeReinicio, mensajeReiniciarClave } from './reiniciarClave'
@@ -669,6 +670,7 @@ export const repoApi = {
   },
 
   vehiculos: {
+    kmHoy: (vehiculoId) => leerKmHoy(api.metricasDiarias, vehiculoId),
     /**
      * Kilómetros recorridos por día, calculados por el servidor con TODAS las posiciones del día (la lectura de
      * posiciones solo entrega 1.000 por consulta, unas 11 horas, y por eso el cálculo desde el navegador se movía).

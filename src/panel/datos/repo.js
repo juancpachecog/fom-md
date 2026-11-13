@@ -218,6 +218,7 @@ const repo = HAY_API
         usuariosAsignados: repoApi.vehiculos.usuariosAsignados,
         odometro: repoApi.vehiculos.odometro,
         kmPorDia: repoApi.vehiculos.kmPorDia,
+        kmHoy: repoApi.vehiculos.kmHoy,
         registrarOdometro: repoApi.vehiculos.registrarOdometro,
         // Alta, edición, área y conductor: reales desde el #219.
         ...repoApi.vehiculosEscritura,
