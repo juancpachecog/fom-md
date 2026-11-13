@@ -66,7 +66,7 @@ export function validarImei(texto) {
 /** ICCID de la SIM: de 18 a 22 dígitos (viene impreso en la tarjeta). */
 export function validarIccid(texto) {
   const crudo = String(texto ?? '').trim()
-  if (!crudo) return { valor: '', error: 'Escribe el ICCID: viene impreso en la tarjeta SIM.' }
+  if (!crudo) return { valor: '', error: '' }
   if (/[^\d\s]/u.test(crudo)) return { valor: '', error: 'El ICCID lleva solo números.' }
   const valor = soloDigitos(crudo)
   if (valor.length < 18 || valor.length > 22) {

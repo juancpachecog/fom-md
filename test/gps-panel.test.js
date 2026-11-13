@@ -26,7 +26,7 @@ test('ICCID: de 18 a 22 dígitos', () => {
   assert.equal(validarIccid('8958020119045537216123').error, '')
   assert.match(validarIccid('89580201190455372').error, /18 a 22 dígitos; este tiene 17/u)
   assert.match(validarIccid('89580201190455372161234').error, /este tiene 23/u)
-  assert.match(validarIccid('').error, /impreso en la tarjeta/u)
+  for (const valor of ['', '   ', undefined, null]) assert.deepEqual(validarIccid(valor), { valor: '', error: '' })
   assert.match(validarIccid('8958-0201').error, /solo números/u)
 })
 
@@ -45,6 +45,8 @@ test('paso 1 y paso 2: errores por campo, vacío cuando todo está bien', () => 
   assert.ok(validarEquipo({ marca: 'Coban', modelo: 'GPS-403', imei: '123' }).imei)
   const linea = { telefono: '0414-5523187', iccid: '895804011904553118', operador: 'Movistar', apn: 'internet.movistar.ve', estadoSim: 'active' }
   assert.deepEqual(validarLinea(linea), {})
+  for (const iccid of ['', '  ', undefined]) assert.deepEqual(validarLinea({ ...linea, iccid }), {})
+  assert.ok(validarLinea({ ...linea, iccid: '123' }).iccid)
   assert.ok(validarLinea({ ...linea, apn: '' }).apn)
   assert.ok(validarLinea({ ...linea, apn: 'con espacio' }).apn)
   assert.ok(validarLinea({ ...linea, operador: ' ' }).operador)
