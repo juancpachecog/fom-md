@@ -22,9 +22,6 @@ export const CATALOGO_GPS = {
   Coban: {
     'GPS-403': { protocolo: 'coban-gps103', protocoloNombre: 'Coban GPS103', transporte: 'tcp' },
   },
-  Meitrack: {
-    T399L: { protocolo: 'meitrack-t399', protocoloNombre: 'Meitrack T399', transporte: 'tcp' },
-  },
 }
 
 export const ESTADOS_SIM = [

@@ -1329,7 +1329,7 @@ export const repo = {
         // Si ya transmitía como «detectado», sigue transmitiendo: su señal no se corta al registrarlo.
         const detectado = detectadosDemo(ahora).find((d) => d.imei === imeiN && d.reportando)
         const fila = {
-          id: `gps-n${ahora.toString(36)}`,
+          id: crypto.randomUUID(),
           modelo: modelo.trim(), imei: imeiN,
           fabricante: fabricante || null, protocolo: protocolo || null, serie: serie || null,
           linea: linea || metadata.simPhone || null,

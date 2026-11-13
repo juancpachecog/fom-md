@@ -8,7 +8,6 @@ import { Cargando, ErrorCarga, Modal, Vacio } from '../comp/ui'
 import { Cabeza, IcoGps, Pastilla, RAIZ_GPS, useAhora } from '../comp/GpsPiezas'
 import { CAMPOS_GPS, cambiosGps } from '../datos/metadatosGps'
 import { canArchiveGps, gpsEditChanges } from '../datos/gpsInventory.js'
-import { esAdminFom } from '../roles'
 import {
   ESTADOS_SIM, PUNTOS_CLAVE, calidadRecepcion, coordenadasTexto, estadoEquipo,
   haceCuanto, intervaloTexto, lecturaTrama, nombreEquipo, nombreProtocolo, senalDe, unirTramasConPosiciones,
@@ -80,7 +79,7 @@ export default function AdminGpsDetalle() {
         acciones={(
           <>
             <button type="button" className="gp-btn2" onClick={() => setPestana('datos')}><IcoGps nombre="editar" />Editar</button>
-            {esAdminFom(sesion?.perfil) && canArchiveGps(g) && <button type="button" className="gp-btn3" onClick={() => setArchivando(true)}>Retirar del inventario</button>}
+            {sesion?.perfil?.rol === 'admin_fom' && canArchiveGps(g) && <button type="button" className="gp-btn3" onClick={() => setArchivando(true)}>Retirar del inventario</button>}
             {g.vehiculoId
               ? <button type="button" className="gp-btn2" onClick={() => setDesmontando(true)}>Desmontar</button>
               : <button type="button" className="gp-btn2" onClick={() => navegar(`${RAIZ_GPS}/${g.id}/instalar`)}><IcoGps nombre="enlace" />Instalar en una unidad</button>}
