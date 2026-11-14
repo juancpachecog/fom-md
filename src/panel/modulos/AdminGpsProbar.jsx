@@ -15,6 +15,7 @@ import { ComandosMeitrackFicha } from './AdminGpsMeitrack'
 import './admin-gps.css'
 import { locationStatus } from '../meitrack/location-status.js'
 import { MeitrackClockReadback } from '../meitrack/MeitrackClockReadback.jsx'
+import { IntervaloGps } from '../comp/IntervaloGps'
 
 // ============================================================
 // PROBAR SEÑAL (T-95, tablero GW3)
@@ -57,7 +58,7 @@ function ComandosSmsCoban({ equipo, clave, alCambiarClave }) {
     }
   }
   return (
-    <section className="gp-card" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '22px 24px 10px' }} aria-labelledby="gp-cmd-t">
+    <><section className="gp-card" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '22px 24px 10px' }} aria-labelledby="gp-cmd-t">
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 6, flexWrap: 'wrap' }}>
         <div className="gp-titulo">
           <p className="gp-k">{alCambiarClave ? 'Comandos SMS' : 'Paso 3 de 3'}</p>
@@ -94,7 +95,7 @@ function ComandosSmsCoban({ equipo, clave, alCambiarClave }) {
       {fallo && <p className="gp-error" role="alert">{fallo}</p>}
       {comandos.some(c => c.falta) && <span className="gp-hint" role="status" style={{ paddingTop: 6 }}>El receptor no está configurado en el sitio. El comando 02 está bloqueado hasta corregir la configuración.</span>}
       <span className="gp-hint" style={{ padding: '10px 0 6px', borderTop: '1px solid var(--e-borde, #262e39)' }}>Los puntos son la clave SMS: se pone al copiar y no se guarda.</span>
-    </section>
+    </section><IntervaloGps modelo={equipo.modelo} clave={String(clave ?? '').trim() || '123456'} /></>
   )
 }
 

@@ -29,6 +29,10 @@ export const nombreDocumentoUsuario = tipo => ({
 /** Solo los campos modificados; los que el directorio no entrega se conservan. */
 export function cambiosDatosUsuario(borrador, persona) {
   const patch = {}
+  if (borrador.nombre !== undefined && borrador.nombre.trim() !== String(persona.nombre ?? '').trim()) {
+    if (borrador.nombre.trim().length < 2 || borrador.nombre.trim().length > 120) throw new Error('El nombre debe tener entre 2 y 120 caracteres.')
+    patch.nombre = borrador.nombre.trim()
+  }
   for (const [campo, anterior] of [
     ['cedula', persona.cedula], ['telefono', persona.telefono],
     ['direccion', persona.direccion], ['nacimiento', persona.fechaNacimiento],

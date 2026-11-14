@@ -1,3 +1,4 @@
+import { useConfirmar } from './Confirmar'
 import { useEffect, useRef, useState } from 'react'
 import repo from '../datos/repo'
 import { Campo, Modal } from './ui'
@@ -39,6 +40,7 @@ export default function NuevaUnidadEmpresa({
   abierto, empresas = [], empresaInicial = '', empresaFija = false, equipoFijo = null, ofrecerGps = false,
   datosInstalacion = {}, propia = null, nombrePropia = 'tu empresa', alListo, alCerrarConUnidad, alCerrar,
 }) {
+  const { confirmar, dialogo } = useConfirmar()
   const [empresaId, setEmpresaId] = useState(empresaInicial)
   const [datos, setDatos] = useState(UNIDAD_VACIA)
   const [gpsId, setGpsId] = useState('')
@@ -106,6 +108,7 @@ export default function NuevaUnidadEmpresa({
     }
     enviando.current = true
     setGuardando(true)
+    if (!await confirmar({ titulo: creada ? 'Instalar GPS' : 'Crear vehículo', texto: `${creada ? '¿Instalar el GPS en la unidad creada' : '¿Crear el vehículo en la empresa seleccionada'}${gpsElegido && !creada ? ' e instalar el GPS seleccionado' : ''}?`, accion: creada ? 'Instalar GPS' : 'Crear vehículo' })) { enviando.current = false; setGuardando(false); return }
     let unidad = creada
     try {
       if (!unidad) {
@@ -144,7 +147,7 @@ export default function NuevaUnidadEmpresa({
   }
 
   return (
-    <Modal titulo={equipoFijo ? 'Crear unidad e instalar el GPS' : 'Nueva unidad'} abierto={abierto} alCerrar={cerrar} ancho={560}>
+    <><Modal titulo={equipoFijo ? 'Crear unidad e instalar el GPS' : 'Nueva unidad'} abierto={abierto} alCerrar={cerrar} ancho={560}>
       <div className="nue">
         {errorGps && <p role="alert">{errorGps} <button type="button" className="pnl-btn" disabled={guardando} onClick={() => setIntentoGps(n => n + 1)}>Reintentar inventario</button></p>}
         {creada && (
@@ -215,6 +218,6 @@ export default function NuevaUnidadEmpresa({
           </button>
         </div>
       </div>
-    </Modal>
+    </Modal>{dialogo}</>
   )
 }

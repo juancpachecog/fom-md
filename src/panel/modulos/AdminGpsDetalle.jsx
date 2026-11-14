@@ -19,6 +19,7 @@ import './admin-gps.css'
 import { locationStatus } from '../meitrack/location-status.js'
 import FuncionesInstalacion from './FuncionesInstalacion'
 import ComandosInstalacion from './ComandosInstalacion'
+import { useConfirmar } from '../comp/Confirmar'
 
 // ============================================================
 // DETALLE Y DIAGNÓSTICO DEL EQUIPO (T-95, tablero GW5)
@@ -268,6 +269,7 @@ function Diagnostico({ g, tele, posiciones, ultimaPos, capacidades, ahora }) {
 }
 
 function DatosEditables({ g, alGuardar }) {
+  const { confirmar, dialogo } = useConfirmar()
   const inicial = {
     estado: g.estado, fabricante: g.fabricante ?? '', serie: g.serie ?? '',
     ...Object.fromEntries(CAMPOS_GPS.map((c) => [c.clave, g[c.clave] ?? (c.clave === 'simPhone' ? g.linea ?? '' : '')])),
@@ -278,11 +280,13 @@ function DatosEditables({ g, alGuardar }) {
   const poner = (k, v) => setDatos((d) => ({ ...d, [k]: v }))
 
   const guardar = async () => {
+    if (guardando) return
     setGuardando(true)
     setError('')
     try {
       const cambios = gpsEditChanges(datos, inicial)
       if (!Object.keys(cambios).length) { setGuardando(false); return }
+      if (!await confirmar({ titulo: 'Guardar datos del GPS', texto: '¿Guardar los cambios del equipo? Se conserva su identidad y toda la telemetría.', accion: 'Guardar cambios' })) return
       const metadatos = cambiosGps(datos, inicial)
       await repo.admin.gps.set(g.id, {
         estado: datos.estado !== inicial.estado ? datos.estado : undefined,
@@ -290,6 +294,8 @@ function DatosEditables({ g, alGuardar }) {
         serie: datos.serie.trim() !== inicial.serie ? datos.serie.trim() || null : undefined,
         metadatos,
       })
+      const leido = await repo.admin.gps.obtener(g.id)
+      if (!leido || Object.keys(gpsEditChanges(datos, leido)).length) throw new Error('No se pudo comprobar el cambio completo. Recarga el equipo antes de repetir.')
       await alGuardar()
     } catch (e) {
       setError(e.message)
@@ -351,6 +357,7 @@ function DatosEditables({ g, alGuardar }) {
       <div className="gp-pie">
         <button type="button" className="gp-btn" onClick={guardar} disabled={guardando || JSON.stringify(datos) === JSON.stringify(inicial)}><IcoGps nombre="check" />{guardando ? 'Guardando…' : 'Guardar cambios'}</button>
       </div>
+      {dialogo}
     </section>
   )
 }

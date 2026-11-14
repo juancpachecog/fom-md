@@ -630,7 +630,7 @@ export default function ExpedienteVehiculo() {
             {ver('ficha') && <Parte clave="ficha" movil={movil}><FichaDatosUnidad
               unidad={v} areas={areas} puedeEditar={esGestor(sesion?.perfil)} cambiarArea={cambiarArea}
               guardandoArea={guardandoArea} errorArea={errorArea} guardado={guardado}
-              verUsuarios={() => irAParte('usuarios')}
+              verUsuarios={() => irAParte('usuarios')} alGuardar={recargar}
             />{esGestor(sesion?.perfil)&&<EtiquetasVehiculo key={v.id} vehicleId={v.id}/>}</Parte>}
 
             {/* ---------------- Telemetría ---------------- */}

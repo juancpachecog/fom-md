@@ -1,3 +1,4 @@
+import { useConfirmar } from '../comp/Confirmar'
 import MiniFoto from '../comp/MiniFoto'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -637,6 +638,7 @@ export default function Flota() {
  * Alta del activo, con instalación GPS opcional e independiente (#767).
  */
 export function ModalNuevaUnidad({ abierto, areas, alCerrar, alGuardar, actor }) {
+  const { confirmar: pedirConfirmacion, dialogo } = useConfirmar()
   const [alias, setAlias] = useState('')
   const [numero, setNumero] = useState('')
   const [placa, setPlaca] = useState('')
@@ -685,6 +687,7 @@ export function ModalNuevaUnidad({ abierto, areas, alCerrar, alGuardar, actor })
     setGuardando(true)
     setError('')
     try {
+      if (!await pedirConfirmacion({ titulo: 'Crear vehículo', texto: `¿Crear ${placa || alias || numero} en la empresa actual${gpsId ? ' e instalar el GPS seleccionado' : ''}?`, accion: 'Crear vehículo' })) { enviado.current = false; return }
       const r = await repo.vehiculos.crear(datos, actor)
       setResultado(r)
       try { await alGuardar() } catch { /* Recargar no repite un alta confirmada. */ }
@@ -696,7 +699,7 @@ export function ModalNuevaUnidad({ abierto, areas, alCerrar, alGuardar, actor })
   }
 
   return (
-    <Modal titulo="Nueva unidad" abierto={abierto} alCerrar={cerrar} ancho={560}>
+    <><Modal titulo="Nueva unidad" abierto={abierto} alCerrar={cerrar} ancho={560}>
       {resultado ? (
         <div role="status">
           <p>Unidad creada.</p>
@@ -761,7 +764,7 @@ export function ModalNuevaUnidad({ abierto, areas, alCerrar, alGuardar, actor })
           </div>
         </>
       )}
-    </Modal>
+    </Modal>{dialogo}</>
   )
 }
 

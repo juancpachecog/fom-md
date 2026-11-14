@@ -20,6 +20,7 @@ import FotosIdentidad from './FotosIdentidad'
 import CambiarFoto from './CambiarFoto'
 import { etiquetas as etiquetasFoto, ids as idsFoto } from '../datos/cloudinary'
 import '../modulos/usuarios-perfil.css'
+import { useConfirmar } from './Confirmar'
 
 export const PESTANAS = [
   { v: 'datos', t: 'Datos' },
@@ -337,7 +338,8 @@ function TablaDocumentos({ documentos, error, alVer }) {
 // teléfono, dirección y fecha de nacimiento. El servidor exige formatos
 // (`v-12345678`, `+58414…`); el repositorio los normaliza antes de enviar.
 function ModalPerfil({ persona: p, alCerrar, alHecho }) {
-  const [d, setD] = useState({ cedula: p.cedula ?? '', telefono: p.telefono ?? '', direccion: p.direccion ?? '', nacimiento: p.fechaNacimiento ?? '' })
+  const { confirmar: pedirConfirmacion, dialogo } = useConfirmar()
+  const [d, setD] = useState({ nombre: p.nombre ?? '', cedula: p.cedula ?? '', telefono: p.telefono ?? '', direccion: p.direccion ?? '', nacimiento: p.fechaNacimiento ?? '' })
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
   const set = (k) => (e) => setD((x) => ({ ...x, [k]: e.target.value }))
@@ -347,6 +349,7 @@ function ModalPerfil({ persona: p, alCerrar, alHecho }) {
     setError('')
     try {
       const cambios = cambiosDatosUsuario(d, p)
+      if (Object.keys(cambios).length && !await pedirConfirmacion({ titulo: 'Guardar datos del usuario', texto: `¿Guardar los cambios de ${p.nombre}?`, accion: 'Guardar datos' })) return
       if (Object.keys(cambios).length) await repo.personal.actualizarPerfil(p.userId ?? p.id, cambios)
       alHecho()
     } catch (e) {
@@ -356,8 +359,8 @@ function ModalPerfil({ persona: p, alCerrar, alHecho }) {
     }
   }
   return (
-    <Modal titulo="Editar datos" abierto alCerrar={alCerrar} ancho={520}>
-      <div className="usr-editar">
+    <><Modal titulo="Editar datos" abierto alCerrar={() => !guardando && alCerrar()} ancho={520}>
+      <fieldset className="usr-editar" disabled={guardando} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       {/* La foto de perfil se guarda en la misma dirección que usa «Configuración» (fom/avatar/<userId>). */}
       <div className="usr-editar-identidad">
         <Avatar userId={p.userId ?? p.id} iniciales={f.iniciales(p.nombre)} nombre={p.nombre} clase="pnl-avatar-l" tam={128} />
@@ -371,6 +374,7 @@ function ModalPerfil({ persona: p, alCerrar, alHecho }) {
         </div>
       </div>
       <p className="usr-editar-ayuda">Completa los datos del perfil.</p>
+        <Campo etiqueta="Nombre"><input className="pnl-input" value={d.nombre} maxLength={120} disabled={guardando} onChange={set('nombre')} /></Campo>
         <Campo etiqueta="Cédula" ayuda="V12345678 o E-1234567">
           <input className="pnl-input" value={d.cedula} onChange={set('cedula')} placeholder="V12345678" />
         </Campo>
@@ -394,8 +398,8 @@ function ModalPerfil({ persona: p, alCerrar, alHecho }) {
           {guardando ? 'Guardando…' : 'Guardar datos'}
         </button>
       </div>
-      </div>
-    </Modal>
+      </fieldset>
+    </Modal>{dialogo}</>
   )
 }
 

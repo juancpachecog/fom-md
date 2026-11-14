@@ -8,6 +8,8 @@ import { etiqueta } from '../datos/catalogos'
 import * as f from '../datos/formato'
 import { perfilDeUsuario } from '../datos/usuariosUnidad'
 import './expediente-unidad.css'
+import EditarVehiculo from './EditarVehiculo'
+import { useConfirmar } from '../comp/Confirmar'
 
 function Hechos({ items, unaColumna = false }) {
   return <dl className={`eu-hechos${unaColumna ? ' una-columna' : ''}`}>{items.map(([nombre, valor]) =>
@@ -15,7 +17,9 @@ function Hechos({ items, unaColumna = false }) {
   )}</dl>
 }
 
-export default function FichaDatosUnidad({ unidad: v, areas, puedeEditar, cambiarArea, guardandoArea, errorArea, guardado, verUsuarios }) {
+export default function FichaDatosUnidad({ unidad: v, areas, puedeEditar, cambiarArea, guardandoArea, errorArea, guardado, verUsuarios, alGuardar }) {
+  const [editando, setEditando] = useState(false)
+  const { confirmar, dialogo } = useConfirmar()
   const [numero, setNumero] = useState(v.numeroFlota || '')
   const [ocupadoNumero, setOcupadoNumero] = useState(false)
   const [errorNumero, setErrorNumero] = useState('')
@@ -24,6 +28,7 @@ export default function FichaDatosUnidad({ unidad: v, areas, puedeEditar, cambia
   const guardarNumero = async e => {
     e.preventDefault()
     if (ocupadoNumero) return
+    if (!await confirmar({ titulo: 'Guardar número interno', texto: `¿Actualizar el número interno de ${v.placa}?`, accion: 'Guardar' })) return
     setOcupadoNumero(true); setErrorNumero('')
     try {
       const valor = numero.trim()
@@ -38,9 +43,10 @@ export default function FichaDatosUnidad({ unidad: v, areas, puedeEditar, cambia
   return <div className="eu-ficha">
     <div className="eu-ficha-grid">
       <Tarjeta titulo="Identificación de la unidad">
+        {puedeEditar && HAY_API && <button type="button" className="pnl-btn primario" onClick={() => setEditando(true)}>Editar vehículo</button>}
         <div className="eu-identidad"><span className="eu-icono"><Icono nombre="camion" tam={28} /></span><div><span className="eu-etiqueta">Placa</span><h2>{v.placa || 'Sin placa'}</h2><p>{[v.marca, v.modelo, v.anio].filter(Boolean).join(' · ') || 'Datos del vehículo sin registrar'}</p></div></div>
         <Hechos items={[
-          ['Alias', v.alias], ['Número interno', numeroComprobado !== null ? numeroComprobado || 'Sin registrar' : v.numero], ['Marca', v.marca], ['Modelo', v.modelo],
+          ['Alias', v.aliasRegistrado], ['Número interno', numeroComprobado !== null ? numeroComprobado || 'Sin registrar' : v.numero], ['Marca', v.marca], ['Modelo', v.modelo],
           ['Año', v.anio], ['Tipo de unidad', etiqueta('vehiculo_tipo', v.tipo)],
         ]} />
         {puedeEditar && HAY_API && <form onSubmit={guardarNumero}><Campo etiqueta="Editar número interno de flota" error={errorNumero}><input className="pnl-input" value={numero} maxLength={30} disabled={ocupadoNumero} onChange={e => { setNumero(e.target.value); setNumeroComprobado(null) }} /></Campo><button type="submit" className="pnl-btn sutil" disabled={ocupadoNumero || numero.trim() === (numeroComprobado ?? v.numeroFlota ?? '')}>{ocupadoNumero ? 'Guardando…' : 'Guardar número interno'}</button>{numeroComprobado !== null && <span className="eu-nota" role="status">Guardado y comprobado.</span>}</form>}
@@ -58,7 +64,7 @@ export default function FichaDatosUnidad({ unidad: v, areas, puedeEditar, cambia
           <div className="eu-area"><span className="eu-icono"><Icono nombre="pin" tam={22} /></span><div><b>{v.areaNombre || 'Sin área'}</b><p>Ubicación, sector o contrato de la unidad.</p></div></div>
           {puedeEditar && <>
             {areas.estado === 'error' ? <ErrorCarga error={areas.error} onReintentar={areas.recargar} /> : <Campo etiqueta="Cambiar área" error={errorArea}>
-              <select className="pnl-select" value={v.areaId ?? ''} disabled={guardandoArea || areas.estado !== 'ok'} onChange={e => cambiarArea(e.target.value)}>
+              <select className="pnl-select" value={v.areaId ?? ''} disabled={guardandoArea || areas.estado !== 'ok'} onChange={async e => { const id = e.target.value; if (await confirmar({ titulo: 'Cambiar área', texto: `¿Cambiar el área de ${v.placa}?`, accion: 'Cambiar área' })) cambiarArea(id) }}>
                 <option value="">Sin área</option>
                 {(areas.datos ?? []).map(a => <option key={a.id} value={a.id}>{a.nombre} ({etiqueta('area_tipo', a.tipo)})</option>)}
               </select>
@@ -76,5 +82,6 @@ export default function FichaDatosUnidad({ unidad: v, areas, puedeEditar, cambia
         {perfil && <Link to={perfil} className="pnl-btn sutil">Ver perfil</Link>}
       </div>}
     </Tarjeta>
+    {editando && <EditarVehiculo key={v.id} unidad={v} alCerrar={() => setEditando(false)} alGuardar={alGuardar} />}{dialogo}
   </div>
 }

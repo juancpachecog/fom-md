@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { REGLAS_CLAVE, validarClave } from '../../lib/clave'
 import { Link, useSearchParams } from 'react-router-dom'
 import repo, { DIRECTORIO_REAL } from '../datos/repo'
@@ -17,6 +17,8 @@ import UsuariosMovil from './UsuariosMovil'
 import { PastillaManejo } from '../comp/ManejoConductor'
 import './usuarios-perfil.css'
 import '../../styles/movil-modulos.css'
+import { revisarRetirada, retirarRegistro } from '../datos/cicloDatos'
+import { esAdminFom } from '../roles'
 
 // Gente pertenece a la empresa de la sesión. El directorio global vive
 // en «Usuarios generales» y no se mezcla con esta vista.
@@ -192,19 +194,22 @@ export default function AdminUsuarios() {
  * `alCambiar` se llama tras cada cambio para releer lo que se ve.
  */
 export function useAccionesCuenta({ actor, alCambiar }) {
+  const enCurso = useRef(false)
   const [moviendo, setMoviendo] = useState(null)
   const [claveDe, setClaveDe] = useState(null) // {nombre, clave} tras restablecer
   const [aviso, setAviso] = useState('')
   const { confirmar, dialogo } = useConfirmar()
 
   const accion = async (fn) => {
+    if (enCurso.current) return
+    enCurso.current = true
     setAviso('')
     try {
       await fn()
       await alCambiar?.()
     } catch (e) {
       setAviso(e.message)
-    }
+    } finally { enCurso.current = false }
   }
 
   const restablecerClave = async (p) => {
@@ -228,9 +233,19 @@ export function useAccionesCuenta({ actor, alCambiar }) {
   }
 
   const eliminarDefinitivo = async (p) => {
-    if (!await confirmar({ titulo: 'Eliminar cuenta', texto: `¿Eliminar DEFINITIVAMENTE la cuenta de ${p.nombre}?`, accion: 'Eliminar', peligro: true })) return
-    if (!await confirmar({ titulo: 'Eliminar cuenta', texto: 'Esta acción no se puede deshacer. ¿Confirmas?', accion: 'Sí, eliminar', peligro: true })) return
-    accion(() => repo.admin.usuarios.eliminarDefinitivo(p.id, actor))
+    if (!DIRECTORIO_REAL) {
+      if (await confirmar({ titulo: 'Retirar usuario de demostración', texto: `¿Retirar ${p.nombre}?`, accion: 'Retirar', peligro: true })) accion(() => repo.admin.usuarios.eliminarDefinitivo(p.id, actor))
+      return
+    }
+    accion(async () => {
+      const ambito = p.empresaId || 'global'
+      const item = { type: 'user', id: p.userId || p.id, status: p.estado }
+      const previo = await revisarRetirada(ambito, item)
+      if (!previo.canRetire) throw new Error(previo.message || 'No se puede retirar esta identidad.')
+      if (!await confirmar({ titulo: 'Retirar usuario', texto: `${p.nombre} perderá el acceso en este ámbito. Se conservan su identidad y todo su historial. ${previo.message || ''}`, accion: 'Retirar usuario', peligro: true })) return false
+      await retirarRegistro(ambito, { ...item, status: previo.currentStatus }, 'Retirada de usuario desde administración', crypto.randomUUID())
+      if (!(await revisarRetirada(ambito, item)).alreadyRetired) throw new Error('No quedó comprobada la retirada. Recarga antes de repetir.')
+    })
   }
 
   // Las tres acciones que el servidor SI sabe hacer sobre una cuenta. Ninguna
@@ -239,7 +254,8 @@ export function useAccionesCuenta({ actor, alCambiar }) {
     if (!await confirmar({ titulo: 'Suspender cuenta', texto: `${p.nombre} no podrá entrar hasta que la reactives. ¿Suspender?`, accion: 'Suspender', peligro: true })) return
     accion(() => repo.admin.usuarios.suspender(p.id, 'Suspendida desde la consola'))
   }
-  const reactivar = (p) => {
+  const reactivar = async (p) => {
+    if (!await confirmar({ titulo: 'Reactivar cuenta', texto: `¿Restablecer el acceso de ${p.nombre}?`, accion: 'Reactivar' })) return
     accion(() => repo.admin.usuarios.reactivar(p.id, 'Reactivada desde la consola'))
   }
   const revocarAcceso = async (p) => {
@@ -286,7 +302,7 @@ export function useAccionesCuenta({ actor, alCambiar }) {
 /** El nombre de cada acción en su botón. */
 const TEXTO_ACCION = {
   clave: 'Clave', suspender: 'Suspender', reactivar: 'Reactivar', revocar: 'Revocar',
-  mover: 'Mover', eliminar: 'Eliminar', salida: 'Dar salida',
+  mover: 'Mover', eliminar: 'Retirar usuario', salida: 'Dar salida',
 }
 
 /**
@@ -301,6 +317,7 @@ export function accionesDeCuenta(p, { lista, actor, directorioReal }) {
       'clave',
       p.estado === 'suspended' ? 'reactivar' : p.estado === 'active' ? 'suspender' : null,
       p.estado !== 'revoked' ? 'revocar' : null,
+      esAdminFom(actor) && p.estado !== 'disabled' && p.estado !== 'revoked' ? 'eliminar' : null,
     ].filter(Boolean)
   }
   // En la demo, la misma regla de rango que el repositorio (puedeGestionarA): nadie se administra
@@ -615,6 +632,7 @@ function generarClaveTemporal() {
 }
 
 export function ModalCrear({ abierto, empresas, alCerrar, alGuardar, actor, directorioReal, global = false, empresaInicial = '' }) {
+  const { confirmar: pedirConfirmacion, dialogo } = useConfirmar()
   const [nombre, setNombre] = useState('')
   const [apellido, setApellido] = useState('')
   const [email, setEmail] = useState('')
@@ -637,6 +655,7 @@ export function ModalCrear({ abierto, empresas, alCerrar, alGuardar, actor, dire
   }
 
   const confirmar = async () => {
+    if (guardando) return
     setGuardando(true)
     setError('')
     try {
@@ -650,6 +669,7 @@ export function ModalCrear({ abierto, empresas, alCerrar, alGuardar, actor, dire
       }
       if (global && !empresaId) throw new Error('Selecciona la empresa de la persona.')
       const nombreCompleto = [nombre, directorioReal ? apellido : ''].filter(Boolean).join(' ').trim()
+      if (!await pedirConfirmacion({ titulo: 'Crear usuario', texto: `¿Crear ${nombreCompleto} con el perfil seleccionado?`, accion: 'Crear usuario' })) return
       const r = await repo.admin.usuarios.crear({
         nombre: nombreCompleto, email, rol, empresaId, conduce, clave,
         // La ruta «por empresa» (/tenants/:id/users) aún no está en el servidor publicado: si la empresa
@@ -677,7 +697,7 @@ export function ModalCrear({ abierto, empresas, alCerrar, alGuardar, actor, dire
       ]
 
   return (
-    <Modal titulo="Nuevo usuario" abierto={abierto} alCerrar={cerrar} ancho={520}>
+    <><Modal titulo="Nuevo usuario" abierto={abierto} alCerrar={cerrar} ancho={520}>
       {directorioReal && !global && !creado && <p className="pnl-campo-ayuda">La cuenta se creará en {actor?.empresa || 'la empresa de tu sesión'}.</p>}
       {creado ? (
         <>
@@ -762,7 +782,7 @@ export function ModalCrear({ abierto, empresas, alCerrar, alGuardar, actor, dire
           </div>
         </>
       )}
-    </Modal>
+    </Modal>{dialogo}</>
   )
 }
 

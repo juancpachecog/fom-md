@@ -8,7 +8,7 @@
 //    de esa empresa. Desde el inventario global (#749) el equipo no tiene que ser de la misma empresa.
 
 /** Topes del servidor (CreateVehicleDto). */
-export const LIMITES_UNIDAD = { numero: 30, codigo: 60, placa: 20, alias: 80, marca: 80, modelo: 80 }
+export const LIMITES_UNIDAD = { numero: 30, codigo: 50, placa: 20, alias: 80, marca: 80, modelo: 80 }
 
 export const TIPOS_UNIDAD = [
   { v: 'camioneta', t: 'Camioneta' },

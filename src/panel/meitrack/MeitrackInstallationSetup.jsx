@@ -5,6 +5,7 @@ import { readIdentitySms, readCommandsSms, readPendingSms, readConnectionOk } fr
 import { receiverAvailable, connectionSms, connectionReadback } from './operational-setup.js'
 import { parseSetupCapture } from './meitrack-setup.js'
 import { MeitrackClockReadback } from './MeitrackClockReadback.jsx'
+import { IntervaloGps } from '../comp/IntervaloGps'
 
 const request = (path, body, signal) => pedir(`/api/v1/console/meitrack-setup/${path}`, { metodo:'POST', cuerpo:body, señal:signal, empresaContexto:null })
 export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdentityChange, onCapture, onLockChange, onSelect, selected=false, canRegister=false, onRegister, registered=false, registering=false, registrationError='', soloPrueba=false }) {
@@ -74,6 +75,7 @@ export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdent
       {message && <p role="status">{message}</p>}
       <span className="gp-hint">La clave y las respuestas completas permanecen sólo en memoria. Descartar no deshace los SMS enviados. No se activa ni se instala el GPS al registrarlo.</span>
     </section>
+    <IntervaloGps key={imei+firmware} modelo="T399L" clave={password} compatible={identity?.supported && announced?.includes('A12')} />
     {configured&&<MeitrackClockReadback key={imei+firmware} imei={imei} firmware={firmware} readback={readback}/>}
     <section className="gp-card gp-col" aria-label="Detectados sin registrar Meitrack">
       <h2 className="gp-st">Detectados sin registrar · confirmar al final</h2>

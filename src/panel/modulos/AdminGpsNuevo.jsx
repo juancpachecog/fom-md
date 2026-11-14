@@ -128,6 +128,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
     setGuardando(true)
     setErrorAlta('')
     try {
+      if (!await confirmar({ titulo: 'Registrar GPS sin activar', texto: '¿Crear la ficha de inventario del GPS identificado? No se instala ni se activa y se conserva la recepción original.', accion: 'Registrar GPS' })) return
       if (!navigator.locks?.request) throw Error('Use un navegador compatible con la protección de intentos entre pestañas.')
       const payload = { imei: identidad, model: datos.modelo, manufacturer: datos.marca,
         protocolFamily: modelo?.protocolo, ...metadatos(), ...(datos.serie.trim() ? { serialNumber: datos.serie.trim() } : {}), ...(porDatos ? {registrationMethod:'received_data',identityConfirmedByOperator:true} : {}) }
@@ -157,6 +158,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
     setGuardando(true)
     setErrorAlta('')
     try {
+      if (!await confirmar({ titulo: 'Registrar GPS sin activar', texto: '¿Crear la ficha de inventario del Meitrack identificado? No se instala ni se activa.', accion: 'Registrar GPS' })) return
       const payload = { imei: identidad, model: datos.modelo, manufacturer: datos.marca,
         protocolFamily: 'meitrack-t399', ...metadatos(),
         ...(datos.serie.trim() ? { serialNumber: datos.serie.trim() } : {}) }

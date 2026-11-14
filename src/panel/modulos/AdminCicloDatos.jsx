@@ -10,6 +10,10 @@ import { candidatosCiclo, claveCiclo, crearConjuntoPrueba, estadoCiclo, guardarR
 import ExpiracionTelemetria from './ExpiracionTelemetria'
 import './ciclo-datos.css'
 
+// #835: conservar todo hasta que Juan decida plazos tras medir crecimiento.
+// La base aplica también esta suspensión; la interfaz no debe ofrecer ejecutarla.
+const PRESERVAR_TELEMETRIA = true
+
 export default function AdminCicloDatos() {
   const [params] = useSearchParams()
   const [empresaId, setEmpresaId] = useState(params.get('empresa') || '')
@@ -122,6 +126,7 @@ export default function AdminCicloDatos() {
   }, 'Procedencia registrada. Revisa el impacto antes de eliminar.')
   const revisar = () => hacer(async () => { setPlan(await revisarLimpieza(conjuntoId)) }, 'Impacto consultado; todavía no se ha eliminado nada.')
   const limpiar = () => hacer(async () => {
+    if (PRESERVAR_TELEMETRIA) throw new Error('La limpieza está suspendida hasta definir la retención.')
     if (!plan?.canDelete || frase !== 'ELIMINAR PRUEBAS') throw new Error('Revisa el plan y escribe la confirmación completa.')
     if (!Number.isFinite(Date.parse(plan.expiresAt))) throw new Error('No se pudo validar el plan. Revisa nuevamente su impacto.')
     setPlanPendiente(plan.planId)
@@ -150,6 +155,7 @@ export default function AdminCicloDatos() {
     if (comprobado.status !== 'verified' || comprobado.remaining !== 0) throw new Error('El estado actual cambió; el comprobante muestra registros presentes.')
   }, 'El comprobante confirma que los registros del plan ya no están en la base activa.')
   const guardarPolitica = () => hacer(async () => {
+    if (PRESERVAR_TELEMETRIA) throw new Error('La retención está en revisión. No se modifican plazos ahora.')
     if (!motivoValido) throw new Error('Escribe el motivo de la política.')
     const cambios = familiasRetencion.map(family => {
       const actual = versionActual(ciclo.datos?.policies, family)
@@ -166,7 +172,8 @@ export default function AdminCicloDatos() {
   }, 'Políticas verificadas mediante una consulta independiente. Guardar no ejecuta una limpieza.')
 
   return <div className="pnl-modulo ciclo-datos">
-    <Cabecera titulo="Retirada y limpieza de datos" bajada="Retira registros del uso y elimina pruebas acreditadas tras revisar su impacto." />
+    <Cabecera titulo="Retirada y conservación de datos" bajada="Retira registros del uso conservando su historial. La limpieza y expiración están suspendidas." />
+    <p role="status">Se conserva toda la telemetría y las recepciones crudas. El plazo de retención está pendiente de decisión; no se ejecutarán borrados físicos.</p>
     {aviso && <p role="alert" className="ciclo-error">{aviso}</p>}
     {exito && <p role="status">{exito}</p>}
     {empresas.estado === 'error' && <ErrorCarga error={empresas.error} onReintentar={empresas.recargar} />}
@@ -196,7 +203,7 @@ export default function AdminCicloDatos() {
           <button className="pnl-btn" disabled={ocupado || accionesBloqueadas || soloHistorico || !conjuntoId} onClick={revisar}>Revisar impacto</button></>}
         {plan && <div className="ciclo-plan"><p>{plan.message}</p>{(plan.counts ?? []).map(c => <p key={c.family}>{familia(c.family)}: {c.count}</p>)}{(plan.blockers ?? []).map((b, i) => <p key={i} role="alert">{familia(b.family)}: {b.reason || b.message || 'Revisa las dependencias del conjunto.'} ({b.count >= 501 ? '501 o más' : b.count})</p>)}
           {plan.executionEnabled === false && <p role="alert">La eliminación aún no está habilitada para este entorno.</p>}
-          {plan.canDelete && !accionesBloqueadas && <><p>Se eliminarán de la base activa. Una copia privada permite recuperación durante {plan.recoveryDays} días.</p><label className="ciclo-campo">Escribe ELIMINAR PRUEBAS<input value={frase} disabled={ocupado} onChange={e => setFrase(e.target.value)} autoComplete="off" /></label><button className="pnl-btn peligro" disabled={ocupado || frase !== 'ELIMINAR PRUEBAS'} onClick={limpiar}>Eliminar las pruebas del plan</button></>}
+          {!PRESERVAR_TELEMETRIA && plan.canDelete && !accionesBloqueadas && <><p>Se eliminarán de la base activa. Una copia privada permite recuperación durante {plan.recoveryDays} días.</p><label className="ciclo-campo">Escribe ELIMINAR PRUEBAS<input value={frase} disabled={ocupado} onChange={e => setFrase(e.target.value)} autoComplete="off" /></label><button className="pnl-btn peligro" disabled={ocupado || frase !== 'ELIMINAR PRUEBAS'} onClick={limpiar}>Eliminar las pruebas del plan</button></>}
         </div>}
         {planPendiente && <button className="pnl-btn sutil" disabled={ocupado} onClick={comprobar}>Comprobar resultado de la limpieza</button>}
         {recibo && <div className="ciclo-plan" aria-label="Comprobante de limpieza"><p>{estadoTrabajo(recibo.status)}</p>
@@ -205,12 +212,12 @@ export default function AdminCicloDatos() {
             {(recibo.counts ?? []).map(c => <p key={c.family}>{familia(c.family)}: {c.count}</p>)}
             <p>{recibo.recoveryAvailable ? 'Copia privada de recuperación disponible dentro de su plazo.' : 'La ventana de recuperación ya terminó.'}</p></>}</div>}
       </section>
-      <section className="ciclo-seccion"><h2>Retención de telemetría</h2><p>Inicialmente seis meses. Aumentar el plazo no recupera datos ya expirados. Los pagos, documentos y la auditoría tienen reglas propias.</p>
+      <section className="ciclo-seccion"><h2>Retención de telemetría</h2><p>Plazo pendiente de decisión. Las políticas que aparecen son históricas y su ejecución está suspendida; aumentar un plazo no recupera datos que ya hubieran expirado.</p>
         {familiasRetencion.map(family => { const actual = versionActual(ciclo.datos?.policies, family); return <p key={family}>{family === 'raw_ingress' ? 'Ingreso crudo' : 'Telemetría canónica'}: {actual ? `${actual.calendarMonths} meses · versión ${actual.version}` : 'sin política registrada'}.</p> })}
-        <label className="ciclo-campo">Meses<select value={meses} disabled={ocupado} onChange={e => setMeses(Number(e.target.value))}><option value={6}>6 meses</option>{inicialCompleta && <option value={3}>3 meses</option>}</select></label>
-        <button type="button" className="pnl-btn" disabled={ocupado || accionesBloqueadas || soloHistorico || !motivoValido || ciclo.estado !== 'ok'} onClick={guardarPolitica}>Guardar política</button>
+        <label className="ciclo-campo">Meses<select value={meses} disabled={PRESERVAR_TELEMETRIA || ocupado} onChange={e => setMeses(Number(e.target.value))}><option value={6}>6 meses</option>{inicialCompleta && <option value={3}>3 meses</option>}</select></label>
+        <button type="button" className="pnl-btn" disabled={PRESERVAR_TELEMETRIA || ocupado || accionesBloqueadas || soloHistorico || !motivoValido || ciclo.estado !== 'ok'} onClick={guardarPolitica}>Guardar política</button>
       </section>
-      <ExpiracionTelemetria confirmar={confirmar} key={empresaId} empresaId={empresaId} deshabilitado={soloHistorico || ciclo.estado !== 'ok' || ['queued', 'running'].includes(recibo?.status)} ocupado={ocupado} hacer={hacer} familia={familia} avisar={setAviso} informar={setExito} alTrabajar={setExpirando} politicaVersion={familiasRetencion.map(f => versionActual(ciclo.datos?.policies, f)?.version ?? 0).join(':')} />
+      <ExpiracionTelemetria confirmar={confirmar} key={empresaId} empresaId={empresaId} deshabilitado={PRESERVAR_TELEMETRIA || soloHistorico || ciclo.estado !== 'ok' || ['queued', 'running'].includes(recibo?.status)} ocupado={ocupado} hacer={hacer} familia={familia} avisar={setAviso} informar={setExito} alTrabajar={setExpirando} politicaVersion={familiasRetencion.map(f => versionActual(ciclo.datos?.policies, f)?.version ?? 0).join(':')} />
     </>}
     {dialogo}
   </div>

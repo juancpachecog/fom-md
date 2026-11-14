@@ -10,7 +10,8 @@ test('activo sin matrícula ni GPS: alias o número interno identifican, sin ide
   assert.equal(cuerpoNuevaUnidad({ placa: ' ABC123 ' }).plate, 'ABC123')
   assert.equal(cuerpoNuevaUnidad({ alias: 'Manlift' }).plate, undefined)
   assert.throws(() => cuerpoNuevaUnidad({ alias: ' ', numero: ' ', placa: '' }), /identificar/)
-  assert.throws(() => cuerpoNuevaUnidad({ alias: 'x'.repeat(61) }), /60 caracteres/)
+  assert.equal(cuerpoNuevaUnidad({ alias: 'x'.repeat(50) }).code.length, 50)
+  assert.throws(() => cuerpoNuevaUnidad({ alias: 'x'.repeat(51) }), /50 caracteres/)
 })
 
 test('sin GPS no instala, ni con inventario vacío; área y GPS fallidos no ocultan el alta', async () => {
