@@ -17,6 +17,8 @@ import {
   armarUsuarioResponsable, generarClaveTemporal, normalizarTelefono, problemaDelResponsable, textoDeError,
 } from '../datos/responsableEmpresa'
 import './empresas.css'
+import EditarEmpresa from './EditarEmpresa'
+import { revisarRetirada, retirarRegistro } from '../datos/cicloDatos'
 
 // ============================================================
 // EMPRESAS (solo Administrador FOM)
@@ -35,6 +37,7 @@ export default function AdminEmpresas() {
   const [q, setQ] = useState('')
   const [tipo, setTipo] = useState('')
   const [creando, setCreando] = useState(false)
+  const [editando, setEditando] = useState(null)
   const [predeDe, setPredeDe] = useState(null) // empresa cuyo listado de compañías se edita
   const [aviso, setAviso] = useState('')
   const [entrando, setEntrando] = useState(false)
@@ -76,7 +79,7 @@ export default function AdminEmpresas() {
     setAviso('')
     setConfirmacion('')
     try {
-      await fn()
+      if (await fn() === false) return
       await recargar()
       setConfirmacion(mensaje)
     } catch (e) {
@@ -84,7 +87,9 @@ export default function AdminEmpresas() {
     } finally { setOcupado(false) }
   }
   // Cada empresa tiene su logo y se ve de una vez al entrar; FOM Operations usa el de FOM.
-  const subirLogo = (e, archivo) => accion(() => subirLogoDeEmpresa(e.id, archivo), `Logo de ${e.nombre} guardado.`)
+  const subirLogo = async (e, archivo) => {
+    if (await confirmar({ titulo: 'Cambiar logo', texto: `¿Guardar el logo seleccionado para ${e.nombre}?`, accion: 'Guardar logo' })) accion(() => subirLogoDeEmpresa(e.id, archivo), `Logo de ${e.nombre} guardado.`)
+  }
 
   const alternarServicio = async (e) => {
     const suspender = e.servicioActivo
@@ -99,13 +104,15 @@ export default function AdminEmpresas() {
   }
 
   const eliminar = async (e) => {
-    if (!await confirmar({
-      titulo: 'Retirar de operación',
-      texto: `¿Retirar de operación ${e.nombre}? Se suspenderá su servicio y se conservará el historial.`,
-      accion: 'Retirar',
-      peligro: true,
-    })) return
-    accion(() => repo.admin.empresas.eliminar(e.id, actor), `${e.nombre} se retiró de operación. Su historial se conserva.`)
+    await accion(async () => {
+      const item = { type: 'tenant', id: e.id, status: e.estado }
+      const previo = await revisarRetirada(e.id, item)
+      if (!previo.canRetire) throw new Error(previo.message || 'Resuelve las dependencias antes de retirar la empresa.')
+      if (!await confirmar({ titulo: 'Retirar empresa', texto: `¿Retirar ${e.nombre} del uso operativo? Se conserva todo su historial. ${previo.message || ''}`, accion: 'Retirar empresa', peligro: true })) return false
+      await retirarRegistro(e.id, item, 'Retirada de empresa desde administración', crypto.randomUUID())
+      const comprobado = await revisarRetirada(e.id, item)
+      if (!comprobado.alreadyRetired) throw new Error('No quedó comprobada la retirada. Consulta de nuevo antes de repetir.')
+    }, `${e.nombre} se retiró de operación. Su historial se conserva.`)
   }
 
   return (
@@ -127,7 +134,7 @@ export default function AdminEmpresas() {
         {estado === 'cargando' && datos === null && <Cargando filas={6} />}
         {estado === 'error' && <ErrorCarga onReintentar={recargar} error={{ message: textoDeError(error, 'No pudimos cargar las empresas. Inténtalo de nuevo.') }} />}
         {datos !== null && (
-          <Contenido subirLogo={subirLogo}
+          <Contenido subirLogo={subirLogo} editar={setEditando}
             lista={lista}
             todas={datos}
             q={q}
@@ -149,19 +156,20 @@ export default function AdminEmpresas() {
       </div>
 
       {dialogo}
+      {editando && <EditarEmpresa key={editando.id} empresa={editando} alCerrar={() => setEditando(null)} alGuardar={recargar} />}
       <ModalNueva abierto={creando} alCerrar={() => setCreando(false)} alGuardar={recargar} actor={actor} />
       <ModalPredefinidas empresa={predeDe} alCerrar={() => setPredeDe(null)} alGuardar={recargar} actor={actor} />
     </div>
   )
 }
 
-function Contenido({ lista, todas, q, setQ, tipo, setTipo, servicio, setServicio, ocupado, alternarServicio, eliminar, abrirPredefinidas, gestionar, entrando, seleccionId, setSeleccionId, subirLogo }) {
+function Contenido({ editar, lista, todas, q, setQ, tipo, setTipo, servicio, setServicio, ocupado, alternarServicio, eliminar, abrirPredefinidas, gestionar, entrando, seleccionId, setSeleccionId, subirLogo }) {
   const seleccion = lista.find(e => e.id === seleccionId) ?? lista[0]
   const operativas = todas.filter(e => !e.respaldo)
   const activas = operativas.filter(e => e.servicioActivo).length
   const deuda = operativas.length && operativas.every(e => Number.isFinite(e.deuda)) ? operativas.reduce((a, e) => a + e.deuda, 0) : null
   const limpiar = () => { setQ(''); setTipo(''); setServicio('') }
-  const fichaProps = { subirLogo, ocupado, alternarServicio, eliminar, abrirPredefinidas, gestionar, entrando }
+  const fichaProps = { editar, subirLogo, ocupado, alternarServicio, eliminar, abrirPredefinidas, gestionar, entrando }
 
   return <>
     <section className="emp-resumen" aria-label="Resumen de las empresas disponibles">
@@ -193,7 +201,7 @@ function Contenido({ lista, todas, q, setQ, tipo, setTipo, servicio, setServicio
   </>
 }
 
-function FichaEmpresa({empresa:e, ocupado, alternarServicio, eliminar, abrirPredefinidas, gestionar, entrando, subirLogo}) {
+function FichaEmpresa({editar, empresa:e, ocupado, alternarServicio, eliminar, abrirPredefinidas, gestionar, entrando, subirLogo}) {
   return <>
     <div className="emp-ficha-identidad"><span className="emp-simbolo grande"><LogoEmpresa empresaId={e.id} nombre={e.nombre} respaldo={<Icono nombre={e.tipo === 'personal' ? 'gente' : 'empresa'} tam={30} />} /></span><div><h2>{e.nombre}</h2><p>{e.respaldo ? 'Respaldo del sistema' : e.tipoEtiqueta || etiqueta('company_tipo',e.tipo)}</p></div></div>
     <Tag color={e.respaldo ? 'gris' : e.servicioActivo ? 'verde' : 'rojo'}>{e.respaldo ? 'Cuenta de respaldo' : e.servicioActivo ? 'Servicio activo' : 'Servicio suspendido'}</Tag>
@@ -203,11 +211,12 @@ function FichaEmpresa({empresa:e, ocupado, alternarServicio, eliminar, abrirPred
     <section className="emp-contacto"><h3>Información de la empresa</h3><dl>{[
       ['RIF',e.rif || 'Sin registrar'],['Contacto',e.contacto || 'Sin registrar'],['Correo',e.email || 'Sin registrar'],['Teléfono',e.telefono || 'Sin registrar'],['Saldo',Number.isFinite(e.deuda) ? f.moneda(e.deuda) : 'No disponible'],
     ].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section>
-    {!e.respaldo && <section className="emp-gestion"><h3>Administración</h3><label className={`pnl-btn${ocupado ? ' deshabilitado' : ''}`}><Icono nombre="mas" tam={17} />Subir logo<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={ocupado} onChange={(ev) => { const a = ev.target.files?.[0]; ev.target.value = ''; if (a) subirLogo(e, a) }} /></label>{e.tipo === 'estandar' && <button type="button" className="pnl-btn" disabled={ocupado} onClick={()=>abrirPredefinidas(e)}><Icono nombre="gente" tam={17} />Compañías asociadas</button>}<button type="button" className="pnl-btn" disabled={ocupado} onClick={()=>alternarServicio(e)}><Icono nombre={e.servicioActivo ? 'reloj' : 'check'} tam={17} />{e.servicioActivo ? 'Suspender servicio' : 'Reactivar servicio'}</button><details><summary>Otras acciones</summary><p>Retirar una empresa suspende su servicio y conserva el historial.</p><button type="button" className="pnl-btn sutil" disabled={ocupado} onClick={()=>eliminar(e)}>Retirar de operación</button></details></section>}
+    {!e.respaldo && <section className="emp-gestion"><h3>Administración</h3><button type="button" className="pnl-btn" disabled={ocupado} onClick={() => editar(e)}>Editar empresa</button><label className={`pnl-btn${ocupado ? ' deshabilitado' : ''}`}><Icono nombre="mas" tam={17} />Subir logo<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={ocupado} onChange={(ev) => { const a = ev.target.files?.[0]; ev.target.value = ''; if (a) subirLogo(e, a) }} /></label>{e.tipo === 'estandar' && <button type="button" className="pnl-btn" disabled={ocupado} onClick={()=>abrirPredefinidas(e)}><Icono nombre="gente" tam={17} />Compañías asociadas</button>}<button type="button" className="pnl-btn" disabled={ocupado} onClick={()=>alternarServicio(e)}><Icono nombre={e.servicioActivo ? 'reloj' : 'check'} tam={17} />{e.servicioActivo ? 'Suspender servicio' : 'Reactivar servicio'}</button><details><summary>Otras acciones</summary><p>Retirar una empresa la archiva y conserva su historial. Primero deben resolverse sus dependencias.</p><button type="button" className="pnl-btn sutil" disabled={ocupado} onClick={()=>eliminar(e)}>Retirar de operación</button></details></section>}
   </>
 }
 
 function ModalNueva({ abierto, alCerrar, alGuardar, actor }) {
+  const { confirmar: pedirConfirmacion, dialogo } = useConfirmar()
   const [nombre, setNombre] = useState('')
   const [tipo, setTipo] = useState('estandar')
   const [rif, setRif] = useState('')
@@ -244,6 +253,7 @@ function ModalNueva({ abierto, alCerrar, alGuardar, actor }) {
     const problema = problemaDelResponsable({ contacto, email, telefono })
     if (problema) { setError(problema); return }
     setGuardando(true); setError('')
+    if (!await pedirConfirmacion({ titulo: 'Crear empresa', texto: `¿Crear ${nombre.trim()} y su usuario supervisor? Revisa los datos antes de confirmar.`, accion: 'Crear empresa' })) { setGuardando(false); return }
     const responsable = { contacto: contacto.trim(), email: email.trim(), telefono: normalizarTelefono(telefono) }
     let empresa
     try {
@@ -258,6 +268,11 @@ function ModalNueva({ abierto, alCerrar, alGuardar, actor }) {
     const clave = generarClaveTemporal(responsable.email)
     let usuario = null
     let fallo = ''
+    let asociacionError = ''
+    if (empresa.id && tipo === 'estandar' && prede.length) {
+      try { await repo.admin.empresas.asignarPredefinidas(empresa.id, prede, actor) }
+      catch { asociacionError = 'La empresa ya existe, pero sus compañías asociadas no quedaron verificadas. Revisa «Compañías asociadas» en su ficha; no vuelvas a crearla.' }
+    }
     if (!empresa.id) {
       fallo = 'El servidor no dijo cuál es la empresa nueva, así que no se pudo crear el usuario. Búscala en la lista y crea al supervisor desde Usuarios.'
     } else {
@@ -265,7 +280,7 @@ function ModalNueva({ abierto, alCerrar, alGuardar, actor }) {
     }
     try { await alGuardar() } catch { /* la lista se refresca sola en la próxima carga */ }
     setCorreoNuevo(responsable.email)
-    setResultado({ empresa, responsable, clave, usuario, fallo })
+    setResultado({ empresa, responsable, clave, usuario, fallo, asociacionError })
     setGuardando(false)
   }
 
@@ -288,6 +303,7 @@ function ModalNueva({ abierto, alCerrar, alGuardar, actor }) {
     return <Modal titulo="Empresa creada" abierto={abierto} alCerrar={cerrar} ancho={560}>
       <div className="emp-form" aria-busy={guardando}>
         <p className="emp-confirmacion" role="status"><Icono nombre="check" tam={18} />{empresa.nombre} ya está creada.</p>
+        {resultado.asociacionError && <p className="emp-error" role="alert">{resultado.asociacionError}</p>}
         {usuario ? <>
           <p className="emp-ayuda">{usuario.nombre} ya es <b>supervisor</b> de la empresa{usuario.clave
             ? <> y puede entrar con el correo <b>{usuario.email}</b> y la clave temporal <code>{usuario.clave}</code>.</>
@@ -308,7 +324,7 @@ function ModalNueva({ abierto, alCerrar, alGuardar, actor }) {
     </Modal>
   }
 
-  return <Modal titulo="Nueva empresa" abierto={abierto} alCerrar={cerrar} ancho={760}>
+  return <><Modal titulo="Nueva empresa" abierto={abierto} alCerrar={cerrar} ancho={760}>
     <form className="emp-form" onSubmit={confirmar} aria-busy={guardando}>
       <p className="emp-ayuda">Registra la empresa y a su responsable. El responsable queda creado como supervisor de la empresa y entra con su correo.</p>
       {error && <p className="emp-error" role="alert">{error}</p>}
@@ -325,7 +341,7 @@ function ModalNueva({ abierto, alCerrar, alGuardar, actor }) {
       {tipo === 'estandar' && <section><h3>Compañías asociadas</h3><p className="emp-ayuda">Opcional: compañías para las que trabaja esta contratista.</p><SelectorCompanias fuente={companias} seleccion={prede} alCambiar={setPrede} disabled={guardando} /></section>}
       <div className="emp-form-acciones"><button type="button" className="pnl-btn" disabled={guardando} onClick={cerrar}>Cancelar</button><button type="submit" className="pnl-btn primario" disabled={guardando}><Icono nombre="check" tam={17} />{guardando ? 'Creando…' : 'Crear empresa'}</button></div>
     </form>
-  </Modal>
+  </Modal>{dialogo}</>
 }
 
 function SelectorCompanias({fuente, seleccion, alCambiar, disabled}) {
@@ -335,27 +351,31 @@ function SelectorCompanias({fuente, seleccion, alCambiar, disabled}) {
 }
 
 function ModalPredefinidas({ empresa, alCerrar, alGuardar, actor }) {
+  const { confirmar: pedirConfirmacion, dialogo } = useConfirmar()
   const [prede, setPrede] = useState([])
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
   const companias = useDatos(() => empresa ? repo.admin.empresas.listar({tipo:'predefinida'}) : Promise.resolve([]), [empresa?.id])
-  useEffect(()=>{ setPrede(empresa?.predefinidas ?? []); setError('') },[empresa])
+  const vinculos = useDatos(() => empresa ? DIRECTORIO_REAL ? repo.admin.empresas.predefinidasDe(empresa.id) : Promise.resolve(empresa.predefinidas ?? []) : Promise.resolve([]), [empresa?.id])
+  useEffect(()=>{ if (vinculos.estado === 'ok') setPrede(vinculos.datos ?? []); setError('') },[empresa?.id, vinculos.datos, vinculos.estado])
   if (!empresa) return null
   const cerrar = () => { if (!guardando) alCerrar() }
   const confirmar = async e => {
     e.preventDefault()
-    if (guardando || companias.estado !== 'ok') return
+    if (guardando || companias.estado !== 'ok' || vinculos.estado !== 'ok') return
     setGuardando(true); setError('')
     try {
+      if (!await pedirConfirmacion({ titulo: 'Cambiar compañías asociadas', texto: `¿Guardar las asociaciones de ${empresa.nombre}? Cambia qué compañías pueden supervisar su operación. Se conserva el historial de relaciones.`, accion: 'Guardar asociaciones' })) return
       await repo.admin.empresas.asignarPredefinidas(empresa.id, prede, actor)
       await alGuardar(); alCerrar()
     } catch(e) { setError(textoDeError(e, 'No se pudieron guardar las compañías. Inténtalo de nuevo.')) }
     finally { setGuardando(false) }
   }
-  return <Modal titulo="Compañías asociadas" abierto alCerrar={cerrar} ancho={620}><form className="emp-form" onSubmit={confirmar} aria-busy={guardando}>
+  return <><Modal titulo="Compañías asociadas" abierto alCerrar={cerrar} ancho={620}><form className="emp-form" onSubmit={confirmar} aria-busy={guardando}>
     <div className="emp-asociacion-contexto"><Icono nombre="empresa" tam={28} /><div><h3>{empresa.nombre}</h3><p className="emp-ayuda">Selecciona las compañías para las que trabaja esta contratista.</p></div></div>
     {error && <p className="emp-error" role="alert">{error}</p>}
-    <SelectorCompanias fuente={companias} seleccion={prede} alCambiar={setPrede} disabled={guardando} />
-    <div className="emp-form-acciones"><button type="button" className="pnl-btn" disabled={guardando} onClick={cerrar}>Cancelar</button><button type="submit" className="pnl-btn primario" disabled={guardando || companias.estado !== 'ok'}><Icono nombre="check" tam={17} />{guardando ? 'Guardando…' : 'Guardar asociaciones'}</button></div>
-  </form></Modal>
+    {vinculos.estado === 'error' && <ErrorCarga error={vinculos.error} onReintentar={vinculos.recargar} />}
+    <SelectorCompanias fuente={companias} seleccion={prede} alCambiar={setPrede} disabled={guardando || vinculos.estado !== 'ok'} />
+    <div className="emp-form-acciones"><button type="button" className="pnl-btn" disabled={guardando} onClick={cerrar}>Cancelar</button><button type="submit" className="pnl-btn primario" disabled={guardando || companias.estado !== 'ok' || vinculos.estado !== 'ok'}><Icono nombre="check" tam={17} />{guardando ? 'Guardando…' : 'Guardar asociaciones'}</button></div>
+  </form></Modal>{dialogo}</>
 }

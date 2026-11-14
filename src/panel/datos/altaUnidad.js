@@ -7,7 +7,7 @@ export function cuerpoNuevaUnidad({ alias, placa, marca, modelo, anio, tipo, num
   const interno = numero?.trim() || ''
   const code = (interno || matricula || nombre).toLowerCase().replace(/\s+/gu, '-')
   if (!code) throw new Error('Indica una placa, un alias o un número interno para identificar la unidad.')
-  if (code.length > 60) throw new Error('Usa un número interno o una identificación de hasta 60 caracteres.')
+  if (code.length > 50) throw new Error('Usa un número interno o una identificación de hasta 50 caracteres.')
   return {
     code, plate: matricula || undefined, alias: nombre || undefined,
     fleetNumber: interno || undefined, make: marca?.trim() || undefined,

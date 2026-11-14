@@ -30,6 +30,7 @@ import { buscarEquipoGps, empresaDeInstalacion, empresaPropia, equiposParaNuevaU
 import { empresaDeReinicio, mensajeReiniciarClave } from './reiniciarClave'
 import { crearUnidad, gpsDisponible } from './altaUnidad'
 import { placaMayuscula } from './placas'
+import { cambiarCompanias, relacionesDeContratista } from './companiasEmpresa'
 import { LIMITE_EVENTOS, comoEventoManejo, diasServidor } from './eventosManejo'
 import { cloudinaryConfigurado, subirImagen } from './cloudinary'
 import { carpetaDe } from './archivos'
@@ -48,6 +49,8 @@ function comoUnidad(v) {
   return {
     id: v.id,
     vehiculoId: v.id,
+    codigo: v.code?.toLowerCase(),
+    vin: v.vin ?? null,
     empresaId: null,
 
     marca: v.make || '—',
@@ -57,6 +60,7 @@ function comoUnidad(v) {
     numero: v.fleetNumber || v.code || '—',
     numeroFlota: v.fleetNumber ?? null,
     alias,
+    aliasRegistrado: v.alias ?? null,
     tipo: v.vehicleType || 'otro',
     estado: v.status,
 
@@ -1025,6 +1029,9 @@ export const repoApi = {
         address: direccion,
         birthDate: nacimiento,
       })
+      const esperado = { nombre, cedula: ced, telefono: tel, direccion, fechaNacimiento: nacimiento }
+      const comprobado = (await repoApi.gente.listar()).find(p => p.userId === userId)
+      if (!comprobado || Object.entries(esperado).some(([k, v]) => v !== undefined && comprobado[k] !== v)) throw new Error('No quedó comprobada la edición del usuario. Recarga el perfil antes de repetir.')
       return {
         cedula: r?.profile?.nationalId ?? null,
         telefono: r?.profile?.phone ?? null,
@@ -1335,7 +1342,8 @@ export const repoApi = {
      * cuelga contratistas de si misma) y «personal» es la de una persona.
      */
     async listar({ q = '', tipo = '' } = {}) {
-      const r = await api.entes()
+      const r = await leerTodasLasPaginas((desplazamiento, limite) => api.entes({ desplazamiento, limite }), { limite: 100 })
+      if (r.incompleta) throw new Error('La lista de empresas está incompleta. Reintenta antes de administrar sus datos.')
       return (r?.items ?? []).map((t) => ({
         id: t.id,
         nombre: t.name,
@@ -1375,6 +1383,14 @@ export const repoApi = {
       return { id: r?.tenantId ?? r?.tenant?.id ?? null }
     },
 
+    async set(id, datos) {
+      const esperado = { nombre: datos.nombre.trim(), rif: datos.rif.trim().toLowerCase(), contacto: datos.contacto.trim(), telefono: datos.telefono.replace(/\s+/gu, ''), email: datos.email.trim().toLowerCase() }
+      await api.actualizarEnte(id, { name: esperado.nombre, rif: esperado.rif || null, contactName: esperado.contacto || null, phone: esperado.telefono || null, email: esperado.email || null })
+      const actual = (await repoApi.empresas.listar()).find(e => e.id === id)
+      if (!actual || Object.entries(esperado).some(([k, v]) => actual[k] !== v)) throw new Error('No se pudo comprobar el cambio completo. Recarga la empresa antes de repetir.')
+      return true
+    },
+
     /** Suspender o reactivar el servicio de un ente. */
     async setServicio(id, activo, _actor, razon) {
       await api.actualizarEnte(id, {
@@ -1409,13 +1425,21 @@ export const repoApi = {
       return true
     },
 
-    async asignarPredefinidas(companiaId, contratistas = []) {
-      for (const contratistaId of contratistas) {
-        await api.colgarContratista(companiaId, {
-          contractorTenantId: contratistaId,
-        })
-      }
-      return true
+    async relaciones(companiaId) {
+      const r = await leerTodasLasPaginas((offset, limit) => pedir(`/api/v1/console/tenants/${encodeURIComponent(companiaId)}/relationships?${new URLSearchParams({ limit, offset })}`), { limite: 100 })
+      if (r.incompleta) throw new Error('No se pudo leer el historial completo de asociaciones.')
+      return r.items
+    },
+    async predefinidasDe(contratistaId) {
+      const companias = await repoApi.empresas.listar({ tipo: 'predefinida' })
+      return (await relacionesDeContratista(contratistaId, companias, repoApi.empresas.relaciones)).map(r => r.companiaId)
+    },
+    async asignarPredefinidas(contratistaId, companias = []) {
+      return cambiarCompanias(contratistaId, companias, await repoApi.empresas.listar({ tipo: 'predefinida' }), {
+        listar: repoApi.empresas.relaciones,
+        vincular: (id, contractorTenantId) => api.colgarContratista(id, { contractorTenantId }),
+        terminar: id => api.descolgarContratista(id, { reason: 'asociacion-retirada-desde-consola' }),
+      })
     },
   },
 
@@ -1448,12 +1472,14 @@ export const repoApi = {
 
     async set(id, parche) {
       await api.actualizarVehiculo(id, {
-        plate: placaMayuscula(parche.placa),
-        alias: parche.alias,
+        code: parche.codigo,
+        vin: parche.vin === undefined ? undefined : parche.vin?.trim().toUpperCase() || null,
+        plate: parche.placa === undefined ? undefined : placaMayuscula(parche.placa?.trim()) || null,
+        alias: parche.alias === undefined ? undefined : parche.alias?.trim() || null,
         fleetNumber: parche.numero === undefined ? undefined : parche.numero?.trim() || null,
-        make: parche.marca,
-        model: parche.modelo,
-        modelYear: parche.anio ? Number(parche.anio) : undefined,
+        make: parche.marca === undefined ? undefined : parche.marca?.trim() || null,
+        model: parche.modelo === undefined ? undefined : parche.modelo?.trim() || null,
+        modelYear: parche.anio === undefined ? undefined : parche.anio === '' || parche.anio === null ? null : Number(parche.anio),
         vehicleType: parche.tipo,
         areaId: parche.areaId,
       })
