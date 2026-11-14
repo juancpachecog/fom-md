@@ -7,7 +7,7 @@ function generate(template) {
   if (sha(s) !== '8b3ccf7973b222a3aa718bf2acd028702830b4757d328e556221e5575afe14d1') throw Error('baseline gate')
   s = s.replace(/\b833\b/g, '835').replace(/\b829\b/g, '835')
     .replaceAll('238e0c0bb91b8a82828e349d77324e788b98c6ca', '27cf0ba827d5b1c8b6268f253901be7bdad5b3eb')
-    .replaceAll('33264fa17e63b2b11d04c1413ca37d10d172d71d', '4d6426162c5924872e5ca5e130e3649e7207da62')
+    .replaceAll('33264fa17e63b2b11d04c1413ca37d10d172d71d', 'ebe6bb7a55780efa5ee604618bac07a245af724a')
     .replaceAll('issue-835-daily-km-238e0c0', 'issue-835-admin-30s-27cf0ba')
     .replaceAll('daily-km-238e0c0.tar.gz', 'admin-30s-27cf0ba.tar.gz')
     .replace(/^OLD_ROOT = .*$/m, "OLD_ROOT = Path('/var/www/fom-web/releases/issue-833-daily-km-238e0c0')")
