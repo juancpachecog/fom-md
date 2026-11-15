@@ -32,6 +32,13 @@
 .gp-btn:disabled, .gp-btn2:disabled, .gp-btn3:disabled { opacity: .5; cursor: not-allowed; filter: none; }
 .gp-btn.ancho, .gp-btn2.ancho, .gp-btn3.ancho { width: 100%; }
 .gp-btn.chico, .gp-btn2.chico { height: 36px; padding: 0 14px; font-size: 13px; align-self: flex-start; }
+.gp-config-flow { display: grid; gap: 16px; }
+.gp-discovery-head { display: flex; align-items: center; gap: 16px; }
+.gp-discovery-head .gp-radar { width: 52px; height: 52px; flex: 0 0 52px; }
+.gp-intervalo-titulo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gp-intervalo-select select { width: auto; max-width: 100%; min-height: 34px; padding: 4px 28px 4px 10px; border: 1px solid var(--e-borde-fuerte, #39424f); border-radius: 10px; background: var(--e-sup-alta, #1d2530); color: var(--e-texto, #f3f5f8); font: inherit; font-size: 13px; }
+.gp-intervalo-consent { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.5; color: var(--e-texto-suave, #a7b5c5); }
+.gp-intervalo-consent input { width: auto; flex: none; margin-top: 3px; }
 .gp-enlace { font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; color: #8bc6ff; background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; }
 .gp-enlace:hover { color: #c6e5ff; }
 .gp :is(button, a, input, select):focus-visible { outline: 2px solid #3d9bf5; outline-offset: 2px; }
@@ -213,3 +220,6 @@ label.gp-det b { font-size: 14px; font-weight: 600; }
 /* Meitrack comparte las tarjetas SMS; las respuestas completas necesitan altura. */
 .gp-meitrack-sms .gp-field { height: auto; min-height: 76px; align-items: stretch; }
 .gp-meitrack-sms textarea { flex: 1; width: 100%; min-width: 0; min-height: 76px; box-sizing: border-box; resize: vertical; padding: 10px 0; border: 0; outline: 0; background: transparent; color: var(--e-texto, #f3f5f8); font: 400 13px/1.5 var(--e-mono, ui-monospace, Consolas, monospace); }
+
+.gp .gp-cmd code { color: var(--e-texto, #f3f5f8); }
+.gp-col > .gp-btn, .gp-col > .gp-btn2 { align-self: flex-start; }

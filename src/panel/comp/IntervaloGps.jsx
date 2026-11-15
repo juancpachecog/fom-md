@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { INTERVALO_GPS_PREDETERMINADO, INTERVALOS_GPS, comandoIntervalo } from '../datos/intervaloGps'
 import { useConfirmar } from './Confirmar'
 
-export function IntervaloGps({ modelo, clave, compatible: comprobado }) {
+export function IntervaloGps({ modelo, clave, compatible: comprobado, integrado = false }) {
   const [segundos, setSegundos] = useState(INTERVALO_GPS_PREDETERMINADO)
   const [acepta, setAcepta] = useState(false)
   const [mensaje, setMensaje] = useState('')
@@ -14,6 +14,18 @@ export function IntervaloGps({ modelo, clave, compatible: comprobado }) {
     try { await navigator.clipboard.writeText(comando); setMensaje('SMS copiado. FOM no lo ha enviado ni ha comprobado el cambio en el equipo.') }
     catch { setMensaje('No se pudo copiar. No se ha enviado ningún SMS.') }
   }
+  const vista = comandoIntervalo({ modelo, clave, segundos, compatible: true })
+  if (integrado) return <div className="gp-cmd gp-intervalo" aria-label="Intervalo de reportes">
+    <span className="n">06</span>
+    <div className="tx">
+      <div className="gp-intervalo-titulo"><b>Configurar frecuencia de reportes</b><label className="gp-intervalo-select"><span className="gp-sr">Intervalo de posiciones</span><select value={segundos} onChange={e => { setSegundos(Number(e.target.value)); setMensaje('') }}>{INTERVALOS_GPS.map(s => <option key={s} value={s}>{s} segundos{s === 30 ? ' · predeterminado' : ''}</option>)}</select></label></div>
+      <code>{vista ? vista.replace(clave, '••••') : 'Escribe la clave SMS para preparar el comando.'}</code>
+      <span className="gp-hint">Envía este SMS en la misma secuencia. Comprueba después los reportes recibidos.</span>
+      {coban ? <label className="gp-intervalo-consent"><input type="checkbox" checked={acepta} onChange={e => { setAcepta(e.target.checked); setMensaje('') }} /> Mi GPS-403 admite reportar en movimiento y detenido, sin modo de sueño.</label> : !comprobado && <span className="gp-hint">Requiere firmware compatible y A12 en la respuesta E04.</span>}
+      {mensaje && <span className="gp-hint" role="status">{mensaje}</span>}
+    </div>
+    <button type="button" className="gp-btn2" disabled={!comando} onClick={copiar}>Copiar</button>{dialogo}
+  </div>
   return <section className="gp-card" style={{ padding: 22 }} aria-label="Frecuencia de reportes">
     <h2 className="gp-st">Frecuencia de reportes</h2>
     <label className="gp-f">Intervalo de posiciones<select className="pnl-select" value={segundos} onChange={e => { setSegundos(Number(e.target.value)); setMensaje('') }}>{INTERVALOS_GPS.map(s => <option key={s} value={s}>{s} segundos{s === 30 ? ' (predeterminado)' : ''}</option>)}</select></label>
