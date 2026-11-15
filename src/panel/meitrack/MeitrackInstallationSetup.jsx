@@ -11,7 +11,7 @@ const request = (path, body, signal) => pedir(`/api/v1/console/meitrack-setup/${
 export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdentityChange, onCapture, onLockChange, onSelect, selected=false, canRegister=false, onRegister, registered=false, registering=false, registrationError='', soloPrueba=false }) {
   const [identityText,setIdentityText]=useState(''), [commandsText,setCommandsText]=useState(''), [pendingText,setPendingText]=useState('')
   const [okText,setOkText]=useState(''), [readback,setReadback]=useState(''), [sent,setSent]=useState(false), [noAuth,setNoAuth]=useState(false)
-  const [availability,setAvailability]=useState(null), [capture,setCapture]=useState(null), [search,setSearch]=useState(0), [looking,setLooking]=useState(false)
+  const [availability,setAvailability]=useState(null), [capture,setCapture]=useState(null), [looking,setLooking]=useState(false)
   const [message,setMessage]=useState('')
   const identity=readIdentitySms(identityText,knownImei), imei=identity?.supported ? identity.imei : '', firmware=identity?.firmware
   const announced=readCommandsSms(commandsText,imei), pending=readPendingSms(pendingText,imei)
@@ -34,7 +34,7 @@ export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdent
         const r=receiverAvailable(await request('availability',{imei,firmware},controller.signal))
         if(stopped)return
         setAvailability(r ? {receiver:r,at:performance.now()} : null)
-        if(configured && search && r){
+        if(configured && r){
           setLooking(true)
           const found=parseSetupCapture(await request('discovery',{imei,firmware},controller.signal),r.reference)
           if(!stopped)setCapture(found)
@@ -44,7 +44,7 @@ export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdent
     }
     void update()
     return()=>{stopped=true;active?.abort();clearTimeout(timer)}
-  },[imei,firmware,configured,search])
+  },[imei,firmware,configured])
   async function copy(text){
     if(!text)return
     try{await navigator.clipboard.writeText(text);setMessage('SMS copiado. Envíalo desde tu teléfono; FOM no lo ha enviado.')}
@@ -72,20 +72,20 @@ export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdent
       {okText && !acknowledged && <p role="alert">No se reconoció A21 OK del mismo equipo. No repitas el SMS automáticamente.</p>}
       {card('05','Comprobar configuración',announced && pending ? t399ReadOnlyQuery(password,'DB4',announced) : null,'Comprueba que el GPS guardó TCP, APN, servidor y puerto correctos. Si ya estaba configurado para FOM, consulta DB4 sin reenviar A21. El OK no prueba recepción.',response('Respuesta DB4',readback,setReadback))}
       {readback && !configured && <p role="alert">La lectura no confirma el destino FOM y APN esperados. No repitas A21 sin revisar la respuesta.</p>}
+      <IntervaloGps integrado key={imei+firmware} modelo="T399L" clave={password} compatible={identity?.supported && announced?.includes('A12')} />
       {message && <p role="status">{message}</p>}
       <span className="gp-hint">La clave y las respuestas completas permanecen sólo en memoria. Descartar no deshace los SMS enviados. No se activa ni se instala el GPS al registrarlo.</span>
     </section>
-    <IntervaloGps key={imei+firmware} modelo="T399L" clave={password} compatible={identity?.supported && announced?.includes('A12')} />
+
     {configured&&<MeitrackClockReadback key={imei+firmware} imei={imei} firmware={firmware} readback={readback}/>}
     <section className="gp-card gp-col" aria-label="Detectados sin registrar Meitrack">
-      <h2 className="gp-st">Detectados sin registrar · confirmar al final</h2>
+      <div className="gp-discovery-head"><span className="gp-radar espera" aria-hidden="true">⌁</span><div className="gp-titulo"><p className="gp-k">Descubrimiento automático</p><h2 className="gp-st">Descubriendo dispositivos</h2><span className="gp-hint">Se actualiza cada 5 segundos</span></div></div>
       <p>{soloPrueba ? 'Comprueba la configuración y busca la recepción coincidente sin registrar el equipo.' : 'Después de configurar, busca si el GPS ya está reportando. Compara su IMEI y selecciona la señal coincidente para registrarlo.'}</p>
-      <button type="button" className="gp-btn2" disabled={!configured || looking || registered} onClick={()=>setSearch(n=>n+1)}>{looking ? 'Buscando…' : search ? 'Actualizar lista' : 'Buscar GPS reportando'}</button>
       {!configured && <p>Primero comprueba la configuración con DB4.</p>}
-      {search > 0 && !eligible && <p role="status">{receiver ? 'Todavía no hay recepción reciente comprobada de este GPS. La búsqueda se actualiza automáticamente.' : 'El servicio no está disponible. Conserva la pantalla y vuelve a consultar.'}</p>}
+      {configured && !eligible && <p role="status">{receiver ? 'Todavía no hay recepción reciente comprobada de este GPS. La búsqueda se actualiza automáticamente.' : 'El servicio no está disponible. Conserva la pantalla y vuelve a consultar.'}</p>}
       {eligible && !registered && <div className="gp-cmd"><div className="tx"><b>Detectado: {imei}</b><span className="gp-hint">Meitrack T399L · TCP · recepción reciente coincidente</span></div><button type="button" className="gp-btn2" onClick={onSelect}>{selected ? 'Coincidencia seleccionada' : 'Seleccionar este dispositivo'}</button></div>}
       {registrationError && <p role="alert">{registrationError}</p>}
-      {!soloPrueba && (registered ? <p role="status">Registro comprobado en inventario. La instalación y activación son pasos separados.</p> : <button type="button" className="gp-btn" disabled={!eligible || !selected || !canRegister || registering} onClick={onRegister}>{registering ? 'Comprobando registro…' : 'Registrar sin activar'}</button>)}
+      {!soloPrueba && (registered ? <p role="status">Registro comprobado en inventario. La instalación y activación son pasos separados.</p> : <button type="button" className="gp-btn chico" disabled={!eligible || !selected || !canRegister || registering} onClick={onRegister}>{registering ? 'Comprobando registro…' : 'Registrar'}</button>)}
     </section>
   </>
 }

@@ -95,7 +95,8 @@ function ComandosSmsCoban({ equipo, clave, alCambiarClave }) {
       {fallo && <p className="gp-error" role="alert">{fallo}</p>}
       {comandos.some(c => c.falta) && <span className="gp-hint" role="status" style={{ paddingTop: 6 }}>El receptor no está configurado en el sitio. El comando 02 está bloqueado hasta corregir la configuración.</span>}
       <span className="gp-hint" style={{ padding: '10px 0 6px', borderTop: '1px solid var(--e-borde, #262e39)' }}>Los puntos son la clave SMS: se pone al copiar y no se guarda.</span>
-    </section><IntervaloGps modelo={equipo.modelo} clave={String(clave ?? '').trim() || '123456'} /></>
+      <IntervaloGps integrado modelo={equipo.modelo} clave={String(clave ?? '').trim() || '123456'} />
+    </section></>
   )
 }
 

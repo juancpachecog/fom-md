@@ -53,13 +53,12 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
   const [errorAlta, setErrorAlta] = useState('')
   const [meitrackReceived, setMeitrackReceived] = useState(false)
   const [imeiSms, setImeiSms] = useState('')
-  const [porDatos, setPorDatos] = useState(soloPrueba)
+  const porDatos = true
   const [inicioPrueba, setInicioPrueba] = useState(Date.now)
-  const [identidadFisicaConfirmada, setIdentidadFisicaConfirmada] = useState(false)
   const [seleccionado, setSeleccionado] = useState(null)
   const [guideLocked, setGuideLocked] = useState(false)
   const inFlight = useRef(false)
-  const detectados = useDatos(() => repo.admin.gps.sinEmparejar(), [], soloPrueba ? 5000 : 30_000)
+  const detectados = useDatos(() => repo.admin.gps.sinEmparejar(), [], paso === 3 ? 5000 : 30_000)
   const inventario = useDatos(() => repo.admin.gps.listar(), [], 30_000)
   const mismaLinea = samePhoneRecords(inventario.datos ?? [], datos.telefono)
 
@@ -70,10 +69,9 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
   const identidad = porDatos && !meitrack ? candidatoRecibido?.imei ?? null : identidadConfirmada(datos.imei, imeiSms)
   const imeiPreparacion = identidad ?? (!validarImei(datos.imei).error ? validarImei(datos.imei).valor : '')
   const seleccionadoCoban = porDatos ? candidatoRecibido : !meitrack && detectados.estado === 'ok' && (detectados.datos ?? []).find(d => d.imei === seleccionado && coincideDetectado(d, { inicial: datos.imei, sms: imeiSms, transporte: datos.transporte, ahora }))
-  const puedeRegistrar = !soloPrueba && !!identidad && (meitrack ? meitrackReceived && seleccionado === identidad : !!seleccionadoCoban && (!porDatos || identidadFisicaConfirmada))
+  const puedeRegistrar = !soloPrueba && !!identidad && (meitrack ? meitrackReceived && seleccionado === identidad : !!seleccionadoCoban)
   const poner = (campo, valor) => {
     setSeleccionado(null)
-    setIdentidadFisicaConfirmada(false)
     setMeitrackReceived(false)
     setDatos((d) => ({ ...d, [campo]: valor }))
     setErrores((e) => ({ ...e, [campo]: undefined }))
@@ -82,7 +80,6 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
   const usarImei = (d) => {
     if (equipo || !(porDatos ? coincideRecibido(d,ahora) : coincideDetectado(d, { inicial: datos.imei, sms: imeiSms, transporte: datos.transporte, ahora }))) return
     setSeleccionado(d.imei)
-    setIdentidadFisicaConfirmada(false)
     setErrores((e) => ({ ...e, imei: undefined }))
   }
 
@@ -128,7 +125,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
     setGuardando(true)
     setErrorAlta('')
     try {
-      if (!await confirmar({ titulo: 'Registrar GPS sin activar', texto: '¿Crear la ficha de inventario del GPS identificado? No se instala ni se activa y se conserva la recepción original.', accion: 'Registrar GPS' })) return
+      if (!await confirmar({ titulo: 'Registrar dispositivo', texto: 'Confirma que el dispositivo seleccionado corresponde al GPS y a la SIM que estás configurando, comprobado físicamente o mediante una prueba controlada. Se creará su ficha de inventario; la activación corresponde a la instalación.', accion: 'Registrar GPS' })) return
       if (!navigator.locks?.request) throw Error('Use un navegador compatible con la protección de intentos entre pestañas.')
       const payload = { imei: identidad, model: datos.modelo, manufacturer: datos.marca,
         protocolFamily: modelo?.protocolo, ...metadatos(), ...(datos.serie.trim() ? { serialNumber: datos.serie.trim() } : {}), ...(porDatos ? {registrationMethod:'received_data',identityConfirmedByOperator:true} : {}) }
@@ -158,7 +155,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
     setGuardando(true)
     setErrorAlta('')
     try {
-      if (!await confirmar({ titulo: 'Registrar GPS sin activar', texto: '¿Crear la ficha de inventario del Meitrack identificado? No se instala ni se activa.', accion: 'Registrar GPS' })) return
+      if (!await confirmar({ titulo: 'Registrar dispositivo', texto: '¿Crear la ficha de inventario del Meitrack identificado? No se instala ni se activa.', accion: 'Registrar GPS' })) return
       const payload = { imei: identidad, model: datos.modelo, manufacturer: datos.marca,
         protocolFamily: 'meitrack-t399', ...metadatos(),
         ...(datos.serie.trim() ? { serialNumber: datos.serie.trim() } : {}) }
@@ -181,8 +178,8 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
     if (seguro) navegar(equipo ? `${RAIZ_GPS}/${equipo.id}` : RAIZ_GPS)
   }
   const bajada = soloPrueba ? 'Prepara los SMS y observa la recepción del servidor. Esta pantalla no registra, instala ni activa el equipo.' : paso === 3
-    ? meitrack ? 'Configura por SMS y busca la señal coincidente al final para registrar sin activar.' : porDatos ? 'Identifica el Coban mediante su recepción y confirma la correspondencia antes de registrar sin activar.' : 'Envía los comandos por SMS a la línea del equipo y espera su primera señal.'
-    : 'Prepara el equipo y su línea. Confirma la identidad antes del alta; el Coban también admite identificación por datos cuando no responde los SMS.'
+    ? meitrack ? 'Configura por SMS y busca la señal coincidente para registrarlo.' : porDatos ? 'Identifica el Coban mediante su recepción y selecciona el dispositivo para registrarlo.' : 'Envía los comandos por SMS a la línea del equipo y espera su primera señal.'
+    : 'Prepara el equipo y su línea. Después configura los SMS y selecciona el dispositivo que aparezca en el descubrimiento.'
 
   // La vista del equipo para los comandos y la prueba: lo escrito aquí, con el id del registro.
   const equipoVista = {
@@ -257,7 +254,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
                 </div>
                 <span className="gp-hint">{meitrack ? 'Esta preparación admite TCP; no acredita el estado de fábrica del equipo.' : `${(modelo?.transporte ?? 'tcp').toUpperCase()} es el de fábrica del ${datos.modelo}.`}</span>
               </div>
-              <Campo id="n-imei" etiqueta="IMEI conocido (opcional)" todo error={errores.imei} ayuda={equipo ? 'Ya registrado: el IMEI no se corrige.' : 'Déjalo vacío si no lo conoces. La identidad se confirma al final: por SMS o, para Coban, por datos y comprobación del operador.'}>
+              <Campo id="n-imei" etiqueta="IMEI conocido (opcional)" todo error={errores.imei} ayuda={equipo ? 'Ya registrado: el IMEI no se corrige.' : 'Déjalo vacío si no lo conoces. Podrás seleccionar el dispositivo cuando aparezca en el descubrimiento.'}>
                 <div className={`gp-field${errores.imei ? ' mal' : imeiDeSenal ? ' ok' : ''}${equipo ? ' ro' : ''}`}>
                   <input id="n-imei" className="gp-mono" inputMode="numeric" autoComplete="off" maxLength={20} value={datos.imei} readOnly={Boolean(equipo)} onChange={(e) => poner('imei', e.target.value)} aria-invalid={Boolean(errores.imei)} />
                   {imeiDeSenal && <TomadoDeLaSenal d={(detectados.datos ?? []).find((x) => x.imei === imeiDeSenal)} ahora={ahora} />}
@@ -367,25 +364,11 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
           registered={!!equipo} registering={guardando} registrationError={errorAlta} />
         <button type="button" className="gp-btn2" disabled={guideLocked || !!equipo} onClick={() => setPaso(2)}>Anterior: Línea SIM</button>
       </>}
-      {paso === 3 && !meitrack && !soloPrueba && (
-        <section className="gp-card" aria-label="Identidad consultada por SMS">
-          <h2 className="gp-st">Configura y confirma la identidad</h2>
-          <label><input type="checkbox" checked={porDatos} disabled={!!equipo} onChange={e => {setPorDatos(e.target.checked);setSeleccionado(null);setIdentidadFisicaConfirmada(false)}}/>No recibo respuesta SMS: identificar por datos</label>
-          {porDatos ? <p>Selecciona abajo el IMEI observado en las comunicaciones de tu Coban GPS-403. Abre «Ver comunicación» para comparar recepción, pausa y reactivación. En este modo el alta no exige respuesta SMS.</p> : <>
-          <p>Envía los comandos desde tu teléfono. La consulta de identidad no requiere conocer el IMEI de antemano. Compara la respuesta del mismo GPS con la señal recibida antes de registrar.</p>
-          <Campo id="n-imei-sms" etiqueta="IMEI consultado por SMS" ayuda="Puede quedar pendiente mientras envías las consultas de abajo. Después introduce sólo sus 15 dígitos, sin contraseñas ni respuestas completas.">
-            <div className="gp-field"><input id="n-imei-sms" inputMode="numeric" autoComplete="off" value={imeiSms} readOnly={!!equipo} onChange={e => { setImeiSms(e.target.value); setSeleccionado(null) }} /></div>
-          </Campo>
-          {imeiSms && !identidad && <p role="alert">El IMEI consultado no es válido o no coincide con el indicado al principio. No selecciones otro dispositivo para continuar.</p>}
-          </>}
-
-        </section>
-      )}
       {paso === 3 && !meitrack && (
         <>
           <div className="gp-aviso" role="status">{soloPrueba ? 'Prueba sin registro: copia los SMS para enviarlos desde tu teléfono y observa las comunicaciones.' : equipo ? 'Registro comprobado en inventario; instalar y activar son pasos separados.' : porDatos ? 'Preparación sin registro. Elige la recepción del Coban y confirma qué equipo corresponde. No se exige respuesta SMS.' : 'Preparación sin registro. Configura por SMS, consulta el IMEI y elige la señal coincidente al final.'}</div>
-          <div className="gp-grid l400">
-            {porDatos && !soloPrueba ? <details className="gp-card"><summary>Configuración por SMS (opcional)</summary><p>Si el equipo ya transmite al receptor, no hace falta repetir APN ni dirección para identificarlo.</p><ComandosSms equipo={equipoVista} clave={clave} alCambiarClave={setClave}/></details> : <ComandosSms equipo={equipoVista} clave={clave} alCambiarClave={setClave} />}
+          <div className="gp-config-flow">
+            <ComandosSms equipo={equipoVista} clave={clave} alCambiarClave={setClave} />
             {equipo && <PruebaSenal equipo={equipoVista} />}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
@@ -395,21 +378,19 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
       )}
       {paso === 3 && !meitrack && !equipo && (
         <section className="gp-card gp-col" aria-labelledby="det-final">
-          <h2 className="gp-st" id="det-final">{soloPrueba ? 'Comunicación recibida · sin registrar' : 'Detectados sin registrar · confirmar al final'}</h2>
+          <div className="gp-discovery-head"><span className="gp-radar espera"><IcoGps nombre="senal" /></span><div className="gp-titulo"><p className="gp-k">Descubrimiento automático</p><h2 className="gp-st" id="det-final">Descubriendo dispositivos</h2><span className="gp-hint">Se actualiza cada 5 segundos</span></div></div>
           {soloPrueba && <><p>Referencia de prueba: {new Date(inicioPrueba).toLocaleString('es-VE')}.</p><button type="button" className="gp-btn2" onClick={()=>setInicioPrueba(Date.now())}>Marcar nueva referencia</button><p role="status">{detectados.estado !== 'ok' ? 'Esperando una lectura válida del servidor.' : (detectados.datos ?? []).some(d=>Date.parse(d.ultimaVez)>inicioPrueba && Date.parse(d.ultimaVez)<=ahora) ? 'Hay candidatos con mensajes posteriores a la referencia. Revisa su detalle.' : 'Todavía no hay candidatos con mensajes posteriores a la referencia.'}</p></>}
-          <p>{soloPrueba ? 'La lista se actualiza cada 5 segundos. Abre Ver comunicación para revisar fechas y mensajes. Compara el IMEI si lo conoces; otro candidato no confirma cuál GPS estás probando.' : porDatos ? 'Sólo se seleccionan identidades Coban recientes obtenidas del campo IMEI y con el mismo transporte. La coincidencia física la confirma el operador.' : 'Compara el IMEI de la respuesta SMS. Selecciona la identidad coincidente con recepción comprobada y el mismo transporte.'}</p>
+          <p>{soloPrueba ? 'La lista se actualiza cada 5 segundos. Abre Ver comunicación para revisar fechas y mensajes. Compara el IMEI si lo conoces; otro candidato no confirma cuál GPS estás probando.' : porDatos ? 'Selecciona el GPS que estás configurando. Abre su comunicación para revisar la última señal y comprobar cuál corresponde.' : 'Compara el IMEI de la respuesta SMS. Selecciona la identidad coincidente con recepción comprobada y el mismo transporte.'}</p>
           <>
 
             {detectados.estado === 'error' && <p role="alert">{detectados.error?.message}</p>}
-            {(detectados.datos ?? []).length === 0 && <p>No hay dispositivos sin registrar detectados todavía. Envía los comandos y actualiza la lista.</p>}
+            {(detectados.datos ?? []).length === 0 && <p>Esperando la primera señal. Envía los comandos al GPS; aparecerá aquí cuando se comunique.</p>}
             {(detectados.datos ?? []).map(d => <Detectado key={d.imei} d={d} ahora={ahora} elegido={seleccionado === d.imei} detallado>
               {!soloPrueba && <button type="button" className="gp-btn2 chico" disabled={!(porDatos ? coincideRecibido(d,ahora) : coincideDetectado(d, { inicial: datos.imei, sms: imeiSms, transporte: datos.transporte, ahora }))} onClick={() => usarImei(d)}>{seleccionado === d.imei ? 'Coincidencia seleccionada' : 'Seleccionar este dispositivo'}</button>}
             </Detectado>)}
-            <button type="button" className="gp-btn2" onClick={() => detectados.recargar()}>Actualizar lista</button>
           </>
           {errorAlta && <p role="alert">{errorAlta}</p>}
-          {!soloPrueba && porDatos && candidatoRecibido && <label><input type="checkbox" checked={identidadFisicaConfirmada} onChange={e=>setIdentidadFisicaConfirmada(e.target.checked)}/>Confirmo que este IMEI corresponde al GPS-403 y a la SIM que estoy preparando. Lo comprobé físicamente o mediante una prueba controlada; no me basé sólo en que dejó de reportar.</label>}
-          {!soloPrueba && <button type="button" className="gp-btn" disabled={guardando || !puedeRegistrar} onClick={registrarCoban}>{guardando ? 'Comprobando registro…' : 'Registrar sin activar'}</button>}
+          {!soloPrueba && <button type="button" className="gp-btn chico" disabled={guardando || !puedeRegistrar} onClick={registrarCoban}>{guardando ? 'Comprobando registro…' : 'Registrar'}</button>}
         </section>
       )}
       {dialogo}
