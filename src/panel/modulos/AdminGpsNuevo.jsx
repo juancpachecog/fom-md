@@ -3,15 +3,16 @@ import { useConfirmar } from '../comp/Confirmar'
 import { pedir } from '../datos/api'
 import { MeitrackInstallationSetup } from '../meitrack/MeitrackInstallationSetup'
 import { registerInventory, sha256 } from '../meitrack/registration'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { useSesion } from '../useSesion'
 import { Cabeza, Detectado, IcoGps, Pastilla, RAIZ_GPS, useAhora } from '../comp/GpsPiezas'
 import { ComandosSms, PruebaSenal } from './AdminGpsProbar'
 import { validarPreparacion, identidadConfirmada, coincideDetectado, testigoInventarioCoban } from '../datos/gps-discovery'
+import { samePhoneRecords } from '../datos/gpsInventory.js'
 import {
-  CATALOGO_GPS, ESTADOS_SIM, haceCuanto, validarIccid, validarImei, validarLinea,
+  CATALOGO_GPS, ESTADOS_SIM, haceCuanto, nombreEquipo, validarIccid, validarImei, validarLinea,
 } from '../datos/gps'
 import './admin-gps.css'
 
@@ -47,6 +48,7 @@ export default function AdminGpsNuevo() {
   const [errores, setErrores] = useState({})
   const [equipo, setEquipo] = useState(null)
   const [guardando, setGuardando] = useState(false)
+  const [verificandoLinea, setVerificandoLinea] = useState(false)
   const [errorAlta, setErrorAlta] = useState('')
   const [meitrackReceived, setMeitrackReceived] = useState(false)
   const [imeiSms, setImeiSms] = useState('')
@@ -54,6 +56,8 @@ export default function AdminGpsNuevo() {
   const [guideLocked, setGuideLocked] = useState(false)
   const inFlight = useRef(false)
   const detectados = useDatos(() => repo.admin.gps.sinEmparejar(), [], 30_000)
+  const inventario = useDatos(() => repo.admin.gps.listar(), [], 30_000)
+  const mismaLinea = samePhoneRecords(inventario.datos ?? [], datos.telefono)
 
   const modelo = CATALOGO_GPS[datos.marca]?.[datos.modelo] ?? null
   const meitrack = datos.marca === 'Meitrack' && datos.modelo === 'T399L'
@@ -95,10 +99,18 @@ export default function AdminGpsNuevo() {
   })
 
   const siguiente2 = async () => {
+    if (verificandoLinea) return
     const e = validarLinea(datos)
     setErrores(e)
     if (Object.keys(e).length > 0) return
-    setPaso(3)
+    setVerificandoLinea(true)
+    try {
+      const existentes = samePhoneRecords(await repo.admin.gps.listar(), datos.telefono)
+      if (existentes.length && !await confirmar({ titulo: 'La línea ya está en el inventario',
+        texto: 'Revisa la ficha existente antes de crear otro equipo. Si estás trasladando la SIM a otro GPS, confirma que corresponde registrar un aparato distinto.', accion: 'Continuar con otro GPS' })) return
+      setPaso(3)
+    } catch { setErrores({ telefono: 'No se pudo comprobar el inventario. Reintenta antes de continuar.' }) }
+    finally { setVerificandoLinea(false) }
   }
 
   const registrarCoban = async () => {
@@ -263,6 +275,7 @@ export default function AdminGpsNuevo() {
 
         </div>
       )}
+      {paso === 2 && mismaLinea.length > 0 && <section className="gp-aviso" role="status"><p>Esta línea ya está registrada. Puedes corregir la ficha existente o retirar el duplicado sin crear otro equipo.</p>{mismaLinea.map(g => <Link key={g.id} className="gp-enlace" to={`${RAIZ_GPS}/${g.id}?vista=datos`}>Ver / editar {nombreEquipo(g)}</Link>)}</section>}
 
       {paso === 2 && (
         <div className="gp-grid l360">
@@ -309,7 +322,7 @@ export default function AdminGpsNuevo() {
             {errorAlta && <div className="gp-aviso error" role="alert">{errorAlta}</div>}
             <div className="gp-pie entre">
               <button type="button" className="gp-btn2" onClick={() => setPaso(1)} disabled={guardando}><IcoGps nombre="anterior" />Anterior</button>
-              <button type="button" className="gp-btn" onClick={siguiente2} disabled={guardando}>
+              <button type="button" className="gp-btn" onClick={siguiente2} disabled={guardando || verificandoLinea}>
                 Siguiente: Configurar y probar<IcoGps nombre="siguiente" />
               </button>
             </div>

@@ -1274,6 +1274,12 @@ export const repoApi = {
       })
       return { id: r?.gpsDevice?.id ?? r?.device?.id ?? r?.id ?? null }
     },
+    async archivar(equipoId, motivo) {
+      await pedir(`/api/v1/console/gps-devices/${equipoId}/archive`, { metodo: 'POST', cuerpo: { reason: motivo }, empresaContexto: null })
+      const rows = await repoApi.admin.gps.listar()
+      if (rows.some(g => g.id === equipoId)) throw Error('El equipo todavía aparece en inventario. Comprueba su estado antes de repetir.')
+      return true
+    },
     async asociar(equipoId, vehiculoId, notas, { tecnico, ubicacion } = {}) {
       await api.instalarEquipoGps(equipoId, {
         vehicleId: vehiculoId,

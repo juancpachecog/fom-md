@@ -8,6 +8,9 @@ nominal existente: `node scripts/build-fom-production.mjs <directorio>`.
 También exige `VITE_GPS_RECEPTOR` con la IPv4 pública revisada del receptor del
 ambiente. El build falla si falta o es inválida; su identidad forma parte del
 perfil publicado. Puede suministrarse como variable del proceso de publicación.
+El build ejecuta además las pruebas del asistente GPS (identidad, SIM, registro,
+recuperación de intentos y retiro seguro) antes de generar la web. Sólo al pasar
+incorpora `gpsFlowVerified: true` al perfil que exige el publicador.
 No copiar archivos `.env`, claves ni tokens al repositorio o a registros.
 `npm run build:demo` es sólo para demostraciones y no se publica como panel FOM.
 

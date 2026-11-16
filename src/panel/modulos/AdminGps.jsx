@@ -177,7 +177,7 @@ function Inventario() {
               <section className="gp-card gp-col" id="gp-detectados" aria-labelledby="gp-det-t">
                 <div className="gp-titulo">
                   <h2 className="gp-st" id="gp-det-t">Detectados sin registrar</h2>
-                  <span className="gp-hint">Ya transmiten al receptor y no están en ninguna empresa.</span>
+                  <span className="gp-hint">Son recepciones del GPS, todavía sin ficha de inventario. Registra el equipo para editar sus datos. Las recepciones originales se conservan como historial.</span>
                 </div>
                 {detectados.estado === 'cargando' && <span className="gp-hint">Buscando…</span>}
                 {detectados.estado === 'error' && <span className="gp-hint">{detectados.error?.message}</span>}
@@ -239,7 +239,7 @@ function FilaEquipo({ g, unidad, ahora, abrir, conEmpresa }) {
       <td><Pastilla tono={est.tono}>{est.texto}</Pastilla></td>
       <td><Pastilla tono={senal.tono} punto>{senal.texto}</Pastilla></td>
       <td className="der">
-        <button type="button" className="gp-enlace" onClick={(e) => { e.stopPropagation(); abrir() }} aria-label={`Ver ${nombreEquipo(g)} ${g.vehiculoNombre ?? 'en inventario'}`}>Ver →</button>
+        <button type="button" className="gp-enlace" onClick={(e) => { e.stopPropagation(); abrir() }} aria-label={`Ver ${nombreEquipo(g)} ${g.vehiculoNombre ?? 'en inventario'}`}>Ver / editar →</button>
       </td>
     </tr>
   )
