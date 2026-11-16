@@ -46,6 +46,7 @@ function ComandosSmsCoban({ equipo, clave, alCambiarClave }) {
   const comandos = armarComandos({ clave, apn: equipo.apn ?? '', ip: IP_RECEPTOR, puerto: PUERTO_RECEPTOR, transporte: equipo.transport ?? 'tcp' })
   const linea = equipo.linea || equipo.simPhone
   const copiar = async (c) => {
+    if (c.falta || !c.texto) return
     setFallo('')
     try {
       await navigator.clipboard.writeText(c.texto)
@@ -85,13 +86,13 @@ function ComandosSmsCoban({ equipo, clave, alCambiarClave }) {
             <code>{c.visible}</code>
             <span className="gp-hint">{c.respuesta}</span>
           </div>
-          <button type="button" className="gp-btn2" aria-label={`Copiar comando ${Number(c.n)}`} onClick={() => copiar(c)}>
+          <button type="button" className="gp-btn2" disabled={!!c.falta} title={c.falta || undefined} aria-label={`Copiar comando ${Number(c.n)}`} onClick={() => copiar(c)}>
             <IcoGps nombre={copiado === c.n ? 'check' : 'copiar'} />{copiado === c.n ? 'Copiado' : 'Copiar'}
           </button>
         </div>
       ))}
       {fallo && <p className="gp-error" role="alert">{fallo}</p>}
-      {!IP_RECEPTOR && <span className="gp-hint" style={{ paddingTop: 6 }}>Falta la IP del receptor en la configuración del sitio: escríbela en el comando 02 antes de enviarlo.</span>}
+      {comandos.some(c => c.falta) && <span className="gp-hint" role="status" style={{ paddingTop: 6 }}>El receptor no está configurado en el sitio. El comando 02 está bloqueado hasta corregir la configuración.</span>}
       <span className="gp-hint" style={{ padding: '10px 0 6px', borderTop: '1px solid var(--e-borde, #262e39)' }}>Los puntos son la clave SMS: se pone al copiar y no se guarda.</span>
     </section>
   )
