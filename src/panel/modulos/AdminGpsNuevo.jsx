@@ -16,6 +16,7 @@ import {
   CATALOGO_GPS, ESTADOS_SIM, haceCuanto, nombreEquipo, validarIccid, validarImei, validarLinea,
 } from '../datos/gps'
 import DescubrimientoGps from '../comp/DescubrimientoGps'
+import { apiAutodeteccion } from '../datos/gpsAutodeteccion'
 import { ofrecerVehiculoTrasGps } from '../datos/continuarRegistroGps'
 import './admin-gps.css'
 
@@ -50,6 +51,9 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
   const [clave, setClave] = useState('')
   const [errores, setErrores] = useState({})
   const [equipo, setEquipo] = useState(null)
+  const [propuestas,setPropuestas] = useState({})
+  const [propuestaPendiente,setPropuestaPendiente] = useState(null)
+  const propuestaIntento = useRef(null)
   const [guardando, setGuardando] = useState(false)
   const [verificandoLinea, setVerificandoLinea] = useState(false)
   const [errorAlta, setErrorAlta] = useState('')
@@ -121,13 +125,30 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
     finally { setVerificandoLinea(false) }
   }
 
+  const guardarPropuesta = async (id, imei) => {
+    const proposal = propuestas[imei]
+    if (!proposal) return
+    if (!propuestaIntento.current) {
+      const initial = await apiAutodeteccion(pedir).leer(id)
+      propuestaIntento.current = { body: {...proposal,expectedVersion:initial.revision,reason:'Selección durante el registro del GPS'},token:crypto.randomUUID() }
+    }
+    await apiAutodeteccion(pedir).guardar(id,propuestaIntento.current.body,propuestaIntento.current.token)
+    propuestaIntento.current = null; setPropuestaPendiente(null)
+  }
+  const reintentarPropuesta = async () => {
+    if (inFlight.current || !propuestaPendiente) return
+    inFlight.current=true;setGuardando(true);setErrorAlta('')
+    try {await guardarPropuesta(equipo.id,equipo.imei);await ofrecerVehiculoTrasGps(equipo.id,{confirmar,navegar,raiz:RAIZ_GPS})}
+    catch(e){setErrorAlta('El GPS ya está registrado. Falta confirmar la selección de funciones. '+e.message)}
+    finally{inFlight.current=false;setGuardando(false)}
+  }
   const registrarCoban = async () => {
     if (soloPrueba || inFlight.current || equipo || !puedeRegistrar || meitrack) return
     inFlight.current = true
     setGuardando(true)
     setErrorAlta('')
     try {
-      if (!await confirmar({ titulo: 'Registrar dispositivo', texto: 'Confirma que el dispositivo seleccionado corresponde al GPS y a la SIM que estás configurando, comprobado físicamente o mediante una prueba controlada. Se creará su ficha de inventario; la activación corresponde a la instalación.', accion: 'Registrar GPS' })) return
+      if (!await confirmar({ titulo: 'Registrar dispositivo', texto: 'Confirma que el dispositivo seleccionado corresponde al GPS y a la SIM que estás configurando, comprobado físicamente o mediante una prueba controlada. Se creará su ficha de inventario y se guardarán las funciones elegidas; se aplican al asociarlo a un vehículo.', accion: 'Registrar GPS' })) return
       if (!navigator.locks?.request) throw Error('Use un navegador compatible con la protección de intentos entre pestañas.')
       const payload = { imei: identidad, model: datos.modelo, manufacturer: datos.marca,
         protocolFamily: modelo?.protocolo, ...metadatos(), ...(datos.serie.trim() ? { serialNumber: datos.serie.trim() } : {}), ...(porDatos ? {registrationMethod:'received_data',identityConfirmedByOperator:true} : {}) }
@@ -143,6 +164,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
         },
       }))
       setEquipo({ id, imei: identidad, ...metadatos() })
+      if (propuestas[identidad]) { setPropuestaPendiente({id,imei:identidad}); await guardarPropuesta(id,identidad) }
       await ofrecerVehiculoTrasGps(id, { confirmar, navegar, raiz: RAIZ_GPS })
     } catch (err) {
       setErrorAlta(err.message)
@@ -384,6 +406,8 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
         <div className="gp-titulo"><p className="gp-k">Registro completado</p><h2 className="gp-st">El GPS ya está en el inventario</h2><span className="gp-mono">{equipo.imei}</span></div>
         <p className="gp-lbl">Puedes registrar un vehículo ahora y asociarle este equipo, o hacerlo más tarde desde su ficha.</p>
         <div className="gp-acciones">
+          {propuestaPendiente && <button type="button" className="gp-btn" disabled={guardando} onClick={reintentarPropuesta}>Guardar funciones y continuar</button>}
+          {errorAlta && <p className="gp-error" role="alert">{errorAlta} El GPS ya está registrado; este paso no vuelve a crearlo.</p>}
           <Link className="gp-btn" to={`${RAIZ_GPS}/${equipo.id}/instalar`} state={{ crearVehiculoTrasRegistro: true }}>Crear vehículo y asociar GPS</Link>
           <Link className="gp-btn2" to={`${RAIZ_GPS}/${equipo.id}`}>Ir al equipo</Link>
         </div>
@@ -391,7 +415,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
       {paso === 4 && !meitrack && !equipo && <>
         <DescubrimientoGps listado={detectados} ahora={ahora} seleccionado={seleccionado} alSeleccionar={usarImei}
           puedeElegir={d => coincideRecibido(d, ahora)} puedeRegistrar={puedeRegistrar} alRegistrar={registrarCoban}
-          guardando={guardando} error={errorAlta} registrado={!!equipo} soloPrueba={soloPrueba} alVolver={() => setPaso(3)} />
+          guardando={guardando} error={errorAlta} registrado={!!equipo} soloPrueba={soloPrueba} alVolver={() => setPaso(3)} propuestas={propuestas} alCambiarPropuesta={(imei,value) => setPropuestas(prev => ({...prev,[imei]:value}))} />
       </>}
       {dialogo}
     </div>

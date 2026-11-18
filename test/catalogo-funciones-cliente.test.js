@@ -61,3 +61,10 @@ test('readback conserva la empresa inicial aunque cambie el contexto durante POS
   try { await api.guardarDefinicion(null,body,token); assert.ok(calls.every(url=>url.includes(`/tenants/${id}/`))) }
   finally {api.fijarEmpresaGestion(null);globalThis.fetch=old}
 })
+test('el catálogo permite porcentajes y metros sin convertirlos a otras dimensiones',()=>{
+  for(const [unit,dimension] of [['percent','ratio'],['meter','distance']]){
+    const form={...api.formularioDefinicion(null),key:'medicion',name:'Medición',reason:'Nueva medición',kind:'numeric',unit,min:'0',max:'100',precision:'2'}
+    const body=api.cuerpoDefinicion(form,null)
+    assert.equal(body.definition.unit,unit);assert.equal(body.definition.dimension,dimension)
+  }
+})

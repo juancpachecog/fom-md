@@ -17,6 +17,7 @@ import { masNuevoPrimero } from '../datos/orden'
 import * as f from '../datos/formato'
 import './admin-gps.css'
 import { locationStatus } from '../meitrack/location-status.js'
+import FuncionesDetectadas from '../comp/FuncionesDetectadas'
 import FuncionesInstalacion from './FuncionesInstalacion'
 import ComandosInstalacion from './ComandosInstalacion'
 import { useConfirmar } from '../comp/Confirmar'
@@ -42,6 +43,7 @@ export default function AdminGpsDetalle() {
   const [params, setParams] = useSearchParams()
   const pestana = pestanaEquipo(params.toString())
   const setPestana = value => setParams(previous => { const next = new URLSearchParams(previous); next.set('vista', value); return next }, { replace: true })
+  const [funcionesRevision,setFuncionesRevision] = useState(0)
   const [desmontando, setDesmontando] = useState(false)
   const [archivando, setArchivando] = useState(false)
   const sesion = useSesion()
@@ -105,7 +107,10 @@ export default function AdminGpsDetalle() {
           <DatosEditables g={g} alGuardar={async () => { setAviso('Datos del equipo guardados.'); await equipo.recargar(); setPestana('diagnostico') }} />
         )}
         {pestana === 'historial' && <Historial g={g} posiciones={posiciones} />}
-        {pestana === 'funciones' && (g.instalacionId ? <FuncionesInstalacion assignmentId={g.instalacionId} protocolFamily={g.protocolo}/> : <p>Instala el equipo en un vehículo para configurar sus funciones.</p>)}
+        {pestana === 'funciones' && <>
+          {g.protocolo === 'coban-gps103' && <section className="gp-card gp-col"><FuncionesDetectadas id={g.id} editar={sesion?.perfil?.rol === 'admin_fom'} assignmentId={g.instalacionId} alAplicar={() => setFuncionesRevision(n => n+1)} /></section>}
+          {g.instalacionId ? <FuncionesInstalacion key={`${g.instalacionId}-${funcionesRevision}`} assignmentId={g.instalacionId} protocolFamily={g.protocolo}/> : <p className="gp-hint">Puedes guardar la selección ahora y aplicarla después de instalar el GPS en un vehículo.</p>}
+        </>}
         {pestana === 'comandos' && (g.instalacionId ? <ComandosInstalacion key={g.instalacionId} assignmentId={g.instalacionId}/> : <p>Instala el equipo en un vehículo para consultar sus comandos.</p>)}
       </div>
 
