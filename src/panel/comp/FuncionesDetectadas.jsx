@@ -74,7 +74,7 @@ export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar
     {loadError && <p className="gp-error" role="alert">{loadError} {snapshot && 'Las lecturas anteriores no confirman el estado actual.'}</p>}
     {!snapshot && !loadError && <p className="gp-hint" role="status">Analizando las tramas recibidas…</p>}
     {snapshot && <>
-      <div className="gp-auto-status"><span><i className={snapshot.communicationFresh && !loadError ? 'live' : ''} />Comunicación <b>{haceCuanto(snapshot.lastCommunicationAt)}</b></span><span><i className={snapshot.positionFresh && !loadError ? 'live' : ''} />Posición <b>{haceCuanto(snapshot.lastPositionAt)}</b></span></div>
+      <div className="gp-auto-status"><span><i className={snapshot.communicationFresh && !loadError ? 'live' : ''} />Comunicación <b>{haceCuanto(snapshot.lastCommunicationAt)}</b></span><span><i className={snapshot.positionFresh && !loadError ? 'live' : ''} />Posición recibida <b>{haceCuanto(snapshot.lastPositionAt)}</b></span></div>
       <p className="gp-hint">{snapshot.variants.filter(v => /extended19|position13|state20|unrecognized/.test(v.id)).map(v => variantes[v.id] || 'Variante pendiente').join(' · ') || 'Aún sin tramas de posición reconocidas'} · Firmware sin identificar</p>
       {snapshot.settings && <div className="gp-auto-settings"><span>Alarma armada: <b>{snapshot.settings.armed ? 'ON' : 'OFF'}</b></span><span>Intervalo: <b>{snapshot.settings.motionIntervalSeconds}s / {snapshot.settings.stationaryIntervalSeconds}s</b></span><small>Reportado {haceCuanto(snapshot.settings.receivedAt)}{snapshot.settings.freshness === 'stale' ? ' · lectura antigua' : ''}</small></div>}
       {snapshot.warnings.includes('position_reporting_disabled') && <p className="gp-aviso">El último estado recibido indicaba reportes de posición desactivados. Revisa la configuración del equipo.</p>}
@@ -89,7 +89,15 @@ export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar
       {paginas > 1 && <div className="gp-discovery-pagination"><button type="button" className="gp-btn2 chico" disabled={!actual} onClick={() => setPagina(actual-1)}>Anterior</button><span>{actual+1} / {paginas}</span><button type="button" className="gp-btn2 chico" disabled={actual+1>=paginas} onClick={() => setPagina(actual+1)}>Siguiente</button></div>}
       <p className="gp-hint">{choices.filter(c => c.selected).length} seleccionadas · ACC no confirma que el motor esté girando. Los valores describen lo que reportó el equipo.</p>
     </>}
-    {signals.filter(s => s.interpretation === 'unit_pending').map(s => <p className="gp-hint" key={s.key}>{nombreSenal(s.key)}: {valorSenal(s)} · pendiente de interpretación</p>)}
+    {(signals.some(s => s.interpretation === 'unit_pending') || snapshot?.settings) && <details className="gp-auto-more"><summary>Más lecturas y estado</summary>
+      {signals.filter(s => s.interpretation === 'unit_pending').map(s => <p className="gp-hint" key={s.key}>{nombreSenal(s.key)}: {valorSenal(s)}</p>)}
+      {snapshot?.settings && <dl className="gp-discovery-facts">{[
+        ['Modo de sueño',({0:'En línea',1:'Inteligente',2:'Ahorro'})[snapshot.settings.sleepMode] ?? 'Sin lectura'],
+        ['Alarma de vibración',typeof snapshot.settings.shockAlarmEnabled === 'boolean' ? snapshot.settings.shockAlarmEnabled ? 'ON' : 'OFF' : 'Sin lectura'],
+        ['Alarma de batería baja',typeof snapshot.settings.lowBatteryAlarmEnabled === 'boolean' ? snapshot.settings.lowBatteryAlarmEnabled ? 'ON' : 'OFF' : 'Sin lectura'],
+        ['Zona horaria reportada',typeof snapshot.settings.timezoneOffsetHours === 'number' ? 'UTC'+(snapshot.settings.timezoneOffsetHours>=0?'+':'')+snapshot.settings.timezoneOffsetHours : 'Sin lectura'],
+      ].map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>}
+    </details>}
     {snapshot && !selection && <p className="gp-hint">Todavía no hay un perfil inequívoco de funciones para estas tramas. Puedes registrar el equipo y revisarlo desde su ficha.</p>}
     {id && editar && <div className="gp-auto-actions"><button type="button" className="gp-btn chico" disabled={busy || !selection || !saved} onClick={save}>{busy ? 'Comprobando…' : 'Guardar selección'}</button>{assignmentId && saved?.revision > 0 && <button type="button" className="gp-btn2 chico" disabled={busy} onClick={apply}>Usar en esta instalación</button>}</div>}
     {mensaje && <p className="gp-aviso" role="status">{mensaje}</p>}{dialogo}
