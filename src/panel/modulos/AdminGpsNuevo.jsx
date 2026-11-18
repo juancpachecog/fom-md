@@ -282,7 +282,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
                     <button key={t} type="button" className="gp-chip alto" aria-pressed={datos.transporte === t} onClick={() => poner('transporte', t)}>{t.toUpperCase()}</button>
                   ))}
                 </div>
-                <span className="gp-hint">{meitrack ? 'Esta preparación admite TCP; no acredita el estado de fábrica del equipo.' : `${(modelo?.transporte ?? 'tcp').toUpperCase()} es el de fábrica del ${datos.modelo}.`}</span>
+                <span className="gp-hint">{meitrack ? 'Esta preparación admite TCP; no acredita el estado de fábrica del equipo.' : 'Elige el transporte configurado en tu equipo. La variante y sus datos se comprobarán en Trama.'}</span>
               </div>
               <Campo id="n-imei" etiqueta="IMEI conocido (opcional)" todo error={errores.imei} ayuda={equipo ? 'Ya registrado: el IMEI no se corrige.' : 'Déjalo vacío si no lo conoces. Podrás seleccionar el dispositivo cuando aparezca en el descubrimiento.'}>
                 <div className={`gp-field${errores.imei ? ' mal' : imeiDeSenal ? ' ok' : ''}${equipo ? ' ro' : ''}`}>

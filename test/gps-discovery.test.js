@@ -5,8 +5,8 @@ import { registerInventory, sha256 } from '../src/panel/meitrack/registration.js
 import { t399ReadOnlyQuery } from '../src/panel/meitrack/commands.js'
 
 const imei = '999727000000001', other = '999727000000002', now = Date.parse('2026-11-02T17:00:00Z')
-test('preparar sin IMEI permite los dos modelos; un IMEI conocido inválido no se omite', () => {
-  for (const [marca, modelo] of [['Coban', 'GPS-403'], ['Meitrack', 'T399L']]) {
+test('preparar sin IMEI permite GPS103, GPS403 y T399L; un IMEI conocido inválido no se omite', () => {
+  for (const [marca, modelo] of [['Coban', 'GPS-103'], ['Coban', 'GPS-403'], ['Meitrack', 'T399L']]) {
     assert.deepEqual(validarPreparacion({ marca, modelo, imei: '' }), {})
     assert.ok(validarPreparacion({ marca, modelo, imei: '123' }).imei)
   }

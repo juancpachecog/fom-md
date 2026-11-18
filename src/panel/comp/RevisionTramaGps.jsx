@@ -33,6 +33,7 @@ export default function RevisionTramaGps({revision,imei,ahora=Date.now(),registr
  const [verSenales,setVerSenales]=useState(false)
  const [paginaSenales,setPaginaSenales]=useState(0)
  const signals=snapshot?.signals??[],pages=Math.max(1,Math.ceil(signals.length/4)),page=Math.min(paginaSenales,pages-1)
+ const showingReadings=verSenales&&signals.length>0
  const facts=[['IMEI',imei||'Identidad de la ficha'],['Identidad en la trama',snapshot?.identityMatches?'Coincide con el equipo':'Sin muestra coincidente'],
   ['Fecha y hora del equipo',fechaHoraEquipo(snapshot?.deviceDateTime)],['Hora GPS reportada',horaGps(snapshot?.gpsClock)],
   ['Ubicación (latitud, longitud)',ubicacionTrama(snapshot?.position)],['Recepción · Venezuela',snapshot?.sample?.receivedAt?new Date(snapshot.sample.receivedAt).toLocaleString('es-VE',{timeZone:'America/Caracas'}):'Sin trama de posición']]
@@ -41,10 +42,10 @@ export default function RevisionTramaGps({revision,imei,ahora=Date.now(),registr
   {error&&<p className="gp-error" role="alert">{error} Las lecturas anteriores no habilitan el registro.</p>}
   {snapshot&&<>
    <dl className="gp-discovery-facts gp-frame-facts">{facts.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-   {!ready&&!error&&<p className="gp-aviso">{snapshot.validation?.blockingReasons?.map(motivoRevision).join(' ')||'Esperando una posición reciente para registrar.'}</p>}
+   {!ready&&!error&&<p className="gp-aviso" title={snapshot.validation?.blockingReasons?.map(motivoRevision).join(' ')}>{snapshot.validation?.blockingReasons?.[0]?motivoRevision(snapshot.validation.blockingReasons[0]):'Esperando una posición reciente para registrar.'}</p>}
    <p className="gp-frame-note">La fecha y hora del equipo se muestran como llegaron. Su zona horaria sigue sin comprobar; la recepción sí tiene referencia del servidor.</p>
-   <div className="gp-frame-signals"><button type="button" className="gp-btn2 chico" aria-expanded={verSenales} onClick={()=>setVerSenales(v=>!v)}>{verSenales?'Ocultar lecturas':`Ver ${snapshot.signals?.length??0} señales recibidas`}</button><small>ACC, puerta y sensores se revisan en Funciones.</small></div>
-   {verSenales&&<><dl className="gp-discovery-facts gp-frame-readings">{signals.slice(page*4,(page+1)*4).map(s=><div key={s.key}><dt>{nombreSenal(s.key)}{s.freshness==='stale'?' · lectura anterior':''}</dt><dd>{valorSenal(s)}</dd></div>)}{!signals.length&&<div><dd>Aún sin señales adicionales interpretables.</dd></div>}</dl>{pages>1&&<div className="gp-discovery-pagination"><button type="button" className="gp-btn2 chico" disabled={!page} onClick={()=>setPaginaSenales(page-1)}>Anterior</button><span>{page+1} / {pages}</span><button type="button" className="gp-btn2 chico" disabled={page+1>=pages} onClick={()=>setPaginaSenales(page+1)}>Siguiente</button></div>}</>}
+   <div className="gp-frame-signals"><button type="button" className="gp-btn2 chico" disabled={!signals.length} aria-expanded={showingReadings} onClick={()=>setVerSenales(v=>!v)}>{!signals.length?'Sin señales adicionales':showingReadings?'Ocultar lecturas':`Ver ${signals.length} señales recibidas`}</button><small>ACC, puerta y sensores se revisan en Funciones.</small></div>
+   {showingReadings&&<><dl className="gp-discovery-facts gp-frame-readings">{signals.slice(page*4,(page+1)*4).map(s=><div key={s.key}><dt>{nombreSenal(s.key)}{s.freshness==='stale'?' · lectura anterior':''}</dt><dd>{valorSenal(s)}</dd></div>)}</dl>{pages>1&&<div className="gp-discovery-pagination"><button type="button" className="gp-btn2 chico" disabled={!page} onClick={()=>setPaginaSenales(page-1)}>Anterior</button><span>{page+1} / {pages}</span><button type="button" className="gp-btn2 chico" disabled={page+1>=pages} onClick={()=>setPaginaSenales(page+1)}>Siguiente</button></div>}</>}
   </>}
  </section>
 }
