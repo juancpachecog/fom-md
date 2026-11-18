@@ -47,7 +47,7 @@ export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar
   const selection = profile ? propuestaDesdePerfil(profile,current) : current
   const choices = selection?.choices ?? []
   const savedSelection = profile && saved ? propuestaDesdePerfil(profile,saved) : null
-  const cambiosSinGuardar = !!savedSelection && JSON.stringify(selection) !== JSON.stringify(savedSelection)
+  const cambiosSinGuardar = !!savedSelection && (saved.profileId !== selection.profileId || saved.profileVersion !== selection.profileVersion || JSON.stringify(selection) !== JSON.stringify(savedSelection))
   const signals = snapshot?.signals ?? [], paginas = Math.max(1, Math.ceil(choices.length / 4)), actual = Math.min(pagina, paginas - 1)
   const save = async () => {
     if (lock.current || !selection || !saved) return
