@@ -5,10 +5,11 @@ import { readIdentitySms, readCommandsSms, readPendingSms, readConnectionOk } fr
 import { receiverAvailable, connectionSms, connectionReadback } from './operational-setup.js'
 import { parseSetupCapture } from './meitrack-setup.js'
 import { MeitrackClockReadback } from './MeitrackClockReadback.jsx'
+import DescubrimientoGps from '../comp/DescubrimientoGps'
 import { IntervaloGps } from '../comp/IntervaloGps'
 
 const request = (path, body, signal) => pedir(`/api/v1/console/meitrack-setup/${path}`, { metodo:'POST', cuerpo:body, señal:signal, empresaContexto:null })
-export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdentityChange, onCapture, onLockChange, onSelect, selected=false, canRegister=false, onRegister, registered=false, registering=false, registrationError='', soloPrueba=false }) {
+export function MeitrackInstallationSetup({ fase = 'configuracion', alVolver, listado, ahora = Date.now(), seleccionado, password, apn, knownImei='', onIdentityChange, onCapture, onLockChange, onSelect, selected=false, canRegister=false, onRegister, registered=false, registering=false, registrationError='', soloPrueba=false }) {
   const [identityText,setIdentityText]=useState(''), [commandsText,setCommandsText]=useState(''), [pendingText,setPendingText]=useState('')
   const [okText,setOkText]=useState(''), [readback,setReadback]=useState(''), [sent,setSent]=useState(false), [noAuth,setNoAuth]=useState(false)
   const [availability,setAvailability]=useState(null), [capture,setCapture]=useState(null), [looking,setLooking]=useState(false)
@@ -53,8 +54,8 @@ export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdent
   function card(n,title,sms,hint,field){return <div className="gp-cmd"><span className="n">{n}</span><div className="tx"><b>{title}</b><code>{sms ? sms.replace(password,'••••') : n === '04' && configured ? 'La configuración para FOM ya está comprobada. No hace falta repetir A21.' : n === '04' && sent ? 'Configuración marcada como enviada. No repetir.' : 'Completa la comprobación anterior.'}</code><span className="gp-hint">{hint}</span>{field}</div><button type="button" className="gp-btn2" disabled={!sms} onClick={()=>void copy(sms)}>Copiar</button></div>}
   function response(label,value,setValue,disabled=false){return <label className="gp-f"><span>{label}</span><div className="gp-field"><textarea value={value} maxLength={2048} autoComplete="off" spellCheck={false} disabled={disabled} onChange={e=>setValue(e.target.value)} /></div></label>}
   return <>
-    <section className="gp-card gp-meitrack-sms" style={{display:'flex',flexDirection:'column',gap:12,padding:'22px 24px'}} aria-label="Comandos SMS Meitrack">
-      <div className="gp-titulo"><p className="gp-k">Paso 3 de 3 · Comandos SMS</p><h2 className="gp-st">Configura el equipo</h2><span className="gp-lbl">Envía los mensajes en orden a la línea del GPS y pega cada respuesta. No se registra ningún equipo al copiar o avanzar.</span></div>
+    <section hidden={fase === 'deteccion'} className="gp-card gp-meitrack-sms" style={{display:'flex',flexDirection:'column',gap:12,padding:'22px 24px'}} aria-label="Comandos SMS Meitrack">
+      <div className="gp-titulo"><p className="gp-k">Paso 3 de 4 · Comandos SMS</p><h2 className="gp-st">Configura el equipo</h2><span className="gp-lbl">Envía los mensajes en orden a la línea del GPS y pega cada respuesta. No se registra ningún equipo al copiar o avanzar.</span></div>
       {card('01','Identificar el GPS',t399ReadOnlyQuery(password,'E91'),'Lee IMEI y versión; no necesitas conocerlos de antemano.',response('Respuesta E91',identityText,setIdentityText,sent))}
       {identity && <p role="status">IMEI: {identity.imei} · Versión: {identity.firmware}</p>}
       {identityText && !identity && <p role="alert">La respuesta no es válida o no coincide con el IMEI conocido.</p>}
@@ -77,15 +78,10 @@ export function MeitrackInstallationSetup({ password, apn, knownImei='', onIdent
       <span className="gp-hint">La clave y las respuestas completas permanecen sólo en memoria. Descartar no deshace los SMS enviados. No se activa ni se instala el GPS al registrarlo.</span>
     </section>
 
-    {configured&&<MeitrackClockReadback key={imei+firmware} imei={imei} firmware={firmware} readback={readback}/>}
-    <section className="gp-card gp-col" aria-label="Detectados sin registrar Meitrack">
-      <div className="gp-discovery-head"><span className="gp-radar espera" aria-hidden="true">⌁</span><div className="gp-titulo"><p className="gp-k">Descubrimiento automático</p><h2 className="gp-st">Descubriendo dispositivos</h2><span className="gp-hint">Se actualiza cada 5 segundos</span></div></div>
-      <p>{soloPrueba ? 'Comprueba la configuración y busca la recepción coincidente sin registrar el equipo.' : 'Después de configurar, busca si el GPS ya está reportando. Compara su IMEI y selecciona la señal coincidente para registrarlo.'}</p>
-      {!configured && <p>Primero comprueba la configuración con DB4.</p>}
-      {configured && !eligible && <p role="status">{receiver ? 'Todavía no hay recepción reciente comprobada de este GPS. La búsqueda se actualiza automáticamente.' : 'El servicio no está disponible. Conserva la pantalla y vuelve a consultar.'}</p>}
-      {eligible && !registered && <div className="gp-cmd"><div className="tx"><b>Detectado: {imei}</b><span className="gp-hint">Meitrack T399L · TCP · recepción reciente coincidente</span></div><button type="button" className="gp-btn2" onClick={onSelect}>{selected ? 'Coincidencia seleccionada' : 'Seleccionar este dispositivo'}</button></div>}
-      {registrationError && <p role="alert">{registrationError}</p>}
-      {!soloPrueba && (registered ? <p role="status">Registro comprobado en inventario. La instalación y activación son pasos separados.</p> : <button type="button" className="gp-btn chico" disabled={!eligible || !selected || !canRegister || registering} onClick={onRegister}>{registering ? 'Comprobando registro…' : 'Registrar'}</button>)}
-    </section>
+    {fase !== 'deteccion' && configured&&<MeitrackClockReadback key={imei+firmware} imei={imei} firmware={firmware} readback={readback}/>}
+    {fase === 'deteccion' && <DescubrimientoGps alVolver={alVolver} listado={listado} ahora={ahora} seleccionado={seleccionado}
+      alSeleccionar={onSelect} puedeElegir={d => !!eligible && d.imei === imei} puedeRegistrar={!!eligible && selected && canRegister}
+      alRegistrar={onRegister} guardando={registering} error={registrationError} registrado={registered} soloPrueba={soloPrueba} />}
+
   </>
 }
