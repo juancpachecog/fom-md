@@ -46,6 +46,8 @@ export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar
   }, [desiredId, desiredVersion])
   const selection = profile ? propuestaDesdePerfil(profile,current) : current
   const choices = selection?.choices ?? []
+  const savedSelection = profile && saved ? propuestaDesdePerfil(profile,saved) : null
+  const cambiosSinGuardar = !!savedSelection && JSON.stringify(selection) !== JSON.stringify(savedSelection)
   const signals = snapshot?.signals ?? [], paginas = Math.max(1, Math.ceil(choices.length / 4)), actual = Math.min(pagina, paginas - 1)
   const save = async () => {
     if (lock.current || !selection || !saved) return
@@ -81,10 +83,10 @@ export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar
     </>}
     {editar && profiles.length > 1 && <label className="gp-auto-profile"><span>Tipo de lectura</span><select value={desiredId ? desiredId+'@'+desiredVersion : ''} onChange={elegirPerfil} disabled={busy}><option value="">Revisar perfil…</option>{profiles.map(p=><option key={p.profileId+'@'+p.profileVersion} value={p.profileId+'@'+p.profileVersion}>{p.profileId==='coban.ascii.extended19'?'ASCII extendido':p.profileVersion===2?'Posición y entradas':'Posición básica'}</option>)}</select></label>}
     {selection && <>
-      <div className="gp-auto-heading"><b>Funciones del dispositivo</b>{editar && <button type="button" className="gp-btn2 chico" disabled={busy} onClick={() => cambiar({...selection,choices:choices.map(c => ({...c,selected:signals.some(s => s.key === c.semanticKey && s.quality === 'valid' && s.freshness === 'fresh' && s.interpretation === 'implemented')}))})}>Seleccionar observadas</button>}</div>
+      <div className="gp-auto-heading"><b>Funciones del dispositivo</b>{editar && <button type="button" className="gp-btn2 chico" disabled={busy || !!loadError} onClick={() => cambiar({...selection,choices:choices.map(c => ({...c,selected:signals.some(s => s.key === c.semanticKey && s.quality === 'valid' && s.freshness === 'fresh' && s.interpretation === 'implemented')}))})}>Seleccionar observadas</button>}</div>
       <div className="gp-auto-functions">{choices.slice(actual*4,(actual+1)*4).map((choice,index) => {const signal = signals.find(s => s.key === choice.semanticKey);return <label className="gp-auto-function" key={choice.semanticKey}>
         {editar && <input type="checkbox" checked={choice.selected} disabled={busy} onChange={e => cambiar({...selection,choices:choices.map((c,i) => i === actual*4+index ? {...c,selected:e.target.checked} : c)})} />}
-        <span><b>{nombreSenal(choice.semanticKey)}</b><small>{signal ? signal.quality === 'contradictory' ? 'Lectura contradictoria' : signal.freshness === 'stale' ? 'Observada · lectura antigua' : 'Observada' : 'Compatible · sin muestra'} · Comprobación pendiente</small></span><span className="gp-auto-value" title={signal ? fecha(signal.receivedAt) : undefined}>{signal ? valorSenal(signal) : 'Sin lectura'}{signal && <small>{haceCuanto(signal.receivedAt)}</small>}</span>
+        <span><b>{nombreSenal(choice.semanticKey)}</b><small>{signal ? signal.quality === 'contradictory' ? 'Lectura contradictoria' : loadError || signal.freshness === 'stale' ? 'Observada · lectura anterior' : 'Observada' : 'Compatible · sin muestra'} · Comprobación pendiente</small></span><span className="gp-auto-value" title={signal ? fecha(signal.receivedAt) : undefined}>{signal ? valorSenal(signal) : 'Sin lectura'}{signal && <small>{haceCuanto(signal.receivedAt)}</small>}</span>
       </label>})}</div>
       {paginas > 1 && <div className="gp-discovery-pagination"><button type="button" className="gp-btn2 chico" disabled={!actual} onClick={() => setPagina(actual-1)}>Anterior</button><span>{actual+1} / {paginas}</span><button type="button" className="gp-btn2 chico" disabled={actual+1>=paginas} onClick={() => setPagina(actual+1)}>Siguiente</button></div>}
       <p className="gp-hint">{choices.filter(c => c.selected).length} seleccionadas · ACC no confirma que el motor esté girando. Los valores describen lo que reportó el equipo.</p>
@@ -99,7 +101,8 @@ export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar
       ].map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>}
     </details>}
     {snapshot && !selection && <p className="gp-hint">Todavía no hay un perfil inequívoco de funciones para estas tramas. Puedes registrar el equipo y revisarlo desde su ficha.</p>}
-    {id && editar && <div className="gp-auto-actions"><button type="button" className="gp-btn chico" disabled={busy || !selection || !saved} onClick={save}>{busy ? 'Comprobando…' : 'Guardar selección'}</button>{assignmentId && saved?.revision > 0 && <button type="button" className="gp-btn2 chico" disabled={busy} onClick={apply}>Usar en esta instalación</button>}</div>}
+    {id && editar && <div className="gp-auto-actions"><button type="button" className="gp-btn chico" disabled={busy || !selection || !saved} onClick={save}>{busy ? 'Comprobando…' : 'Guardar selección'}</button>{assignmentId && saved?.revision > 0 && <button type="button" className="gp-btn2 chico" disabled={busy || cambiosSinGuardar} onClick={apply}>Usar en esta instalación</button>}</div>}
+    {id && cambiosSinGuardar && <p className="gp-hint">Guarda los cambios antes de aplicarlos a la instalación.</p>}
     {mensaje && <p className="gp-aviso" role="status">{mensaje}</p>}{dialogo}
   </section>
 }
