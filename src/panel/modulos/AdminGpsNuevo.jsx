@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useConfirmar } from '../comp/Confirmar'
 import { pedir } from '../datos/api'
 import { MeitrackInstallationSetup } from '../meitrack/MeitrackInstallationSetup'
@@ -7,7 +7,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { useSesion } from '../useSesion'
-import { Cabeza, Detectado, IcoGps, Pastilla, RAIZ_GPS, useAhora } from '../comp/GpsPiezas'
+import { Cabeza, IcoGps, Pastilla, RAIZ_GPS, useAhora } from '../comp/GpsPiezas'
 import { ComandosSms, PruebaSenal } from './AdminGpsProbar'
 import { validarPreparacion, identidadConfirmada, coincideDetectado, testigoInventarioCoban } from '../datos/gps-discovery'
 import { samePhoneRecords } from '../datos/gpsInventory.js'
@@ -15,6 +15,7 @@ import { receivedCobanCandidate } from '../datos/coban-identification.js'
 import {
   CATALOGO_GPS, ESTADOS_SIM, haceCuanto, nombreEquipo, validarIccid, validarImei, validarLinea,
 } from '../datos/gps'
+import DescubrimientoGps from '../comp/DescubrimientoGps'
 import './admin-gps.css'
 
 // ============================================================
@@ -28,7 +29,7 @@ const OPERADORES = [
   ['Movilnet', 'int.movilnet.com.ve'],
 ]
 
-const PASOS = ['Equipo', 'Línea SIM', 'Configurar y probar']
+const PASOS = ['Equipo', 'Línea SIM', 'Configurar GPS', 'Detectar dispositivos']
 
 const INICIAL = {
   marca: 'Coban', modelo: 'GPS-403', transporte: 'tcp', imei: '', serie: '', firmware: '',
@@ -54,11 +55,11 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
   const [meitrackReceived, setMeitrackReceived] = useState(false)
   const [imeiSms, setImeiSms] = useState('')
   const porDatos = true
-  const [inicioPrueba, setInicioPrueba] = useState(Date.now)
   const [seleccionado, setSeleccionado] = useState(null)
   const [guideLocked, setGuideLocked] = useState(false)
   const inFlight = useRef(false)
-  const detectados = useDatos(() => repo.admin.gps.sinEmparejar(), [], paso === 3 ? 5000 : 30_000)
+  const detectados = useDatos(() => repo.admin.gps.sinEmparejar(), [], paso === 4 ? 5000 : 30_000)
+  useEffect(() => { if (paso === 4) detectados.recargar(); window.scrollTo({ top: 0, behavior: 'instant' }) }, [paso])
   const inventario = useDatos(() => repo.admin.gps.listar(), [], 30_000)
   const mismaLinea = samePhoneRecords(inventario.datos ?? [], datos.telefono)
 
@@ -177,7 +178,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
     })
     if (seguro) navegar(equipo ? `${RAIZ_GPS}/${equipo.id}` : RAIZ_GPS)
   }
-  const bajada = soloPrueba ? 'Prepara los SMS y observa la recepción del servidor. Esta pantalla no registra, instala ni activa el equipo.' : paso === 3
+  const bajada = paso === 4 ? 'Selecciona un GPS y consulta su comunicación junto a la lista.' : soloPrueba ? 'Prepara los SMS y observa la recepción del servidor. Esta pantalla no registra, instala ni activa el equipo.' : paso === 3
     ? meitrack ? 'Configura por SMS y busca la señal coincidente para registrarlo.' : porDatos ? 'Identifica el Coban mediante su recepción y selecciona el dispositivo para registrarlo.' : 'Envía los comandos por SMS a la línea del equipo y espera su primera señal.'
     : 'Prepara el equipo y su línea. Después configura los SMS y selecciona el dispositivo que aparezca en el descubrimiento.'
 
@@ -196,7 +197,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
 
 
   return (
-    <div className="gp">
+    <div className={`gp${paso === 4 ? ' gp-detect-step' : ''}`}>
       <Cabeza
         ruta={[['Hardware y telemetría'], ['Equipos GPS', RAIZ_GPS], [soloPrueba ? 'Probar comunicación' : 'Nuevo GPS']]}
         titulo={soloPrueba ? 'Probar comunicación GPS' : 'Nuevo GPS'}
@@ -221,7 +222,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
         <div className="gp-grid l360">
           <section className="gp-card" style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: '22px 24px' }} aria-labelledby="gp-p1">
             <div className="gp-titulo">
-              <p className="gp-k">Paso 1 de 3</p>
+              <p className="gp-k">Paso 1 de 4</p>
               <h2 className="gp-st" id="gp-p1">Datos del equipo</h2>
               <span className="gp-lbl">Elige marca y modelo. Si no conoces el IMEI, podrás identificar el Coban por sus comunicaciones o consultar la identidad por SMS.</span>
             </div>
@@ -277,7 +278,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
 
           <section className="gp-card gp-col">
             <h2 className="gp-st">Primero configura, después identifica</h2>
-            <p>En el último paso tendrás los comandos SMS y los dispositivos detectados sin registrar. Podrás comparar la respuesta SMS o identificar el Coban mediante su recepción de datos.</p>
+            <p>Primero tendrás los comandos SMS y, al avanzar, la lista de dispositivos detectados sin registrar. Podrás comparar la respuesta SMS o identificar el Coban mediante su recepción de datos.</p>
             <p>No se crea ningún registro al avanzar por estas pantallas.</p>
           </section>
 
@@ -289,7 +290,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
         <div className="gp-grid l360">
           <section className="gp-card" style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: '22px 24px' }} aria-labelledby="gp-p2">
             <div className="gp-titulo">
-              <p className="gp-k">Paso 2 de 3</p>
+              <p className="gp-k">Paso 2 de 4</p>
               <h2 className="gp-st" id="gp-p2">Línea SIM</h2>
               <span className="gp-lbl">La línea por la que el equipo manda sus datos y recibe los comandos.</span>
             </div>
@@ -331,7 +332,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
             <div className="gp-pie entre">
               <button type="button" className="gp-btn2" onClick={() => setPaso(1)} disabled={guardando}><IcoGps nombre="anterior" />Anterior</button>
               <button type="button" className="gp-btn" onClick={siguiente2} disabled={guardando || verificandoLinea}>
-                Siguiente: Configurar y probar<IcoGps nombre="siguiente" />
+                Siguiente: Configurar GPS<IcoGps nombre="siguiente" />
               </button>
             </div>
           </section>
@@ -355,44 +356,32 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
         </div>
       )}
 
-      {paso === 3 && meitrack && <>
-        <MeitrackInstallationSetup password={clave} imei={imeiPreparacion} firmware={datos.firmware.trim()} apn={datos.apn.trim()}
+      {paso >= 3 && meitrack && <>
+        <MeitrackInstallationSetup alVolver={() => setPaso(3)} fase={paso === 4 ? 'deteccion' : 'configuracion'} listado={detectados} ahora={ahora} seleccionado={seleccionado} password={clave} imei={imeiPreparacion} firmware={datos.firmware.trim()} apn={datos.apn.trim()}
           knownImei={!validarImei(datos.imei).error ? validarImei(datos.imei).valor : ''} onCapture={setMeitrackReceived}
           onIdentityChange={value => { setImeiSms(value.imei); setDatos(d => ({ ...d, firmware: value.firmware, transporte:'tcp' })); setSeleccionado(null); setMeitrackReceived(false) }}
           onLockChange={setGuideLocked} onSelect={() => { if (identidad && meitrackReceived) setSeleccionado(identidad) }}
           selected={!!identidad && seleccionado === identidad} canRegister={puedeRegistrar} onRegister={registrarMeitrack} soloPrueba={soloPrueba}
           registered={!!equipo} registering={guardando} registrationError={errorAlta} />
-        <button type="button" className="gp-btn2" disabled={guideLocked || !!equipo} onClick={() => setPaso(2)}>Anterior: Línea SIM</button>
+        {paso === 3 && <div className="gp-discovery-navigation"><button type="button" className="gp-btn2" disabled={guardando || guideLocked || !!equipo} onClick={() => setPaso(2)}>Anterior: Línea SIM</button><button type="button" className="gp-btn" onClick={() => setPaso(4)}>Siguiente: detectar dispositivos</button></div>}
       </>}
-      {paso === 3 && !meitrack && (
-        <>
+      {paso >= 3 && !meitrack && (
+        <div hidden={paso !== 3}>
           <div className="gp-aviso" role="status">{soloPrueba ? 'Prueba sin registro: copia los SMS para enviarlos desde tu teléfono y observa las comunicaciones.' : equipo ? 'Registro comprobado en inventario; instalar y activar son pasos separados.' : porDatos ? 'Preparación sin registro. Elige la recepción del Coban y confirma qué equipo corresponde. No se exige respuesta SMS.' : 'Preparación sin registro. Configura por SMS, consulta el IMEI y elige la señal coincidente al final.'}</div>
           <div className="gp-config-flow">
             <ComandosSms equipo={equipoVista} clave={clave} alCambiarClave={setClave} />
             {equipo && <PruebaSenal equipo={equipoVista} />}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button type="button" className="gp-btn2" disabled={!!equipo} onClick={() => setPaso(2)}><IcoGps nombre="anterior" />Anterior</button>
+            <button type="button" className="gp-btn2" disabled={!!equipo} onClick={() => setPaso(2)}><IcoGps nombre="anterior" />Anterior</button><button type="button" className="gp-btn" onClick={() => setPaso(4)}>Siguiente: detectar dispositivos<IcoGps nombre="siguiente" /></button>
           </div>
-        </>
+        </div>
       )}
-      {paso === 3 && !meitrack && !equipo && (
-        <section className="gp-card gp-col" aria-labelledby="det-final">
-          <div className="gp-discovery-head"><span className="gp-radar espera"><IcoGps nombre="senal" /></span><div className="gp-titulo"><p className="gp-k">Descubrimiento automático</p><h2 className="gp-st" id="det-final">Descubriendo dispositivos</h2><span className="gp-hint">Se actualiza cada 5 segundos</span></div></div>
-          {soloPrueba && <><p>Referencia de prueba: {new Date(inicioPrueba).toLocaleString('es-VE')}.</p><button type="button" className="gp-btn2" onClick={()=>setInicioPrueba(Date.now())}>Marcar nueva referencia</button><p role="status">{detectados.estado !== 'ok' ? 'Esperando una lectura válida del servidor.' : (detectados.datos ?? []).some(d=>Date.parse(d.ultimaVez)>inicioPrueba && Date.parse(d.ultimaVez)<=ahora) ? 'Hay candidatos con mensajes posteriores a la referencia. Revisa su detalle.' : 'Todavía no hay candidatos con mensajes posteriores a la referencia.'}</p></>}
-          <p>{soloPrueba ? 'La lista se actualiza cada 5 segundos. Abre Ver comunicación para revisar fechas y mensajes. Compara el IMEI si lo conoces; otro candidato no confirma cuál GPS estás probando.' : porDatos ? 'Selecciona el GPS que estás configurando. Abre su comunicación para revisar la última señal y comprobar cuál corresponde.' : 'Compara el IMEI de la respuesta SMS. Selecciona la identidad coincidente con recepción comprobada y el mismo transporte.'}</p>
-          <>
-
-            {detectados.estado === 'error' && <p role="alert">{detectados.error?.message}</p>}
-            {(detectados.datos ?? []).length === 0 && <p>Esperando la primera señal. Envía los comandos al GPS; aparecerá aquí cuando se comunique.</p>}
-            {(detectados.datos ?? []).map(d => <Detectado key={d.imei} d={d} ahora={ahora} elegido={seleccionado === d.imei} detallado>
-              {!soloPrueba && <button type="button" className="gp-btn2 chico" disabled={!(porDatos ? coincideRecibido(d,ahora) : coincideDetectado(d, { inicial: datos.imei, sms: imeiSms, transporte: datos.transporte, ahora }))} onClick={() => usarImei(d)}>{seleccionado === d.imei ? 'Coincidencia seleccionada' : 'Seleccionar este dispositivo'}</button>}
-            </Detectado>)}
-          </>
-          {errorAlta && <p role="alert">{errorAlta}</p>}
-          {!soloPrueba && <button type="button" className="gp-btn chico" disabled={guardando || !puedeRegistrar} onClick={registrarCoban}>{guardando ? 'Comprobando registro…' : 'Registrar'}</button>}
-        </section>
-      )}
+      {paso === 4 && !meitrack && <>
+        <DescubrimientoGps listado={detectados} ahora={ahora} seleccionado={seleccionado} alSeleccionar={usarImei}
+          puedeElegir={d => coincideRecibido(d, ahora)} puedeRegistrar={puedeRegistrar} alRegistrar={registrarCoban}
+          guardando={guardando} error={errorAlta} registrado={!!equipo} soloPrueba={soloPrueba} alVolver={() => setPaso(3)} />
+      </>}
       {dialogo}
     </div>
   )
