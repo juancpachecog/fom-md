@@ -3,6 +3,7 @@ const uuid = id => { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{
 export function apiAutodeteccion(pedir) {
   const get = (path, opts = {}) => pedir(`/api/v1/console/${path}`, { ...opts, empresaContexto: null })
   return {
+    revisar: ({id,imei,transport}) => id ? get(`gps-devices/${uuid(id)}/frame-review`) : get('gps-discovery/review',{metodo:'POST',cuerpo:{imei,...(transport?{transport}:{})}}),
     detectar: ({ id, imei }) => id ? get(`gps-devices/${uuid(id)}/discovery`) : get('gps-discovery/inspect', { metodo: 'POST', cuerpo: { imei } }),
     leer: id => get(`gps-devices/${uuid(id)}/function-preferences`),
     async guardar(id, body, token) {

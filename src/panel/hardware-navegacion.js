@@ -34,7 +34,7 @@ export function reorganizarMenu(menu, perfil) {
   return result.filter(g => g.items.length)
 }
 
-export const PESTANAS_EQUIPO = ['diagnostico', 'datos', 'funciones', 'comandos', 'historial']
+export const PESTANAS_EQUIPO = ['diagnostico', 'trama', 'datos', 'funciones', 'comandos', 'historial']
 export function pestanaEquipo(search) {
   const value = new URLSearchParams(search).get('vista')
   return PESTANAS_EQUIPO.includes(value) ? value : 'diagnostico'

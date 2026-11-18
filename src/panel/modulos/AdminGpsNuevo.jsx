@@ -18,6 +18,7 @@ import {
 import DescubrimientoGps from '../comp/DescubrimientoGps'
 import { apiAutodeteccion } from '../datos/gpsAutodeteccion'
 import { ofrecerVehiculoTrasGps } from '../datos/continuarRegistroGps'
+import {muestraTramaVigente} from '../datos/revisionTramaGps'
 import './admin-gps.css'
 
 // ============================================================
@@ -61,6 +62,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
   const [imeiSms, setImeiSms] = useState('')
   const porDatos = true
   const [seleccionado, setSeleccionado] = useState(null)
+  const [revisionActual,setRevisionActual]=useState(null)
   const [guideLocked, setGuideLocked] = useState(false)
   const inFlight = useRef(false)
   const detectados = useDatos(() => repo.admin.gps.sinEmparejar(), [], paso === 4 ? 5000 : 30_000)
@@ -75,7 +77,8 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
   const identidad = porDatos && !meitrack ? candidatoRecibido?.imei ?? null : identidadConfirmada(datos.imei, imeiSms)
   const imeiPreparacion = identidad ?? (!validarImei(datos.imei).error ? validarImei(datos.imei).valor : '')
   const seleccionadoCoban = porDatos ? candidatoRecibido : !meitrack && detectados.estado === 'ok' && (detectados.datos ?? []).find(d => d.imei === seleccionado && coincideDetectado(d, { inicial: datos.imei, sms: imeiSms, transporte: datos.transporte, ahora }))
-  const puedeRegistrar = !soloPrueba && !!identidad && (meitrack ? meitrackReceived && seleccionado === identidad : !!seleccionadoCoban)
+  const tramaValidada=revisionActual?.imei===identidad && !revisionActual?.error && revisionActual?.transport===datos.transporte && muestraTramaVigente(revisionActual?.snapshot,ahora)
+  const puedeRegistrar = !soloPrueba && !!identidad && (meitrack ? meitrackReceived && seleccionado === identidad : !!seleccionadoCoban&&tramaValidada)
   const poner = (campo, valor) => {
     setSeleccionado(null)
     setMeitrackReceived(false)
@@ -148,7 +151,8 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
     setGuardando(true)
     setErrorAlta('')
     try {
-      if (!await confirmar({ titulo: 'Registrar dispositivo', texto: 'Confirma que el dispositivo seleccionado corresponde al GPS y a la SIM que estás configurando, comprobado físicamente o mediante una prueba controlada. Se creará su ficha de inventario y se guardarán las funciones elegidas; se aplican al asociarlo a un vehículo.', accion: 'Registrar GPS' })) return
+      const sampleKey=revisionActual.snapshot.sample.key
+      if (!await confirmar({ titulo: 'Registrar dispositivo', texto: 'Revisa el IMEI, la fecha, hora y ubicación de la pestaña Trama. ¿Registrar este GPS con las funciones elegidas? Se creará su ficha y podrás asociarlo a un vehículo.', accion: 'Registrar GPS' })) return
       if (!navigator.locks?.request) throw Error('Use un navegador compatible con la protección de intentos entre pestañas.')
       const payload = { imei: identidad, model: datos.modelo, manufacturer: datos.marca,
         protocolFamily: modelo?.protocolo, ...metadatos(), ...(datos.serie.trim() ? { serialNumber: datos.serie.trim() } : {}), ...(porDatos ? {registrationMethod:'received_data',identityConfirmedByOperator:true} : {}) }
@@ -160,7 +164,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
           const fresh = await repo.admin.gps.sinEmparejar()
           if (!fresh.some(d => d.imei === identidad && (porDatos ? coincideRecibido(d) : coincideDetectado(d, { inicial: datos.imei, sms: imeiSms, transporte: datos.transporte })))) throw Error('La señal coincidente ya no está disponible. Actualiza la lista.')
           return repo.admin.gps.registrar({ imei: identidad, modelo: datos.modelo, fabricante: datos.marca,
-            protocolo: modelo?.protocolo, serie: datos.serie.trim() || undefined, ...metadatos(), ...(porDatos ? {registrationMethod:'received_data',identityConfirmedByOperator:true} : {}) }, sesion?.perfil)
+            protocolo: modelo?.protocolo, serie: datos.serie.trim() || undefined, ...metadatos(), ...(porDatos ? {registrationMethod:'received_data',identityConfirmedByOperator:true,discoverySampleKey:sampleKey} : {}) }, sesion?.perfil)
         },
       }))
       setEquipo({ id, imei: identidad, ...metadatos() })
@@ -278,7 +282,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
                     <button key={t} type="button" className="gp-chip alto" aria-pressed={datos.transporte === t} onClick={() => poner('transporte', t)}>{t.toUpperCase()}</button>
                   ))}
                 </div>
-                <span className="gp-hint">{meitrack ? 'Esta preparación admite TCP; no acredita el estado de fábrica del equipo.' : `${(modelo?.transporte ?? 'tcp').toUpperCase()} es el de fábrica del ${datos.modelo}.`}</span>
+                <span className="gp-hint">{meitrack ? 'Esta preparación admite TCP; no acredita el estado de fábrica del equipo.' : 'Elige el transporte configurado en tu equipo. La variante y sus datos se comprobarán en Trama.'}</span>
               </div>
               <Campo id="n-imei" etiqueta="IMEI conocido (opcional)" todo error={errores.imei} ayuda={equipo ? 'Ya registrado: el IMEI no se corrige.' : 'Déjalo vacío si no lo conoces. Podrás seleccionar el dispositivo cuando aparezca en el descubrimiento.'}>
                 <div className={`gp-field${errores.imei ? ' mal' : imeiDeSenal ? ' ok' : ''}${equipo ? ' ro' : ''}`}>
@@ -415,7 +419,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
       {paso === 4 && !meitrack && !equipo && <>
         <DescubrimientoGps listado={detectados} ahora={ahora} seleccionado={seleccionado} alSeleccionar={usarImei}
           puedeElegir={d => coincideRecibido(d, ahora)} puedeRegistrar={puedeRegistrar} alRegistrar={registrarCoban}
-          guardando={guardando} error={errorAlta} registrado={!!equipo} soloPrueba={soloPrueba} alVolver={() => setPaso(3)} propuestas={propuestas} alCambiarPropuesta={(imei,value) => setPropuestas(prev => ({...prev,[imei]:value}))} />
+          guardando={guardando} error={errorAlta} registrado={!!equipo} soloPrueba={soloPrueba} alVolver={() => setPaso(3)} propuestas={propuestas} alCambiarPropuesta={(imei,value) => setPropuestas(prev => ({...prev,[imei]:value}))} alRevision={(imei,revision)=>setRevisionActual({...revision,imei})} />
       </>}
       {dialogo}
     </div>

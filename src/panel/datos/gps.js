@@ -11,8 +11,8 @@ import { tiempoSinSenal, transmitiendo } from './sinSenal.js'
 import { validReceiverIp } from './gpsReceiver.js'
 
 /**
- * Marcas y modelos que el receptor FOM sabe leer. El modelo elige el
- * protocolo. Meitrack sólo ofrece preparación controlada: su presencia en el
+ * Modelos preparables; la compatibilidad de cada variante se comprueba en la
+ * trama recibida. El modelo elige la familia de protocolo. Meitrack sólo ofrece preparación controlada: su presencia en el
  * catálogo no acredita un receptor disponible ni habilita activación.
  */
 export const CATALOGO_GPS = {
@@ -20,6 +20,7 @@ export const CATALOGO_GPS = {
     T399L: { protocolo: 'meitrack-t399', protocoloNombre: 'Meitrack T399', transporte: 'tcp' },
   },
   Coban: {
+    'GPS-103': { protocolo: 'coban-gps103', protocoloNombre: 'Coban GPS103', transporte: 'tcp' },
     'GPS-403': { protocolo: 'coban-gps103', protocoloNombre: 'Coban GPS103', transporte: 'tcp' },
   },
 }

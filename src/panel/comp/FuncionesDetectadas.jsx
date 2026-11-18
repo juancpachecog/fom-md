@@ -100,7 +100,7 @@ export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar
         ['Zona horaria reportada',typeof snapshot.settings.timezoneOffsetHours === 'number' ? 'UTC'+(snapshot.settings.timezoneOffsetHours>=0?'+':'')+snapshot.settings.timezoneOffsetHours : 'Sin lectura'],
       ].map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>}
     </details>}
-    {snapshot && !selection && <p className="gp-hint">Todavía no hay un perfil inequívoco de funciones para estas tramas. Puedes registrar el equipo y revisarlo desde su ficha.</p>}
+    {snapshot && !selection && <p className="gp-hint">Todavía no hay un perfil inequívoco de funciones. {id?'Revisa las lecturas en la pestaña Trama.':'Valida primero la pestaña Trama; las funciones pendientes pueden revisarse después desde la ficha.'}</p>}
     {id && editar && <div className="gp-auto-actions"><button type="button" className="gp-btn chico" disabled={busy || !selection || !saved} onClick={save}>{busy ? 'Comprobando…' : 'Guardar selección'}</button>{assignmentId && saved?.revision > 0 && <button type="button" className="gp-btn2 chico" disabled={busy || cambiosSinGuardar} onClick={apply}>Usar en esta instalación</button>}</div>}
     {id && cambiosSinGuardar && <p className="gp-hint">Guarda los cambios antes de aplicarlos a la instalación.</p>}
     {mensaje && <p className="gp-aviso" role="status">{mensaje}</p>}{dialogo}

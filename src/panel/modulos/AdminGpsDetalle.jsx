@@ -18,6 +18,7 @@ import * as f from '../datos/formato'
 import './admin-gps.css'
 import { locationStatus } from '../meitrack/location-status.js'
 import FuncionesDetectadas from '../comp/FuncionesDetectadas'
+import {RevisionTramaRegistrada} from '../comp/RevisionTramaGps'
 import FuncionesInstalacion from './FuncionesInstalacion'
 import ComandosInstalacion from './ComandosInstalacion'
 import { useConfirmar } from '../comp/Confirmar'
@@ -92,7 +93,7 @@ export default function AdminGpsDetalle() {
       />
 
       <div className="gp-tabs" role="tablist" aria-label="Partes del equipo">
-        {[['diagnostico', 'Diagnóstico'], ['datos', 'Datos del equipo'], ['funciones', 'Funciones y sensores'], ['comandos', 'Comandos'], ['historial', 'Historial']].map(([clave, texto]) => (
+        {[['diagnostico', 'Diagnóstico'],...(g.protocolo==='coban-gps103'?[['trama','Trama']]:[]), ['datos', 'Datos del equipo'], ['funciones', 'Funciones y sensores'], ['comandos', 'Comandos'], ['historial', 'Historial']].map(([clave, texto]) => (
           <button key={clave} type="button" role="tab" id={`gp-tab-${clave}`} aria-controls={`gp-panel-${clave}`} aria-selected={pestana === clave} className="gp-tab" onClick={() => setPestana(clave)}>{texto}</button>
         ))}
       </div>
@@ -100,6 +101,7 @@ export default function AdminGpsDetalle() {
       {aviso && <div className="gp-aviso" role="status"><IcoGps nombre="check" />{aviso}</div>}
 
       <div role="tabpanel" id={`gp-panel-${pestana}`} aria-labelledby={`gp-tab-${pestana}`} className="gp-pila">
+        {pestana==='trama'&&g.protocolo==='coban-gps103'&&<section className="gp-card"><RevisionTramaRegistrada id={g.id} imei={g.imei} transport={g.transport} ahora={ahora}/></section>}
         {pestana === 'diagnostico' && (
           <Diagnostico g={g} tele={tele} posiciones={posiciones.datos ?? []} ultimaPos={ultimaPos.datos} capacidades={capacidades.datos} ahora={ahora} />
         )}
