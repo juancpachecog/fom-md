@@ -29,7 +29,7 @@ export async function guardarDefinicion(id, body, token) {
 
 export const UNIDADES_FUNCIONES = [
   ['celsius', 'temperature', '°C'], ['fahrenheit', 'temperature', '°F'], ['volt', 'voltage', 'V'],
-  ['kilometer', 'distance', 'km'], ['rpm', 'rotation_rate', 'RPM'], ['kph', 'speed', 'km/h'], ['degree', 'angle', '°'],
+  ['kilometer', 'distance', 'km'], ['meter', 'distance', 'm'], ['percent', 'ratio', '%'], ['rpm', 'rotation_rate', 'RPM'], ['kph', 'speed', 'km/h'], ['degree', 'angle', '°'],
 ]
 
 export function cuerpoDefinicion(form, previous) {
