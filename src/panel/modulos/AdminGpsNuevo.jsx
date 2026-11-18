@@ -16,6 +16,7 @@ import {
   CATALOGO_GPS, ESTADOS_SIM, haceCuanto, nombreEquipo, validarIccid, validarImei, validarLinea,
 } from '../datos/gps'
 import DescubrimientoGps from '../comp/DescubrimientoGps'
+import { ofrecerVehiculoTrasGps } from '../datos/continuarRegistroGps'
 import './admin-gps.css'
 
 // ============================================================
@@ -109,7 +110,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
     const e = validarLinea(datos)
     setErrores(e)
     if (Object.keys(e).length > 0) return
-    if (soloPrueba) { setInicioPrueba(Date.now()); setPaso(3); return }
+    if (soloPrueba) { setPaso(3); return }
     setVerificandoLinea(true)
     try {
       const existentes = samePhoneRecords(await repo.admin.gps.listar(), datos.telefono)
@@ -141,7 +142,8 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
             protocolo: modelo?.protocolo, serie: datos.serie.trim() || undefined, ...metadatos(), ...(porDatos ? {registrationMethod:'received_data',identityConfirmedByOperator:true} : {}) }, sesion?.perfil)
         },
       }))
-      setEquipo({ id, ...metadatos() })
+      setEquipo({ id, imei: identidad, ...metadatos() })
+      await ofrecerVehiculoTrasGps(id, { confirmar, navegar, raiz: RAIZ_GPS })
     } catch (err) {
       setErrorAlta(err.message)
     } finally {
@@ -164,7 +166,8 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
       const unitHash = await sha256(payload.imei)
       const id = await navigator.locks.request(`fom-727-registration:${unitHash}`, () => registerInventory(payload, { storage: localStorage, digest: sha256,
         request: (path, cuerpo) => pedir(`/api/v1/console/meitrack-setup/${path}`, { metodo: 'POST', cuerpo, empresaContexto: null }) }))
-      setEquipo({ id, ...metadatos() })
+      setEquipo({ id, imei: identidad, ...metadatos() })
+      await ofrecerVehiculoTrasGps(id, { confirmar, navegar, raiz: RAIZ_GPS })
     } catch (err) { setErrorAlta(err.message) }
     finally { inFlight.current = false; setGuardando(false) }
   }
@@ -185,7 +188,7 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
   // La vista del equipo para los comandos y la prueba: lo escrito aquí, con el id del registro.
   const equipoVista = {
     ...equipo,
-    imei: identidad ?? imeiPreparacion,
+    imei: equipo?.imei ?? identidad ?? imeiPreparacion,
     transport: datos.transporte,
     apn: datos.apn.trim(),
     carrier: datos.operador.trim(),
@@ -377,7 +380,15 @@ export default function AdminGpsNuevo({ soloPrueba = false }) {
           </div>
         </div>
       )}
-      {paso === 4 && !meitrack && <>
+      {paso === 4 && equipo && <section className="gp-card gp-col" aria-label="GPS registrado">
+        <div className="gp-titulo"><p className="gp-k">Registro completado</p><h2 className="gp-st">El GPS ya está en el inventario</h2><span className="gp-mono">{equipo.imei}</span></div>
+        <p className="gp-lbl">Puedes registrar un vehículo ahora y asociarle este equipo, o hacerlo más tarde desde su ficha.</p>
+        <div className="gp-acciones">
+          <Link className="gp-btn" to={`${RAIZ_GPS}/${equipo.id}/instalar`} state={{ crearVehiculoTrasRegistro: true }}>Crear vehículo y asociar GPS</Link>
+          <Link className="gp-btn2" to={`${RAIZ_GPS}/${equipo.id}`}>Ir al equipo</Link>
+        </div>
+      </section>}
+      {paso === 4 && !meitrack && !equipo && <>
         <DescubrimientoGps listado={detectados} ahora={ahora} seleccionado={seleccionado} alSeleccionar={usarImei}
           puedeElegir={d => coincideRecibido(d, ahora)} puedeRegistrar={puedeRegistrar} alRegistrar={registrarCoban}
           guardando={guardando} error={errorAlta} registrado={!!equipo} soloPrueba={soloPrueba} alVolver={() => setPaso(3)} />

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { useSesion } from '../useSesion'
@@ -24,6 +24,8 @@ import './admin-gps.css'
 
 export default function AdminGpsInstalar() {
   const { id } = useParams()
+  const { state } = useLocation()
+  const [desdeRegistro] = useState(state?.crearVehiculoTrasRegistro === true)
   const navegar = useNavigate()
   const sesion = useSesion()
   const ahora = useAhora()
@@ -38,7 +40,7 @@ export default function AdminGpsInstalar() {
   const [notas, setNotas] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
-  const [creando, setCreando] = useState(false)
+  const [creando, setCreando] = useState(desdeRegistro)
 
   const listaEmpresas = useMemo(() => empresas.datos ?? [], [empresas.datos])
   // Por defecto, la empresa del equipo si el servidor la dice (T-209); si no, la propia del
@@ -107,6 +109,7 @@ export default function AdminGpsInstalar() {
   }
   // Se creó la unidad pero el equipo no entró: queda en la lista, elegida, para instalarlo con el botón de siempre.
   const creadaSinEquipo = (r) => {
+    setEmpresaElegida(r.empresaId)
     unidades.recargar()
     setSoloSinGps(true)
     setUnidadId(r.vehiculoId)
@@ -267,7 +270,7 @@ export default function AdminGpsInstalar() {
           abierto={creando}
           empresas={listaEmpresas}
           empresaInicial={empresaId}
-          empresaFija
+          empresaFija={!desdeRegistro}
           equipoFijo={{ id: g.id, imei: g.imei, modelo: nombreEquipo(g) }}
           datosInstalacion={{ tecnico, ubicacion, notas }}
           propia={propia}
