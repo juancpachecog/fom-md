@@ -25,7 +25,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   execFileSync(process.execPath, ['--test', ...[
     'gps-panel', 'gps-discovery', 'gps-inventory', 'gps-meitrack', 'meitrack-wizard',
     'meitrack-operational', 'meitrack-guided', 'meitrack-clock-readback', 'production-profile',
-    'coban-identification',
+    'coban-identification', 'gps-function-discovery',
   ].map(name => `test/${name}.test.js`)], { stdio: 'inherit' })
   await build({ mode: 'production', envDir, plugins: [{ name: 'fom-connected-build-witness',
     configResolved(config) {

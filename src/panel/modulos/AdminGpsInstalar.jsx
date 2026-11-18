@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useConfirmar } from '../comp/Confirmar'
+import { pedir } from '../datos/api'
+import { apiAutodeteccion, funcionesTrasInstalar } from '../datos/gpsAutodeteccion'
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { useSesion } from '../useSesion'
@@ -24,6 +27,8 @@ import './admin-gps.css'
 
 export default function AdminGpsInstalar() {
   const { id } = useParams()
+  const { confirmar, dialogo } = useConfirmar()
+  const revisarFunciones = async () => sesion?.perfil?.rol === 'admin_fom' && g.protocolo === 'coban-gps103' ? funcionesTrasInstalar(g.id,{api:apiAutodeteccion(pedir),obtener:repo.admin.gps.obtener,confirmar,token:crypto.randomUUID()}) : ''
   const { state } = useLocation()
   const [desdeRegistro] = useState(state?.crearVehiculoTrasRegistro === true)
   const navegar = useNavigate()
@@ -83,11 +88,12 @@ export default function AdminGpsInstalar() {
         nombrePropia,
         tecnico, ubicacion, notas,
       })
-      navegar(`${RAIZ_GPS}/${g.id}`, {
+      const funciones = await revisarFunciones()
+      navegar(`${RAIZ_GPS}/${g.id}${funciones ? '?vista=funciones' : ''}`, {
         state: {
-          aviso: g.ultimaConexion
+          aviso: funciones || (g.ultimaConexion
             ? `Equipo instalado en ${unidad.alias}.`
-            : `Equipo instalado en ${unidad.alias}. Aún no ha reportado: usa «Probar señal» para comprobar que empiece a enviar.`,
+            : `Equipo instalado en ${unidad.alias}. Aún no ha reportado: usa «Probar señal» para comprobar que empiece a enviar.`),
         },
       })
     } catch (e) {
@@ -97,13 +103,14 @@ export default function AdminGpsInstalar() {
   }
 
   // Creada la unidad con su GPS: se va al detalle del equipo, igual que al instalar en una existente.
-  const instaladoAlCrear = (r) => {
+  const instaladoAlCrear = async (r) => {
     setCreando(false)
-    navegar(`${RAIZ_GPS}/${g.id}`, {
+    const funciones = await revisarFunciones()
+    navegar(`${RAIZ_GPS}/${g.id}${funciones ? '?vista=funciones' : ''}`, {
       state: {
-        aviso: g.ultimaConexion
+        aviso: funciones || (g.ultimaConexion
           ? `Unidad ${r.alias} creada en ${r.empresaNombre} y equipo instalado.`
-          : `Unidad ${r.alias} creada en ${r.empresaNombre} y equipo instalado. Aún no ha reportado: usa «Probar señal» para comprobar que empiece a enviar.`,
+          : `Unidad ${r.alias} creada en ${r.empresaNombre} y equipo instalado. Aún no ha reportado: usa «Probar señal» para comprobar que empiece a enviar.`),
       },
     })
   }
@@ -280,6 +287,7 @@ export default function AdminGpsInstalar() {
           alListo={instaladoAlCrear}
         />
       )}
+      {dialogo}
     </div>
   )
 }

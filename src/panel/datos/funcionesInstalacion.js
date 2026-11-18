@@ -50,7 +50,7 @@ export async function registrarPruebaFuncion(id,functionId,body,token){
     JSON.stringify([...report.observationIds].sort())!==JSON.stringify([...body.observationIds].sort()))throw new Error('La prueba no quedó verificada. Consulta su resultado antes de repetirla.')
   return report
 }
-export const nombreFuncion = key => ({ 'navigation.speed': 'Velocidad GPS', 'navigation.heading': 'Rumbo GPS',
+export const nombreFuncion = key => ({ 'battery.level':'Batería', 'fuel.level':'Combustible', 'environment.humidity':'Humedad', 'navigation.altitude':'Altitud', 'navigation.speed': 'Velocidad GPS', 'navigation.heading': 'Rumbo GPS',
   'ignition.acc': 'Contacto (ACC)', 'door.open': 'Puerta abierta', 'input.digital.active': 'Entrada digital activa',
   'input.voltage': 'Voltaje de entrada', 'engine.rpm': 'Régimen del motor (RPM)', 'engine.running': 'Giro del motor detectado' })[key] || key
 

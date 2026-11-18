@@ -5,11 +5,13 @@ import { Cargando, ErrorCarga } from '../comp/ui'
 import { leerFuncionesInstalacion, listarPerfilesFunciones, leerPerfilFunciones, guardarFuncionesInstalacion,
   historialFuncion, fuentesFuncion, nuevaFilaFuncion, nombreFuncion, valorFuncion } from '../datos/funcionesInstalacion'
 import './catalogo-funciones.css'
+import { useConfirmar } from '../comp/Confirmar'
 import VariablesInstalacion from './VariablesInstalacion'
 import PruebaFuncion from './PruebaFuncion'
 import GuiaFunciones from './GuiaFunciones'
 
 export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
+  const { confirmar, dialogo } = useConfirmar()
   const current = useDatos(() => leerFuncionesInstalacion(assignmentId), [assignmentId], 30000)
   const profiles = useDatos(listarPerfilesFunciones, [])
   const [profileKey, setProfileKey] = useState(''), [profile, setProfile] = useState(null), [rows, setRows] = useState(null)
@@ -31,6 +33,7 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
   const update = (index, fn) => { setRows(items => items.map((r, i) => i === index ? fn(r) : r)); pending.current = null }
   const save = async event => {
     event.preventDefault(); if (lock.current) return
+    if (!await confirmar({titulo:'Guardar funciones de la instalación',texto:'Se creará una versión con esta selección y sus mapeos. Los cambios conservan el historial y requieren revisar sus pruebas.',accion:'Guardar cambios'})) return
     lock.current = true; setBusy(true); setError(''); setMessage('')
     try {
       const body = { expectedVersion: version, profileId: profile.profileId, profileVersion: profile.profileVersion, functions: rows }
@@ -89,5 +92,6 @@ export default function FuncionesInstalacion({ assignmentId, protocolFamily }) {
     </form>}
     {history && <section className="cf-editor"><h3>Muestras de {history.name} — últimas 24 horas</h3><p>Hasta cincuenta muestras. Un dato histórico no acredita el estado actual.</p>{history.data.items.map(item => <p key={item.observationId}>{valorFuncion(item,history.semanticKey)} · {item.observedAt || item.receivedAt} · {item.quality}</p>)}{!history.data.items.length && <p>No hay muestras en esta ventana.</p>}</section>}
     <VariablesInstalacion key={assignmentId} assignmentId={assignmentId} sources={current.datos?.items||[]}/>
+    {dialogo}
   </section>
 }
