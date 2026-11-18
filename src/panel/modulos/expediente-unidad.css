@@ -82,3 +82,8 @@
   .eu-historial-filtros .pnl-select { flex: 1; min-width: 0; }
   .eu-paginacion { padding: 16px; }
 }
+
+.eu-desasignaciones { display:grid; gap:12px; }
+.eu-desasignacion { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:12px 0; border-bottom:1px solid var(--e-borde); }
+.eu-desasignacion > div { display:grid; gap:4px; min-width:0; overflow-wrap:anywhere; }
+.eu-desasignacion span { color:var(--e-texto-2); font-size:13px; }

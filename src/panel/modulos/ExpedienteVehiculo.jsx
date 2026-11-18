@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 
-import repo from '../datos/repo'
+import repo, { CONECTADO } from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { useSesion } from '../useSesion'
 import { esGestor } from '../roles'
@@ -18,6 +18,7 @@ import { subirVarios } from '../datos/archivos'
 import { ArchivosDeDocumento, ModalNuevoDocumento } from './Documentos'
 import FotoUnidad from '../comp/FotoUnidad'
 import FichaDatosUnidad from './FichaDatosUnidad'
+import AsignacionesUnidad from './AsignacionesUnidad'
 import UsuariosUnidad from './UsuariosUnidad'
 import EtiquetasVehiculo from './EtiquetasVehiculo'
 import { FranjaFichaMovil, UbicacionUnidadMovil, textoRecorridoHoy, useHoyDeUnidad } from './FichaUnidadMovil'
@@ -978,7 +979,7 @@ export default function ExpedienteVehiculo() {
         {archivosDe && <ArchivosDeDocumento documento={archivosDe} />}
       </Modal>
       {v && archivando && (
-        <ModalArchivar unidad={v} alCerrar={() => setArchivando(false)} alHecho={() => { setArchivando(false); recargar() }} />
+        <ModalArchivar unidad={v} alCambiar={recargar} alCerrar={() => setArchivando(false)} alHecho={() => { setArchivando(false); recargar() }} />
       )}
     </>
   )
@@ -992,7 +993,7 @@ const BLOQUEO = {
   driverSessions: 'jornadas abiertas', driverAssignments: 'conductores asignados', gpsInstallations: 'equipos GPS instalados',
   workOrders: 'órdenes de trabajo abiertas', emergencies: 'emergencias activas',
 }
-function ModalArchivar({ unidad, alCerrar, alHecho }) {
+function ModalArchivar({ unidad, alCerrar, alHecho, alCambiar }) {
   const [motivo, setMotivo] = useState('')
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
@@ -1028,6 +1029,7 @@ function ModalArchivar({ unidad, alCerrar, alHecho }) {
           ) : (
             <p style={{ margin: '0 0 12px', color: 'var(--e-texto-2)' }}>La unidad sale de la operación y conserva todo su historial. No se borra nada.</p>
           )}
+          {CONECTADO && bloqueos.some(([k]) => k === 'driverAssignments' || k === 'gpsInstallations') && <AsignacionesUnidad unidad={unidad} alCambiar={async () => { await pre.recargar(); await alCambiar?.() }} />}
           <Campo etiqueta="Motivo" error={error}>
             <input className="pnl-input" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Vendida, siniestrada, fuera de servicio…" />
           </Campo>

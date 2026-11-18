@@ -216,6 +216,7 @@ const repo = HAY_API
         listar: repoApi.vehiculos.listar,
         obtener: repoApi.vehiculos.obtener,
         usuariosAsignados: repoApi.vehiculos.usuariosAsignados,
+        asignacionesOperativas: repoApi.vehiculos.asignacionesOperativas,
         odometro: repoApi.vehiculos.odometro,
         kmPorDia: repoApi.vehiculos.kmPorDia,
         kmHoy: repoApi.vehiculos.kmHoy,

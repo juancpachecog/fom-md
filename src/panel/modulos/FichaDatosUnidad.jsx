@@ -9,6 +9,7 @@ import * as f from '../datos/formato'
 import { perfilDeUsuario } from '../datos/usuariosUnidad'
 import './expediente-unidad.css'
 import EditarVehiculo from './EditarVehiculo'
+import AsignacionesUnidad from './AsignacionesUnidad'
 import { useConfirmar } from '../comp/Confirmar'
 
 function Hechos({ items, unaColumna = false }) {
@@ -82,6 +83,7 @@ export default function FichaDatosUnidad({ unidad: v, areas, puedeEditar, cambia
         {perfil && <Link to={perfil} className="pnl-btn sutil">Ver perfil</Link>}
       </div>}
     </Tarjeta>
+    {puedeEditar && HAY_API && <AsignacionesUnidad key={v.id} unidad={v} alCambiar={alGuardar} />}
     {editando && <EditarVehiculo key={v.id} unidad={v} alCerrar={() => setEditando(false)} alGuardar={alGuardar} />}{dialogo}
   </div>
 }

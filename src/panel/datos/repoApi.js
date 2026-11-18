@@ -724,6 +724,18 @@ export const repoApi = {
     },
 
     /** Todas las asignaciones (todas las páginas): la unidad puede estar después de los primeros 200 registros. */
+    async asignacionesOperativas(id) {
+      const [conductores, equipos] = await Promise.all([
+        asignacionesVigentes({ fresco: true }),
+        leerTodasLasPaginas(async (offset, limit) => { const r = await pedir(`/api/v1/console/gps-devices/page?${new URLSearchParams({ limit, offset })}`); if (!Array.isArray(r?.items)) throw Error('No se pudo validar la lista de GPS.'); return r }, { limite: 100 }),
+      ])
+      if (equipos.incompleta) throw Error('No se pudo comprobar el inventario completo. Actualiza antes de desasignar.')
+      const gps = equipos.items.filter(g => g.vehicleId === id).map(g => ({ id: g.installationId, nombre: [g.model || 'Equipo GPS', g.imei].filter(Boolean).join(' · ') }))
+      const usuarios = conductores.filter(c => c.vehicleId === id).map(c => ({ id: c.assignmentId, nombre: c.displayName, rol: c.role }))
+      if ([...gps, ...usuarios].some(a => !a.id)) throw Error('Falta la identidad de una asignación. No se puede retirar sin comprobarla.')
+      return { gps, conductores: usuarios }
+    },
+
     async usuariosAsignados(id) {
       const asignaciones = await asignacionesVigentes()
       return asignaciones
