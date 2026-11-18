@@ -79,7 +79,7 @@ export function MeitrackInstallationSetup({ fase = 'configuracion', alVolver, li
     </section>
 
     {fase !== 'deteccion' && configured&&<MeitrackClockReadback key={imei+firmware} imei={imei} firmware={firmware} readback={readback}/>}
-    {fase === 'deteccion' && <DescubrimientoGps alVolver={alVolver} listado={listado} ahora={ahora} seleccionado={seleccionado}
+    {fase === 'deteccion' && !registered && <DescubrimientoGps alVolver={alVolver} listado={listado} ahora={ahora} seleccionado={seleccionado}
       alSeleccionar={onSelect} puedeElegir={d => !!eligible && d.imei === imei} puedeRegistrar={!!eligible && selected && canRegister}
       alRegistrar={onRegister} guardando={registering} error={registrationError} registrado={registered} soloPrueba={soloPrueba} />}
 
