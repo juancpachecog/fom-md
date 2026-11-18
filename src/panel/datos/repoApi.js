@@ -1284,14 +1284,14 @@ export const repoApi = {
       }
       return true
     },
-    async registrar({ imei, modelo, protocolo, fabricante, serie, linea, registrationMethod, identityConfirmedByOperator, ...metadata }) {
+    async registrar({ imei, modelo, protocolo, fabricante, serie, linea, registrationMethod, identityConfirmedByOperator, discoverySampleKey, ...metadata }) {
       const r = await api.registrarEquipoGps({
         imei,
         model: modelo,
         protocolFamily: protocolo || 'coban-gps103',
         manufacturer: fabricante || undefined,
         serialNumber: serie || undefined,
-        ...(registrationMethod ? {registrationMethod,identityConfirmedByOperator} : {}),
+        ...(registrationMethod ? {registrationMethod,identityConfirmedByOperator,...(discoverySampleKey?{discoverySampleKey}:{})} : {}),
         ...cambiosGps({ ...metadata, simPhone: linea || metadata.simPhone }),
       })
       return { id: r?.gpsDevice?.id ?? r?.device?.id ?? r?.id ?? null }

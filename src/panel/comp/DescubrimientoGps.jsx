@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { haceCuanto } from '../datos/gps'
 import FuncionesDetectadas from './FuncionesDetectadas'
 import DetalleDetectado from './DetalleDetectado'
 import { paginaDescubrimiento, permiteRegistrarVisto } from '../datos/paginaDescubrimiento'
+import RevisionTramaGps, {useRevisionTrama} from './RevisionTramaGps'
 
 const fecha = v => v ? new Date(v).toLocaleString('es-VE') : 'Sin lectura'
 const TAMANO = 4
 
-export default function DescubrimientoGps({ listado, ahora, seleccionado, alSeleccionar, puedeElegir, puedeRegistrar, alRegistrar, guardando, error, registrado, soloPrueba, alVolver, propuestas = {}, alCambiarPropuesta }) {
+export default function DescubrimientoGps({ listado, ahora, seleccionado, alSeleccionar, puedeElegir, puedeRegistrar, alRegistrar, guardando, error, registrado, soloPrueba, alVolver, propuestas = {}, alCambiarPropuesta, alRevision }) {
   const [visto, setVisto] = useState(seleccionado || '')
   const [busqueda, setBusqueda] = useState('')
   const [pagina, setPagina] = useState(0)
@@ -29,18 +30,21 @@ export default function DescubrimientoGps({ listado, ahora, seleccionado, alSele
         {tabla.totalPaginas > 1 && <div className="gp-discovery-pagination"><button type="button" className="gp-btn2 chico" disabled={!tabla.pagina} onClick={() => setPagina(tabla.pagina - 1)}>Anterior</button><span>{tabla.pagina + 1} / {tabla.totalPaginas}</span><button type="button" className="gp-btn2 chico" disabled={tabla.pagina + 1 >= tabla.totalPaginas} onClick={() => setPagina(tabla.pagina + 1)}>Siguiente</button></div>}
       </aside>
       <section className="gp-card gp-discovery-detail" aria-label="Detalle del dispositivo seleccionado">
-        {d ? <Detalle key={d.imei} d={d} ahora={ahora} propuesta={propuestas[d.imei]} alCambiarPropuesta={value => alCambiarPropuesta?.(d.imei,value)} editar={!soloPrueba} /> : <div className="gp-discovery-empty"><h3>{visto ? 'El dispositivo ya no está en esta lectura' : 'Selecciona un dispositivo'}</h3><p>{visto ? 'Puede haberse registrado o quedar fuera de la muestra. Selecciona otro para consultar su comunicación.' : 'Elige un GPS de la lista para ver su identidad, fechas y mensajes aquí, sin salir de esta pantalla.'}</p></div>}
+        {d ? <Detalle key={d.imei} d={d} ahora={ahora} propuesta={propuestas[d.imei]} alCambiarPropuesta={value => alCambiarPropuesta?.(d.imei,value)} alRevision={alRevision} editar={!soloPrueba} /> : <div className="gp-discovery-empty"><h3>{visto ? 'El dispositivo ya no está en esta lectura' : 'Selecciona un dispositivo'}</h3><p>{visto ? 'Puede haberse registrado o quedar fuera de la muestra. Selecciona otro para consultar su comunicación.' : 'Elige un GPS de la lista para ver su identidad, fechas y mensajes aquí, sin salir de esta pantalla.'}</p></div>}
         <div className="gp-discovery-footer">
           {error && <p className="gp-error" role="alert">{error}</p>}
-          {!soloPrueba && !registrado && <><span className="gp-hint">{d && !puedeElegir(d) ? 'Para registrar se necesita identidad verificada, señal reciente y el transporte configurado.' : 'Comprueba que el GPS seleccionado corresponde al equipo y a la SIM que estás preparando.'}</span><button type="button" className="gp-btn chico" disabled={!permiteRegistrarVisto({ guardando, estado: listado.estado, visto: d?.imei, seleccionado, puedeRegistrar })} onClick={alRegistrar}>{guardando ? 'Comprobando…' : 'Registrar'}</button></>}
+          {!soloPrueba && !registrado && <><span className="gp-hint">{d && !puedeElegir(d) ? 'Para registrar se necesita identidad verificada, señal reciente y el transporte configurado.' : !puedeRegistrar?'La pestaña Trama indica qué falta para validar fecha, hora y ubicación.':'Trama validada. Revisa también las funciones antes de registrar el GPS.'}</span><button type="button" className="gp-btn chico" disabled={!permiteRegistrarVisto({ guardando, estado: listado.estado, visto: d?.imei, seleccionado, puedeRegistrar })} onClick={alRegistrar}>{guardando ? 'Comprobando…' : 'Registrar'}</button></>}
         </div>
       </section>
     </div>
   </section>
 }
 
-function Detalle({ d, ahora, propuesta, alCambiarPropuesta, editar }) {
-  const [tab, setTab] = useState('resumen')
+function Detalle({ d, ahora, propuesta, alCambiarPropuesta, editar, alRevision }) {
+  const [tab, setTab] = useState('trama')
+  const revision=useRevisionTrama({imei:d.imei,transport:d.transporte})
+  const notificar=useRef(alRevision);notificar.current=alRevision
+  useEffect(()=>{notificar.current?.(d.imei,revision)},[d.imei,revision.scope,revision.snapshot,revision.error])
   const [pagina, setPagina] = useState(0)
   const [avanzado, setAvanzado] = useState(false)
   const mensajes = d.comunicaciones ?? []
@@ -48,9 +52,9 @@ function Detalle({ d, ahora, propuesta, alCambiarPropuesta, editar }) {
   const actual = Math.min(pagina, paginas - 1)
   return <>
     <div className="gp-discovery-device-heading"><div className="gp-titulo"><span className="gp-k">IMEI observado</span><h3 className="gp-mono">{d.imei}</h3></div><span className={`gp-lbl ${d.reportando ? 'gp-discovery-live' : ''}`}>{d.reportando ? 'Reportando ahora' : `Visto ${haceCuanto(d.ultimaVez, ahora)}`}</span></div>
-    <div className="gp-discovery-tabs" role="tablist" aria-label="Información del dispositivo"><button type="button" role="tab" aria-selected={tab === 'resumen'} onClick={() => setTab('resumen')}>Resumen</button><button type="button" role="tab" aria-selected={tab === 'mensajes'} onClick={() => setTab('mensajes')}>Comunicaciones</button><button type="button" role="tab" aria-selected={tab === 'funciones'} onClick={() => setTab('funciones')}>Funciones</button></div>
+    <div className="gp-discovery-tabs" role="tablist" aria-label="Información del dispositivo"><button type="button" role="tab" aria-selected={tab === 'trama'} onClick={() => setTab('trama')}>Trama</button><button type="button" role="tab" aria-selected={tab === 'resumen'} onClick={() => setTab('resumen')}>Resumen</button><button type="button" role="tab" aria-selected={tab === 'mensajes'} onClick={() => setTab('mensajes')}>Comunicaciones</button><button type="button" role="tab" aria-selected={tab === 'funciones'} onClick={() => setTab('funciones')}>Funciones</button></div>
     <div className="gp-discovery-data" role="tabpanel">
-      {tab === 'funciones' ? <FuncionesDetectadas imei={d.imei} draft={propuesta} alCambiar={alCambiarPropuesta} editar={editar} /> : tab === 'resumen' ? <dl className="gp-discovery-facts">
+      {tab === 'trama' ? <RevisionTramaGps revision={revision} imei={d.imei} ahora={ahora}/> : tab === 'funciones' ? <FuncionesDetectadas imei={d.imei} draft={propuesta} alCambiar={alCambiarPropuesta} editar={editar} /> : tab === 'resumen' ? <dl className="gp-discovery-facts">
         {[
           ['Primera recepción en la muestra', fecha(d.primeraVez)], ['Última recepción', fecha(d.ultimaVez)],
           ['Transporte', String(d.transporte ?? 'Desconocido').toUpperCase()], ['Mensajes en la muestra', d.mensajes],
@@ -60,7 +64,7 @@ function Detalle({ d, ahora, propuesta, alCambiarPropuesta, editar }) {
         ].map(([k,v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
       </dl> : <><table className="gp-discovery-messages"><thead><tr><th>Recepción</th><th>Transporte</th><th>Bytes</th></tr></thead><tbody>{mensajes.slice(actual * TAMANO, (actual + 1) * TAMANO).map((m,i) => <tr key={`${m.recibido}-${i}`}><td>{fecha(m.recibido)}</td><td>{m.transporte?.toUpperCase()}</td><td>{m.bytes}</td></tr>)}</tbody></table>{!mensajes.length && <p className="gp-hint">Sin detalle de mensajes disponible.</p>}{paginas > 1 && <div className="gp-discovery-pagination"><button className="gp-btn2 chico" type="button" disabled={!actual} onClick={() => setPagina(actual - 1)}>Mensajes anteriores</button><span>{actual + 1} / {paginas}</span><button className="gp-btn2 chico" type="button" disabled={actual + 1 >= paginas} onClick={() => setPagina(actual + 1)}>Más mensajes</button></div>}</>}
     </div>
-    {tab !== 'funciones' && <div className="gp-discovery-note"><span className="gp-hint">Horas de recepción del servidor. Muestra de hasta {d.limiteMuestra ?? 5000} mensajes dentro de {d.diasMuestra ?? 30} días; no es el historial completo.</span><button type="button" className="gp-btn2 chico" onClick={() => setAvanzado(true)}>Prueba de identificación</button></div>}
+    {['resumen','mensajes'].includes(tab) && <div className="gp-discovery-note"><span className="gp-hint">Horas de recepción del servidor. Muestra de hasta {d.limiteMuestra ?? 5000} mensajes dentro de {d.diasMuestra ?? 30} días; no es el historial completo.</span><button type="button" className="gp-btn2 chico" onClick={() => setAvanzado(true)}>Prueba de identificación</button></div>}
     {avanzado && <DetalleDetectado inicial={d} alCerrar={() => setAvanzado(false)} />}
   </>
 }
