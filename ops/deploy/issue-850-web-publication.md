@@ -4,8 +4,8 @@
 [WEB43](https://github.com/juancpachecog/fom-md/pull/43). Publicación separada de
 la investigación del error nominal de transferencia y del borrado848.
 
-La fuente funcional es `d032b54d299a39579b821b4267100253cee391ff`, con618pruebas
-completas y22de sesión/inicio/salida; build conectado con el mismo perfil público
+La fuente funcional es `56c30be8ea49745b07112473701a384a6a9ce5d1`, con619pruebas
+completas y23de sesión/inicio/salida; build conectado con el mismo perfil público
 `b1470891795093611bbca035faf86d5c84bb8e14ccc606e87b4c98d29a931ee8`.
 Se cambia intencionadamente JavaScript de sesión para aplicar15min; no cambia
 el login del servidor, claves, configuración de cookie ni la recepción GPS.
@@ -37,3 +37,8 @@ Restauración incierta detiene el paso; nunca repetir activación o borrar un
 release dudoso. Preservar recibos. GHA bloqueado por facturación no se presenta
 como CI verde ni permite Ready/merge. Un resultado de publicación no acredita
 la solución del caso de transferencia que todavía requiere paso/URL del usuario.
+
+La preparaciónv1 se completó sin cambiar Nginx; queda conservada y no se activa.
+El sucesorv2 añade revalidación para500/otros5xx: un fallo aislado conserva
+la sesión si auth responde; una caída general protege la pantalla. No reutilizar
+ni sobrescribir el contrato, archivo o recibo de v1.

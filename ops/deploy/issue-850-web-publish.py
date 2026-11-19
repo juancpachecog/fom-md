@@ -18,18 +18,18 @@ import urllib.parse
 
 ROOT = Path('/var/lib/fom-issue-850-web-contracts')
 STATE = Path('/opt/fom/state/prod')
-RELEASE = Path('/var/www/fom-web/releases/issue-850-session-v1')
+RELEASE = Path('/var/www/fom-web/releases/issue-850-session-v2')
 OLD_ROOT = Path('/var/www/fom-web/releases/issue-846-gps-review-eb29917')
 RETAIN_ROOTS = (OLD_ROOT,)
 SITE = Path('/etc/nginx/sites-available/fom-mobile.conf')
 MOBILE = Path('/etc/nginx/fom-mobile-lifecycle-locations.conf')
-SOURCE = 'd032b54d299a39579b821b4267100253cee391ff'
+SOURCE = '56c30be8ea49745b07112473701a384a6a9ce5d1'
 API_HEAD = 'b76a20c89c45541cd2fd599f4bbdaa77ecd976c1'
 OLD_CONFIG = 'c4b25c2dc28e1ad46ee8f26b658ffd4505fa2f8a578466c02d50887f0cfcc964'
 OLD_INDEX = '99ee4f409acef0eab583bc25bf142692e5a153b076fbe3fc703d87a94ce5624f'
 MOBILE_SHA = '796e853c4fea379d2be037bc27ddb9fa3c87b68a277209f2d766bff30d4674b0'
 TEST = 'e523de689e78878a1152fe45c3da6eda3801c9f87bc0992b3705d2978e8ace05'
-ARCHIVE = ROOT/'session-v1.tar.gz'
+ARCHIVE = ROOT/'session-v2.tar.gz'
 ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C.UTF-8'}
 
 
