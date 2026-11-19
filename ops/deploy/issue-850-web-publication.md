@@ -35,8 +35,8 @@ sin copiar Config.Env a logs.
 Ante fallo se restaura el Nginx protegido846 y se consulta aparte su índice.
 Restauración incierta detiene el paso; nunca repetir activación o borrar un
 release dudoso. Preservar recibos. GHA bloqueado por facturación no se presenta
-como CI verde ni permite Ready/merge. Un resultado de publicación no acredita
-la solución del caso de transferencia que todavía requiere paso/URL del usuario.
+como CI verde ni permite Ready/merge. La publicación web y la corrección SQL de transferencias se verifican por
+separado, cada una con su contrato, respaldo y testigo en850.
 
 La preparaciónv1 se completó sin cambiar Nginx; queda conservada y no se activa.
 El sucesorv2 añade revalidación para500/otros5xx: un fallo aislado conserva
