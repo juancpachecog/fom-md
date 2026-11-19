@@ -24,8 +24,16 @@ import { iniciales as inicialesDe } from './datos/formato'
 import { esAdminFom, etiquetaRolSesion, rolCanonico, tipoEmpresaDe } from './roles'
 import { olvidarFotos } from './datos/cloudinary'
 import { CUENTAS as CUENTAS_VITRINA } from './cuentasDemo'
+import { crearRelojInactividad, INACTIVIDAD_SESION_MS } from './actividadSesion'
+import { alCambiarComunicacion } from './datos/eventosComunicacion'
 
 const CLAVE_SESION = 'fom.panel.sesion'
+const CLAVE_SALIDA_PENDIENTE = 'fom.session.salida-pendiente'
+const CLAVE_GENERACION = 'fom.session.generacion', CLAVE_ACTIVIDAD = 'fom.session.actividad'
+let generacionActiva = null
+let revisionSesion = 0, detenerVigilancia = () => {}, relojActividad = null
+let salidaEnCurso = null, comprobandoConexion = false, canalSesion = null
+let pendienteEnMemoria = false, almacenSalidaDisponible = true
 
 /**
  * Traducción de los roles que existen hoy en producción al catálogo del
@@ -50,9 +58,14 @@ function avisar() {
 }
 
 function fijar(nueva) {
-  fijarEmpresaGestion(nueva?.perfil?.empresaGestion?.id)
+  const estabaActiva = Boolean(sesion?.perfil && !sesion.debeCambiarClave)
+  if (nueva?.perfil || nueva === null || nueva?.finalizada) fijarEmpresaGestion(nueva?.perfil?.empresaGestion?.id)
   sesion = nueva
+  revisionSesion++
   avisar()
+  const activa = Boolean(nueva?.perfil && !nueva.debeCambiarClave)
+  if (!activa) { detenerVigilancia(); relojActividad = null }
+  else if (!estabaActiva) activarVigilancia()
 }
 
 // ============================================================
@@ -163,24 +176,42 @@ async function resolverNombreDeEmpresa(perfil) {
 
 /** Le pregunta al servidor si hay sesión viva. */
 export async function resolverSesion() {
+  if (salidaPendiente()) return reintentarSalida()
+  if (sesion?.finalizada) return
+  const revision = revisionSesion
   try {
-    const r = await api.sesion()
+    const r = await conBloqueoSesion(async () => {
+      const r = await api.sesion()
+      if (r?.authenticated && HAY_API) {
+        const gen = leerGeneracion() || crypto.randomUUID()
+        guardarLocal(CLAVE_GENERACION, gen)
+        try { if (!globalThis.localStorage?.getItem(CLAVE_ACTIVIDAD)) guardarLocal(CLAVE_ACTIVIDAD, Date.now()) } catch { /* Optional storage. */ }
+        generacionActiva = gen
+      }
+      return r
+    })
+    if (revision !== revisionSesion || salidaPendiente()) return
+    const perfil = r?.authenticated ? await resolverNombreDeEmpresa(armarPerfil(r.user)) : null
+    if (revision !== revisionSesion || salidaPendiente()) return
+    if (HAY_API && generacionActiva && leerGeneracion() && generacionActiva !== leerGeneracion()) {
+      fijar({ finalizada: { motivo: 'otra-pestana', pendiente: false } }); return
+    }
     fijar(
       r?.authenticated
         ? {
-            perfil: await resolverNombreDeEmpresa(armarPerfil(r.user)),
+            perfil,
             inicio: Date.now(),
             debeCambiarClave: Boolean(r.mustChangePassword),
           }
         : null,
     )
   } catch (error) {
-    // Un límite temporal o una caída de red no revoca la sesión.
-    fijar(error.estado === 401 ? null : { errorConexion: error.message })
+    if (revision !== revisionSesion || salidaPendiente()) return
+    if (error.estado === 401) fijar(null)
+    else if (sesion?.perfil || actividadGuardada()) await finalizarSesion('conexion')
+    else fijar({ errorConexion: error.message })
   }
 }
-
-if (HAY_API) resolverSesion()
 
 // ============================================================
 // API pública (idéntica para los dos modos)
@@ -200,10 +231,12 @@ export function perfilActual() {
 export async function entrarEmpresa(empresa) {
   if (!esAdminFom(sesion?.perfil)) throw new Error('Solo el administrador FOM puede entrar a otra empresa.')
   if (!empresa?.id) throw new Error('Selecciona una empresa.')
+  const anterior = sesion
   if (HAY_API) {
     const contexto = await api.contextoEmpresa(empresa.id)
     if (contexto?.tenantId !== empresa.id) throw new Error('El servidor no confirmó la empresa seleccionada.')
   }
+  if (sesion !== anterior || !sesion?.perfil) throw new Error('La sesión cambió. Vuelve a iniciar sesión.')
   const perfil = sesion.perfil
   const original = sesion.perfilGlobal ?? perfil
   fijar({ ...sesion, perfilGlobal: original, perfil: {
@@ -239,6 +272,11 @@ export function alCambiar(fn) {
  * @returns {Promise<{ok: true, perfil: object} | {ok: false, error: string}>}
  */
 export async function iniciarSesion({ usuario, clave, recordar = true }) {
+  if (salidaEnCurso) await salidaEnCurso
+  if (salidaPendiente()) {
+    await reintentarSalida()
+    if (salidaPendiente()) return { ok: false, error: 'Primero hay que confirmar el cierre anterior. Revisa la conexión y reintenta.' }
+  }
   if (!HAY_API) return entrarDemo({ usuario, clave, recordar })
 
   const email = String(usuario || '').trim().toLowerCase()
@@ -246,8 +284,17 @@ export async function iniciarSesion({ usuario, clave, recordar = true }) {
   if (!email || !password) return { ok: false, error: 'Escribe tu usuario y tu clave.' }
 
   try {
-    const r = await api.entrar(email, password)
+    const r = await conBloqueoSesion(async () => {
+      if (salidaPendiente()) throw new Error('Falta confirmar la salida anterior. Reintenta cuando vuelva la conexión.')
+      const r = await api.entrar(email, password)
+      generacionActiva = crypto.randomUUID()
+      guardarLocal(CLAVE_GENERACION, generacionActiva)
+      guardarLocal(CLAVE_ACTIVIDAD, Date.now())
+      canalSesion?.postMessage({ tipo: 'entrada', generacion: generacionActiva })
+      return r
+    })
     const perfil = await resolverNombreDeEmpresa(armarPerfil(r?.user))
+    if (leerGeneracion() && leerGeneracion() !== generacionActiva) throw new Error('La sesión cambió en otra pestaña. Vuelve a entrar.')
     const debeCambiarClave = Boolean(r?.mustChangePassword)
     fijar({ perfil, inicio: Date.now(), debeCambiarClave })
     return { ok: true, perfil, debeCambiarClave }
@@ -279,7 +326,7 @@ export const AVISO_SALIDA_FALLIDA =
  * navegador y los datos de la vitrina (sin API, lo que manda el conductor le
  * llega al supervisor por `fom.panel.cambios`).
  */
-const SE_QUEDAN = new Set(['fom.panel.modo', 'fom.mapa.prefs', 'fom.demo.estres', 'fom.panel.cambios', 'fom.panel.cambios.estres'])
+const SE_QUEDAN = new Set(['fom.panel.modo', 'fom.mapa.prefs', 'fom.demo.estres', 'fom.panel.cambios', 'fom.panel.cambios.estres', CLAVE_SALIDA_PENDIENTE])
 const seQueda = (clave) => SE_QUEDAN.has(clave) || clave.startsWith('fom.apariencia.')
 
 /** Claves del panel (`fom…`) y los avisos del conductor (`notis:…`, la misma clave que la app). */
@@ -336,20 +383,23 @@ async function borrarRastros() {
  * @returns {Promise<{ok: true} | {ok: false, error: string}>}
  */
 export async function cerrarSesion() {
-  if (HAY_API) {
-    try {
-      await api.salir()
-    } catch (error) {
+  const generacion = generacionActiva
+  try {
+    await conBloqueoSesion(async () => {
+      if (HAY_API && generacion && leerGeneracion() && leerGeneracion() !== generacion) return
+      if (HAY_API) {
+        try { await api.salir() } catch (error) { if (error?.estado !== 401) throw error }
+      }
+      await borrarRastros()
+    })
+  } catch (error) {
       // 401: el servidor ya no tenía esa sesión, así que salir es cierto.
-      if (error?.estado !== 401) {
         // Los botones de «Cerrar sesión» no leen la respuesta: el aviso se muestra aquí.
         globalThis.alert?.(AVISO_SALIDA_FALLIDA)
         return { ok: false, error: AVISO_SALIDA_FALLIDA }
-      }
-    }
   }
   fijar(null)
-  await borrarRastros()
+  canalSesion?.postMessage({ tipo: 'cerrada', generacion })
   globalThis.location?.replace?.('/entrar')
   return { ok: true }
 }
@@ -379,3 +429,141 @@ export const CUENTAS_DEMO = HAY_API
   ? []
   : CUENTAS.map((c) => ({ usuario: c.usuario, clave: c.clave, rol: c.perfil.rolNombre }))
 export const CUENTA_DEMO = CUENTAS_DEMO[0]
+
+export function inicioDeSesion(s) {
+  if (s?.debeCambiarClave) return '/cambiar-clave-inicial'
+  return esAdminFom(s?.perfil) ? '/panel/seleccionar-empresa' : '/panel'
+}
+
+function salidaPendiente() {
+  if (!almacenSalidaDisponible) return pendienteEnMemoria
+  try { return globalThis.localStorage ? globalThis.localStorage.getItem(CLAVE_SALIDA_PENDIENTE) === '1' : pendienteEnMemoria } catch { return pendienteEnMemoria }
+}
+function marcarSalida(pendiente) {
+  pendienteEnMemoria = pendiente
+  try {
+    if (!globalThis.localStorage) { almacenSalidaDisponible = false; return }
+    if (pendiente) globalThis.localStorage?.setItem(CLAVE_SALIDA_PENDIENTE, '1')
+    else globalThis.localStorage?.removeItem(CLAVE_SALIDA_PENDIENTE)
+  } catch { almacenSalidaDisponible = false }
+}
+function guardarLocal(clave, valor) { try { globalThis.localStorage?.setItem(clave, String(valor)) } catch { /* Private browser mode. */ } }
+function actividadGuardada() { try { return Number(globalThis.localStorage?.getItem(CLAVE_ACTIVIDAD)) > 0 } catch { return false } }
+function leerGeneracion() { try { return globalThis.localStorage?.getItem(CLAVE_GENERACION) || null } catch { return null } }
+function conBloqueoSesion(fn) {
+  return globalThis.navigator?.locks?.request
+    ? navigator.locks.request('fom.panel.autenticacion', fn) : Promise.resolve().then(fn)
+}
+
+/** Hide immediately; remote revocation is reported separately and never assumed offline. */
+export function finalizarSesion(motivo = 'inactividad', { yaRevocada = false, propagar = true } = {}) {
+  if (salidaEnCurso) return salidaEnCurso
+  const generacion = generacionActiva
+  if (HAY_API && generacion && leerGeneracion() && leerGeneracion() !== generacion) {
+    fijar({ finalizada: { motivo: 'otra-pestana', pendiente: false } })
+    return Promise.resolve({ ok: true })
+  }
+  marcarSalida(!yaRevocada && HAY_API)
+  fijar({ finalizada: { motivo, pendiente: !yaRevocada && HAY_API } })
+  if (propagar) canalSesion?.postMessage({ tipo: 'salida', motivo, generacion })
+  salidaEnCurso = (async () => {
+    const confirmada = await conBloqueoSesion(async () => {
+      if (HAY_API && generacion && leerGeneracion() && leerGeneracion() !== generacion) return true
+      // A previous tab may already have completed revocation while this one waited.
+      if (!yaRevocada && HAY_API && !salidaPendiente()) return true
+      let ok = yaRevocada || !HAY_API
+      try { if (!ok) { await api.salir(); ok = true } } catch (e) { ok = e?.estado === 401 }
+      await borrarRastros()
+      // Retain the generation while revocation is pending; no token or identity is stored.
+      if (!ok && generacion) guardarLocal(CLAVE_GENERACION, generacion)
+      marcarSalida(!ok)
+      return ok
+    })
+    fijar({ finalizada: { motivo, pendiente: !confirmada } })
+    return { ok: confirmada }
+  })().finally(() => { salidaEnCurso = null })
+  return salidaEnCurso
+}
+
+export function reintentarSalida() {
+  return finalizarSesion(sesion?.finalizada?.motivo || 'conexion', { propagar: false })
+}
+
+async function comprobarComunicacion(evento) {
+  if (!sesion?.perfil || comprobandoConexion || salidaEnCurso) return
+  comprobandoConexion = true
+  const previa = sesion
+  if (evento.tipo !== 'servidor') fijar({ ...previa, comprobandoConexion: true })
+  const revision = revisionSesion, control = new AbortController()
+  const timer = setTimeout(() => control.abort(), 5000)
+  try {
+    const r = await api.sesion({ señal: control.signal })
+    if (revision !== revisionSesion) return
+    if (!r?.authenticated || r.user?.email !== previa.perfil.correo) await finalizarSesion('sesion', { yaRevocada: !r?.authenticated })
+    else if (sesion.comprobandoConexion) fijar(previa)
+  } catch (e) {
+    if (revision !== revisionSesion) return
+    if ([401, 403].includes(e.estado)) await finalizarSesion('sesion', { yaRevocada: e.estado === 401 })
+    else if (!e.estado || [500, 502, 503, 504].includes(e.estado)) await finalizarSesion('conexion')
+    else if (sesion.comprobandoConexion) fijar(previa)
+  } finally { clearTimeout(timer); comprobandoConexion = false }
+}
+
+function activarVigilancia() {
+  if (!globalThis.document || !globalThis.addEventListener) return
+  detenerVigilancia()
+  let ultimaActividad
+  try { ultimaActividad = Number(globalThis.localStorage?.getItem(CLAVE_ACTIVIDAD)) } catch { /* Use current activity below. */ }
+  if (!ultimaActividad || !Number.isFinite(ultimaActividad)) ultimaActividad = Date.now()
+  if (ultimaActividad > Date.now() + 2000) ultimaActividad = Date.now() - INACTIVIDAD_SESION_MS
+  relojActividad = crearRelojInactividad({ ultimaActividad, autoIniciar: false, alVencer: () => finalizarSesion('inactividad') })
+  let ultimoAviso = 0
+  const actividad = e => {
+    if (!e.isTrusted || document.visibilityState === 'hidden') return
+    const ahora = Date.now()
+    if (ahora - ultimoAviso < 1000) { relojActividad?.comprobar(); return }
+    ultimoAviso = ahora
+    if (relojActividad?.actividad()) {
+      guardarLocal(CLAVE_ACTIVIDAD, ahora)
+      canalSesion?.postMessage({ tipo: 'actividad', instante: ahora, generacion: generacionActiva })
+    }
+  }
+  const comprobar = () => relojActividad?.comprobar()
+  const offline = () => finalizarSesion('conexion')
+  const eventos = ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel']
+  for (const nombre of eventos) globalThis.addEventListener(nombre, actividad, { passive: true })
+  globalThis.addEventListener('focus', comprobar)
+  globalThis.addEventListener('offline', offline)
+  document.addEventListener('visibilitychange', comprobar)
+  detenerVigilancia = () => {
+    relojActividad?.detener()
+    for (const nombre of eventos) globalThis.removeEventListener(nombre, actividad)
+    globalThis.removeEventListener('focus', comprobar)
+    globalThis.removeEventListener('offline', offline)
+    document.removeEventListener('visibilitychange', comprobar)
+  }
+  relojActividad.comprobar()
+}
+
+alCambiarComunicacion(comprobarComunicacion)
+if (globalThis.document && globalThis.addEventListener) {
+  if (globalThis.BroadcastChannel) {
+    canalSesion = new BroadcastChannel('fom.panel.sesion.eventos')
+    canalSesion.onmessage = ({ data }) => {
+      if (data?.tipo === 'entrada' && data.generacion !== generacionActiva && (sesion?.perfil || sesion === undefined)) {
+        fijar({ finalizada: { motivo: 'otra-pestana', pendiente: false } }); return
+      }
+      if (data?.generacion && data.generacion !== generacionActiva) return
+      if (data?.tipo === 'actividad') relojActividad?.actividad(data.instante)
+      if (data?.tipo === 'salida' && sesion?.perfil) finalizarSesion('otra-pestana', { propagar: false })
+      if (data?.tipo === 'cerrada' && sesion?.perfil) fijar({ finalizada: { motivo: 'otra-pestana', pendiente: false } })
+    }
+  }
+  globalThis.addEventListener('online', () => { if (salidaPendiente()) reintentarSalida() })
+  globalThis.addEventListener('storage', e => {
+    if (e.key === CLAVE_SALIDA_PENDIENTE && e.newValue === '1' && sesion?.perfil) finalizarSesion('otra-pestana', { propagar: false })
+    if (e.key === CLAVE_ACTIVIDAD && leerGeneracion() === generacionActiva) relojActividad?.actividad(Number(e.newValue))
+  })
+}
+if (HAY_API) resolverSesion()
+else if (sesion?.perfil) activarVigilancia()

@@ -165,6 +165,7 @@ test('conectado: si el servidor no confirma la salida, se avisa, la sesión sigu
   const srv = servidor({ persona: 'ana@fom.com.ve', salida: 500 })
   const m = await conectado()
   assert.equal(m.perfilActual()?.correo, 'ana@fom.com.ve')
+  const clavesAntesDeSalir = localStorage.claves()
 
   const r = await m.cerrarSesion()
   assert.equal(r.ok, false)
@@ -173,7 +174,7 @@ test('conectado: si el servidor no confirma la salida, se avisa, la sesión sigu
   assert.equal(m.perfilActual()?.correo, 'ana@fom.com.ve', 'no se dice que salió')
   assert.deepEqual(notas.recargas, [])
   assert.deepEqual(notas.bases, [])
-  assert.equal(localStorage.claves().length, Object.keys(LO_QUE_DEJA_UNA_SESION).length)
+  assert.deepEqual(localStorage.claves(), clavesAntesDeSalir)
 
   // Un 401 al salir es que el servidor ya no tenía la sesión: eso sí es haber salido.
   srv.salida = 401

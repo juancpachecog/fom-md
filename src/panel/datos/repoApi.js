@@ -416,7 +416,7 @@ export function olvidarMemorias() {
 let personaDeLaMemoria = perfilActual()?.id ?? null
 alCambiar((s) => {
   // null = sin sesión (salió o expiró). Sin perfil pero con algo = resolviendo o sin conexión: no cambia de quién es.
-  if (s === null) { olvidarMemorias(); personaDeLaMemoria = null; return }
+  if (s === null || s?.finalizada) { olvidarMemorias(); personaDeLaMemoria = null; return }
   const persona = s?.perfil?.id
   if (!persona) return
   if (personaDeLaMemoria && persona !== personaDeLaMemoria) olvidarMemorias()

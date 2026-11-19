@@ -12,6 +12,7 @@
 // ============================================================
 import { aRutaPorEnte, SIN_RUTA_POR_ENTE } from './rutaPorEnte'
 import { placasEnRespuesta } from './placas'
+import { avisarComunicacion } from './eventosComunicacion'
 
 const BASE = (import.meta.env?.VITE_FOM_API || '').replace(/\/+$/, '')
 
@@ -150,9 +151,11 @@ async function pedirUnaVez(rutaPedida, { metodo = 'GET', cuerpo, señal, idempot
   } catch (error) {
     clearTimeout(tope)
     if (control.signal.reason === 'tope') {
+      if (!/\/auth\//u.test(ruta)) avisarComunicacion({ tipo: 'red' })
       throw new Error('El servidor tardó demasiado en responder. Revisa la conexión e inténtalo de nuevo.')
     }
     if (error.name === 'AbortError') throw error
+    if (!/\/auth\//u.test(ruta)) avisarComunicacion({ tipo: 'red' })
     throw new Error(traducir(0))
   }
 
@@ -168,6 +171,8 @@ async function pedirUnaVez(rutaPedida, { metodo = 'GET', cuerpo, señal, idempot
   }
 
   if (!respuesta.ok) {
+    if (!/\/auth\//u.test(ruta) && [401, 502, 503, 504].includes(respuesta.status))
+      avisarComunicacion({ tipo: respuesta.status === 401 ? 'sesion' : 'servidor', estado: respuesta.status })
     // El estado viaja pegado al error: un 401 en el LOGIN significa «clave
     // incorrecta», y el mismo 401 en cualquier otra ruta significa «sesion
     // caida». Sin el numero, quien llama no puede distinguirlos y termina
@@ -206,7 +211,7 @@ export const api = {
   // acceso de la app móvil.
   entrar: (email, password) =>
     pedir(`${CONSOLA}/auth/login`, { metodo: 'POST', cuerpo: { email, password } }),
-  sesion: () => pedir(`${CONSOLA}/auth/session`),
+  sesion: (opciones = {}) => pedir(`${CONSOLA}/auth/session`, opciones),
   salir: () => pedir(`${CONSOLA}/auth/logout`, { metodo: 'POST' }),
   cambiarClaveInicial: (currentPassword, newPassword) =>
     pedir(`${CONSOLA}/auth/password`, {

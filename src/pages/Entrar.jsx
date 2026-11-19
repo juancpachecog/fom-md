@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { alCambiar, CONECTADO_A_BD, CUENTAS_DEMO, iniciarSesion, sesionActual } from '../panel/auth'
+import { alCambiar, CONECTADO_A_BD, CUENTAS_DEMO, iniciarSesion, inicioDeSesion, sesionActual } from '../panel/auth'
 import GloboCanvas from '../components/GloboCanvas'
 import LogoFom from '../components/LogoFom'
 
@@ -44,9 +44,9 @@ export default function Entrar() {
     // Contra la base real la sesión se resuelve preguntando al servidor, así
     // que puede llegar después de pintar: hay que quedarse escuchando.
     const actual = sesionActual()
-    if (actual?.perfil) navegar(actual.debeCambiarClave ? '/cambiar-clave-inicial' : '/panel', { replace: true })
+    if (actual?.perfil) navegar(inicioDeSesion(actual), { replace: true })
     const baja = alCambiar((s) => {
-      if (s?.perfil) navegar(s.debeCambiarClave ? '/cambiar-clave-inicial' : '/panel', { replace: true })
+      if (s?.perfil) navegar(inicioDeSesion(s), { replace: true })
     })
     return () => {
       baja()
@@ -66,7 +66,7 @@ export default function Entrar() {
       // cambia detrás, sin bajón de luz.
       setFase('saliendo')
       setTimeout(
-        () => navegar(r.debeCambiarClave ? '/cambiar-clave-inicial' : '/panel', { replace: true }),
+        () => navegar(inicioDeSesion(r), { replace: true }),
         660,
       )
     } else {
