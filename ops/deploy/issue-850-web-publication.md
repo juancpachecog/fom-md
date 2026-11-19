@@ -4,8 +4,8 @@
 [WEB43](https://github.com/juancpachecog/fom-md/pull/43). Publicación separada de
 la investigación del error nominal de transferencia y del borrado848.
 
-La fuente funcional es `f38e02548e25d2476eb155ad37b5ac047bd5cc01`, con616pruebas
-completas y20de sesión/inicio/salida; build conectado con el mismo perfil público
+La fuente funcional es `d032b54d299a39579b821b4267100253cee391ff`, con618pruebas
+completas y22de sesión/inicio/salida; build conectado con el mismo perfil público
 `b1470891795093611bbca035faf86d5c84bb8e14ccc606e87b4c98d29a931ee8`.
 Se cambia intencionadamente JavaScript de sesión para aplicar15min; no cambia
 el login del servidor, claves, configuración de cookie ni la recepción GPS.
