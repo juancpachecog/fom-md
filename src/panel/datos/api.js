@@ -177,7 +177,7 @@ async function pedirUnaVez(rutaPedida, { metodo = 'GET', cuerpo, señal, idempot
   }
 
   if (!respuesta.ok) {
-    if (!/\/auth\//u.test(ruta) && [401, 502, 503, 504].includes(respuesta.status))
+    if (!/\/auth\//u.test(ruta) && (respuesta.status === 401 || respuesta.status >= 500))
       avisarComunicacion({ tipo: respuesta.status === 401 ? 'sesion' : 'servidor', estado: respuesta.status })
     // El estado viaja pegado al error: un 401 en el LOGIN significa «clave
     // incorrecta», y el mismo 401 en cualquier otra ruta significa «sesion

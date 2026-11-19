@@ -509,7 +509,7 @@ async function comprobarComunicacion(evento) {
   } catch (e) {
     if (revision !== revisionSesion) return
     if ([401, 403].includes(e.estado)) await finalizarSesion('sesion', { yaRevocada: e.estado === 401 })
-    else if (!e.estado || [500, 502, 503, 504].includes(e.estado)) await finalizarSesion('conexion')
+    else if (!e.estado || e.estado >= 500) await finalizarSesion('conexion')
     else if (sesion.comprobandoConexion) fijar(previa)
   } finally { clearTimeout(timer); comprobandoConexion = false }
 }

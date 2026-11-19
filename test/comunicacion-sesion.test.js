@@ -27,3 +27,13 @@ test('el tope cubre el cuerpo lento después de recibir cabeceras', async t => {
   await assert.rejects(request, /tardó demasiado/u)
   assert.deepEqual(events, [{ tipo: 'red', estado: 0 }])
 })
+
+test('500 y otros5xx piden revalidar sesión sin confundirlos con un logout confirmado', async t => {
+  const previous = globalThis.fetch, events = [], off = client.alCambiarComunicacion(e => events.push(e))
+  t.after(() => { globalThis.fetch = previous; off() })
+  for (const status of [500, 503, 507]) {
+    globalThis.fetch = async () => ({ ok: false, status, text: async () => '{"message":"Synthetic server failure"}' })
+    await assert.rejects(client.pedir(`/api/v1/console/vehicles?synthetic=${status}`), e => e.estado === status)
+  }
+  assert.deepEqual(events, [500, 503, 507].map(estado => ({ tipo: 'servidor', estado })))
+})

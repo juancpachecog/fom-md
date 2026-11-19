@@ -68,6 +68,8 @@ test('503 de una capacidad y401 de negocio no cierran una sesión que el servido
   const auth = await fixture(t, async url => basic(url))
   auth.avisarComunicacion({ tipo: 'servidor', estado: 503 }); await tick(); await tick()
   assert.ok(auth.sesionActual().perfil)
+  auth.avisarComunicacion({ tipo: 'servidor', estado: 500 }); await tick(); await tick()
+  assert.ok(auth.sesionActual().perfil)
   auth.avisarComunicacion({ tipo: 'sesion', estado: 401 }); await tick(); await tick()
   assert.ok(auth.sesionActual().perfil); assert.equal(auth.sesionActual().comprobandoConexion, undefined)
 })
