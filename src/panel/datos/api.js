@@ -159,8 +159,14 @@ async function pedirUnaVez(rutaPedida, { metodo = 'GET', cuerpo, señal, idempot
     throw new Error(traducir(0))
   }
 
-  clearTimeout(tope)
-  const texto = await respuesta.text()
+  let texto
+  try { texto = await respuesta.text() }
+  catch (error) {
+    if (error.name === 'AbortError' && control.signal.reason !== 'tope') throw error
+    if (!/\/auth\//u.test(ruta)) avisarComunicacion({ tipo: 'red' })
+    throw new Error(control.signal.reason === 'tope'
+      ? 'El servidor tardó demasiado en responder. Revisa la conexión e inténtalo de nuevo.' : traducir(0))
+  } finally { clearTimeout(tope) }
   let datos = null
   if (texto) {
     try {
