@@ -31,7 +31,12 @@ export function reorganizarMenu(menu, perfil) {
     const index = result.findIndex(g => ['Usuarios', 'Análisis', 'Administración FOM'].includes(g.grupo))
     result.splice(index < 0 ? result.length : index, 0, hardware)
   }
-  return result.filter(g => g.items.length)
+  const visibles = result.filter(g => g.items.length)
+  if (esAdminFom(perfil)) {
+    const index = visibles.findIndex(g => g.grupo === 'Administración FOM')
+    if (index > 0) visibles.unshift(...visibles.splice(index, 1))
+  }
+  return visibles
 }
 
 export const PESTANAS_EQUIPO = ['diagnostico', 'trama', 'datos', 'funciones', 'comandos', 'historial']
