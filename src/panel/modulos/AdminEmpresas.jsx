@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { entrarEmpresa } from '../auth'
+import { entrarEmpresa, salirEmpresa, sesionActual } from '../auth'
 import repo, { DIRECTORIO_REAL } from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { useSesion } from '../useSesion'
@@ -12,13 +12,15 @@ import { COMPANY_TIPO, etiqueta } from '../datos/catalogos'
 import { Icono } from '../Iconos'
 import LogoEmpresa from '../comp/LogoEmpresa'
 import { useConfirmar } from '../comp/Confirmar'
-import { subirLogoDeEmpresa } from '../datos/logos'
+import { olvidarLogos, subirLogoDeEmpresa } from '../datos/logos'
 import {
   armarUsuarioResponsable, generarClaveTemporal, normalizarTelefono, problemaDelResponsable, textoDeError,
 } from '../datos/responsableEmpresa'
 import './empresas.css'
 import EditarEmpresa from './EditarEmpresa'
-import { revisarRetirada, retirarRegistro } from '../datos/cicloDatos'
+import EliminarEmpresa from './EliminarEmpresa'
+import EliminacionesEmpresas from './EliminacionesEmpresas'
+import { eliminacionComprobada } from '../datos/eliminacionEmpresasContrato'
 
 // ============================================================
 // EMPRESAS (solo Administrador FOM)
@@ -38,6 +40,9 @@ export default function AdminEmpresas() {
   const [tipo, setTipo] = useState('')
   const [creando, setCreando] = useState(false)
   const [editando, setEditando] = useState(null)
+  const [eliminando, setEliminando] = useState(null)
+  const [versionEliminaciones, setVersionEliminaciones] = useState(0)
+  const [idsEliminadas, setIdsEliminadas] = useState(() => new Set())
   const [predeDe, setPredeDe] = useState(null) // empresa cuyo listado de compañías se edita
   const [aviso, setAviso] = useState('')
   const [entrando, setEntrando] = useState(false)
@@ -67,11 +72,12 @@ export default function AdminEmpresas() {
   }
 
   const { datos, estado, error, recargar } = useDatos(() => cargar('', ''), [])
-  const lista = useMemo(() => (datos ?? []).filter(e =>
+  const disponibles = useMemo(() => (datos ?? []).filter(e => !idsEliminadas.has(e.id)), [datos, idsEliminadas])
+  const lista = useMemo(() => disponibles.filter(e =>
     (!tipo || e.tipo === tipo) &&
     (!servicio || !e.respaldo && (servicio === 'activo' ? e.servicioActivo : !e.servicioActivo)) &&
     (!q.trim() || [e.nombre, e.rif, e.contacto, e.email, e.telefono].some(v => String(v ?? '').toLocaleLowerCase().includes(q.trim().toLocaleLowerCase())))
-  ), [datos, q, tipo, servicio])
+  ), [disponibles, q, tipo, servicio])
 
   const accion = async (fn, mensaje) => {
     if (ocupado || entrando) return
@@ -103,16 +109,20 @@ export default function AdminEmpresas() {
     accion(() => repo.admin.empresas.setServicio(e.id, !e.servicioActivo, actor), `Servicio ${e.servicioActivo ? 'suspendido' : 'reactivado'} para ${e.nombre}.`)
   }
 
-  const eliminar = async (e) => {
-    await accion(async () => {
-      const item = { type: 'tenant', id: e.id, status: e.estado }
-      const previo = await revisarRetirada(e.id, item)
-      if (!previo.canRetire) throw new Error(previo.message || 'Resuelve las dependencias antes de retirar la empresa.')
-      if (!await confirmar({ titulo: 'Retirar empresa', texto: `¿Retirar ${e.nombre} del uso operativo? Se conserva todo su historial. ${previo.message || ''}`, accion: 'Retirar empresa', peligro: true })) return false
-      await retirarRegistro(e.id, item, 'Retirada de empresa desde administración', crypto.randomUUID())
-      const comprobado = await revisarRetirada(e.id, item)
-      if (!comprobado.alreadyRetired) throw new Error('No quedó comprobada la retirada. Consulta de nuevo antes de repetir.')
-    }, `${e.nombre} se retiró de operación. Su historial se conserva.`)
+  const eliminar = e => { setAviso(''); setConfirmacion(''); setEliminando({ empresa: e }) }
+  const comprobarEliminacion = (dato, mostrar = true) => {
+    const solicitudes = (Array.isArray(dato) ? dato : [dato]).filter(s => s.liveDeleted)
+    if (!solicitudes.length) return
+    const ids = new Set(solicitudes.map(s => s.tenantId))
+    if (ids.has(sesionActual()?.perfil?.empresaGestion?.id)) salirEmpresa()
+    olvidarLogos()
+    setSeleccionId(id => ids.has(id) ? null : id)
+    setIdsEliminadas(anteriores => new Set([...anteriores, ...ids]))
+    Promise.resolve(recargar()).catch(() => setAviso('No se pudo actualizar el listado. Las empresas cuya eliminación ya se comprobó permanecen ocultas.'))
+    if (mostrar) {
+      if (solicitudes.every(s => eliminacionComprobada(s, s.tenantId))) setConfirmacion('Eliminación comprobada: la empresa ya no está en la aplicación ni en los respaldos revisados.')
+      else setConfirmacion('La empresa ya no está en la operación. La comprobación de sus respaldos sigue pendiente.')
+    }
   }
 
   return (
@@ -121,7 +131,7 @@ export default function AdminEmpresas() {
         titulo="Empresas"
         bajada="Elige una empresa para gestionar su operación, sus usuarios y su flota."
       >
-        <Link className="pnl-btn" to="/panel/admin/ciclo-datos">Retirada y limpieza</Link>
+        <Link className="pnl-btn" to="/panel/admin/ciclo-datos">Datos e historial</Link>
         <button type="button" className="pnl-btn primario" disabled={ocupado || entrando} onClick={() => setCreando(true)}>
           <Icono nombre="mas" tam={16} />
           Nueva empresa
@@ -131,12 +141,13 @@ export default function AdminEmpresas() {
       <div className="pnl-cuerpo">
         {aviso && <p className="emp-error" role="alert">{aviso}</p>}
         {confirmacion && <p className="emp-confirmacion" role="status"><Icono nombre="check" tam={18} />{confirmacion}</p>}
+        {DIRECTORIO_REAL && <EliminacionesEmpresas version={versionEliminaciones} alComprobar={comprobarEliminacion} alAbrir={solicitud => setEliminando({ empresa: { id: solicitud.tenantId, nombre: solicitud.companyName || 'Empresa seleccionada' }, solicitud })} />}
         {estado === 'cargando' && datos === null && <Cargando filas={6} />}
         {estado === 'error' && <ErrorCarga onReintentar={recargar} error={{ message: textoDeError(error, 'No pudimos cargar las empresas. Inténtalo de nuevo.') }} />}
         {datos !== null && (
           <Contenido subirLogo={subirLogo} editar={setEditando}
             lista={lista}
-            todas={datos}
+            todas={disponibles}
             q={q}
             setQ={setQ}
             tipo={tipo}
@@ -156,6 +167,7 @@ export default function AdminEmpresas() {
       </div>
 
       {dialogo}
+      {eliminando && <EliminarEmpresa key={eliminando.empresa.id} empresa={eliminando.empresa} solicitudInicial={eliminando.solicitud} alComprobar={comprobarEliminacion} alCerrar={() => { setEliminando(null); setVersionEliminaciones(v => v + 1) }} />}
       {editando && <EditarEmpresa key={editando.id} empresa={editando} alCerrar={() => setEditando(null)} alGuardar={recargar} />}
       <ModalNueva abierto={creando} alCerrar={() => setCreando(false)} alGuardar={recargar} actor={actor} />
       <ModalPredefinidas empresa={predeDe} alCerrar={() => setPredeDe(null)} alGuardar={recargar} actor={actor} />
@@ -211,7 +223,7 @@ function FichaEmpresa({editar, empresa:e, ocupado, alternarServicio, eliminar, a
     <section className="emp-contacto"><h3>Información de la empresa</h3><dl>{[
       ['RIF',e.rif || 'Sin registrar'],['Contacto',e.contacto || 'Sin registrar'],['Correo',e.email || 'Sin registrar'],['Teléfono',e.telefono || 'Sin registrar'],['Saldo',Number.isFinite(e.deuda) ? f.moneda(e.deuda) : 'No disponible'],
     ].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section>
-    {!e.respaldo && <section className="emp-gestion"><h3>Administración</h3><button type="button" className="pnl-btn" disabled={ocupado} onClick={() => editar(e)}>Editar empresa</button><label className={`pnl-btn${ocupado ? ' deshabilitado' : ''}`}><Icono nombre="mas" tam={17} />Subir logo<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={ocupado} onChange={(ev) => { const a = ev.target.files?.[0]; ev.target.value = ''; if (a) subirLogo(e, a) }} /></label>{e.tipo === 'estandar' && <button type="button" className="pnl-btn" disabled={ocupado} onClick={()=>abrirPredefinidas(e)}><Icono nombre="gente" tam={17} />Compañías asociadas</button>}<button type="button" className="pnl-btn" disabled={ocupado} onClick={()=>alternarServicio(e)}><Icono nombre={e.servicioActivo ? 'reloj' : 'check'} tam={17} />{e.servicioActivo ? 'Suspender servicio' : 'Reactivar servicio'}</button><details><summary>Otras acciones</summary><p>Retirar una empresa la archiva y conserva su historial. Primero deben resolverse sus dependencias.</p><button type="button" className="pnl-btn sutil" disabled={ocupado} onClick={()=>eliminar(e)}>Retirar de operación</button></details></section>}
+    {!e.respaldo && <section className="emp-gestion"><h3>Administración</h3><button type="button" className="pnl-btn" disabled={ocupado} onClick={() => editar(e)}>Editar empresa</button><label className={`pnl-btn${ocupado ? ' deshabilitado' : ''}`}><Icono nombre="mas" tam={17} />Subir logo<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={ocupado} onChange={(ev) => { const a = ev.target.files?.[0]; ev.target.value = ''; if (a) subirLogo(e, a) }} /></label>{e.tipo === 'estandar' && <button type="button" className="pnl-btn" disabled={ocupado} onClick={()=>abrirPredefinidas(e)}><Icono nombre="gente" tam={17} />Compañías asociadas</button>}<button type="button" className="pnl-btn" disabled={ocupado} onClick={()=>alternarServicio(e)}><Icono nombre={e.servicioActivo ? 'reloj' : 'check'} tam={17} />{e.servicioActivo ? 'Suspender servicio' : 'Reactivar servicio'}</button><button type="button" className="pnl-btn sutil peligro" disabled={ocupado || !DIRECTORIO_REAL} title={!DIRECTORIO_REAL ? "Disponible en la aplicación conectada" : undefined} onClick={()=>eliminar(e)}>Eliminar empresa</button><p>Elimina la empresa y sus datos, incluidos los respaldos que los contengan.</p></section>}
   </>
 }
 

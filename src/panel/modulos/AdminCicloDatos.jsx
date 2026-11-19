@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { salirEmpresa, sesionActual } from '../auth'
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { Cabecera, Cargando, ErrorCarga } from '../comp/ui'
@@ -8,6 +9,8 @@ import { textoDeError } from '../datos/responsableEmpresa'
 import { candidatosCiclo, claveCiclo, crearConjuntoPrueba, estadoCiclo, guardarRetencionVerificada, leerCiclo, leerReciboLimpieza, limpiarPruebas, marcarPrueba,
   retirarRegistro, revisarLimpieza, revisarRetirada, TIPOS_CICLO, versionActual } from '../datos/cicloDatos'
 import ExpiracionTelemetria from './ExpiracionTelemetria'
+import EliminarEmpresa from './EliminarEmpresa'
+import { olvidarLogos } from '../datos/logos'
 import './ciclo-datos.css'
 
 // #835: conservar todo hasta que Juan decida plazos tras medir crecimiento.
@@ -25,6 +28,7 @@ export default function AdminCicloDatos() {
   const [confirmarPruebas, setConfirmarPruebas] = useState(false), [frase, setFrase] = useState('')
   const [meses, setMeses] = useState(6)
   const [expirando, setExpirando] = useState(false)
+  const [eliminando, setEliminando] = useState(null)
   const llaves = useRef(new Map())
   const ocupacion = useRef(false)
   const { confirmar, dialogo } = useConfirmar()
@@ -100,6 +104,7 @@ export default function AdminCicloDatos() {
   }
   const elegir = item => setSeleccion(actual => elegidos.has(claveCiclo(item)) ? actual.filter(x => claveCiclo(x) !== claveCiclo(item)) : [...actual, item])
   const retirar = async (item) => {
+    if (item.type === 'tenant') { setEliminando({ id: item.id, nombre: item.label }); return }
     if (!motivoValido || ocupado) return
     await hacer(async () => {
       const previo = await revisarRetirada(empresaId, item)
@@ -173,7 +178,7 @@ export default function AdminCicloDatos() {
 
   return <div className="pnl-modulo ciclo-datos">
     <Cabecera titulo="Retirada y conservación de datos" bajada="Retira registros del uso conservando su historial. La limpieza y expiración están suspendidas." />
-    <p role="status">Se conserva toda la telemetría y las recepciones crudas. El plazo de retención está pendiente de decisión; no se ejecutarán borrados físicos.</p>
+    <p role="status">La retención y limpieza generales siguen suspendidas. Eliminar una empresa requiere una revisión y confirmación propias e incluye sus datos en los respaldos.</p>
     {aviso && <p role="alert" className="ciclo-error">{aviso}</p>}
     {exito && <p role="status">{exito}</p>}
     {empresas.estado === 'error' && <ErrorCarga error={empresas.error} onReintentar={empresas.recargar} />}
@@ -192,7 +197,7 @@ export default function AdminCicloDatos() {
         {candidatos.estado === 'error' ? <ErrorCarga error={candidatos.error} onReintentar={candidatos.recargar} /> : candidatos.estado === 'cargando' ? <Cargando /> : <>
           <div className="ciclo-tabla"><table><thead><tr><th>Prueba</th><th>Tipo</th><th>Registro</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{lista.map(item => <tr key={claveCiclo(item)}>
             <td><input type="checkbox" aria-label={`Marcar ${item.label} como prueba`} disabled={ocupado || accionesBloqueadas} checked={elegidos.has(claveCiclo(item))} onChange={() => elegir(item)} /></td>
-            <td>{TIPOS_CICLO[item.type]}</td><td>{item.label}</td><td>{estadoCiclo(item.status)}</td><td><button type="button" className="pnl-btn sutil" disabled={ocupado || accionesBloqueadas || !motivoValido || ['archived','revoked','disabled'].includes(item.status)} onClick={() => retirar(item)}>Retirar</button></td></tr>)}</tbody></table></div>
+            <td>{TIPOS_CICLO[item.type]}</td><td>{item.label}</td><td>{estadoCiclo(item.status)}</td><td><button type="button" className="pnl-btn sutil" disabled={ocupado || accionesBloqueadas || (item.type !== 'tenant' && (!motivoValido || ['archived','revoked','disabled'].includes(item.status)))} onClick={() => retirar(item)}>{item.type === 'tenant' ? 'Eliminar empresa' : 'Retirar'}</button></td></tr>)}</tbody></table></div>
           {!lista.length && <p>No hay registros que coincidan.</p>}<div className="ciclo-filtros"><button className="pnl-btn sutil" disabled={ocupado || offset === 0} onClick={() => setOffset(Math.max(0, offset - 50))}>Anterior</button><span>{candidatos.datos?.total ?? 0} registros</span><button className="pnl-btn sutil" disabled={ocupado || offset + lista.length >= (candidatos.datos?.total ?? 0)} onClick={() => setOffset(offset + 50)}>Siguiente</button></div>
         </>}
         <label className="ciclo-check"><input type="checkbox" checked={confirmarPruebas} disabled={ocupado} onChange={e => setConfirmarPruebas(e.target.checked)} />Confirmo que los {seleccion.length} registros seleccionados y sus datos exclusivos son pruebas desechables. No contienen operación real que deba conservarse.</label>
@@ -220,6 +225,15 @@ export default function AdminCicloDatos() {
       <ExpiracionTelemetria confirmar={confirmar} key={empresaId} empresaId={empresaId} deshabilitado={PRESERVAR_TELEMETRIA || soloHistorico || ciclo.estado !== 'ok' || ['queued', 'running'].includes(recibo?.status)} ocupado={ocupado} hacer={hacer} familia={familia} avisar={setAviso} informar={setExito} alTrabajar={setExpirando} politicaVersion={familiasRetencion.map(f => versionActual(ciclo.datos?.policies, f)?.version ?? 0).join(':')} />
     </>}
     {dialogo}
+    {eliminando && <EliminarEmpresa key={eliminando.id} empresa={eliminando} alCerrar={() => setEliminando(null)} alComprobar={dato => {
+      if (!dato.liveDeleted) return
+      if (sesionActual()?.perfil?.empresaGestion?.id === dato.tenantId) salirEmpresa()
+      olvidarLogos()
+      setEmpresaId(actual => actual === dato.tenantId ? '' : actual)
+      setSeleccion([])
+      Promise.all([empresas.recargar(), historicos.recargar(), candidatos.recargar()])
+        .catch(() => setAviso('La empresa ya no está en la operación. No se pudo actualizar el listado; consulta su estado antes de otra acción.'))
+    }} />}
   </div>
 }
 
