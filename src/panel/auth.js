@@ -23,6 +23,7 @@ import { api, HAY_API, fijarEmpresaGestion } from './datos/api'
 import { iniciales as inicialesDe } from './datos/formato'
 import { esAdminFom, etiquetaRolSesion, rolCanonico, tipoEmpresaDe } from './roles'
 import { olvidarFotos } from './datos/cloudinary'
+import { olvidarLogos } from './datos/logos'
 import { CUENTAS as CUENTAS_VITRINA } from './cuentasDemo'
 import { crearRelojInactividad, INACTIVIDAD_SESION_MS } from './actividadSesion'
 import { alCambiarComunicacion } from './datos/eventosComunicacion'
@@ -207,7 +208,10 @@ export async function resolverSesion() {
     )
   } catch (error) {
     if (revision !== revisionSesion || salidaPendiente()) return
-    if (error.estado === 401) fijar(null)
+    if (error.estado === 401) {
+      if (actividadGuardada() || sesion?.perfil) await finalizarSesion('sesion', { yaRevocada: true })
+      else fijar(null)
+    }
     else if (sesion?.perfil || actividadGuardada()) await finalizarSesion('conexion')
     else fijar({ errorConexion: error.message })
   }
@@ -371,6 +375,7 @@ async function borrarRastros() {
   borrarClavesDeSesion(globalThis.sessionStorage)
   // Las memorias de `repoApi` se borran solas al quedar la sesión en null (ver `alCambiar` allí).
   olvidarFotos()
+  olvidarLogos()
   await borrarBaseHojas()
 }
 
@@ -559,7 +564,7 @@ if (globalThis.document && globalThis.addEventListener) {
       if (data?.tipo === 'cerrada' && sesion?.perfil) fijar({ finalizada: { motivo: 'otra-pestana', pendiente: false } })
     }
   }
-  globalThis.addEventListener('online', () => { if (salidaPendiente()) reintentarSalida() })
+  globalThis.addEventListener('online', () => { if (salidaPendiente() || sesion?.errorConexion) reintentarSalida() })
   globalThis.addEventListener('storage', e => {
     if (e.key === CLAVE_SALIDA_PENDIENTE && e.newValue === '1' && sesion?.perfil) finalizarSesion('otra-pestana', { propagar: false })
     if (e.key === CLAVE_ACTIVIDAD && leerGeneracion() === generacionActiva) relojActividad?.actividad(Number(e.newValue))
