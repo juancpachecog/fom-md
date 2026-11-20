@@ -54,6 +54,46 @@ export const nombreFuncion = key => ({ 'battery.level':'Batería', 'fuel.level':
   'ignition.acc': 'Contacto (ACC)', 'door.open': 'Puerta abierta', 'input.digital.active': 'Entrada digital activa',
   'input.voltage': 'Voltaje de entrada', 'engine.rpm': 'Régimen del motor (RPM)', 'engine.running': 'Giro del motor detectado' })[key] || key
 
+export const familiaFunciones = value => String(value ?? '').trim().toLowerCase().replace(/^coban[ -]gps103$/u, 'coban-gps103')
+
+export function nombreFuente(channel) {
+  const fixed = {
+    'device.acc_reported': 'ACC ON / OFF',
+    'device.door_open_reported': 'Puerta abierta / cerrada',
+    'device.battery_percent_reported': 'Carga de batería',
+    'device.fuel_percent_reported': 'Nivel de combustible',
+    'device.humidity_percent_reported': 'Humedad',
+    'device.altitude_m_reported': 'Altitud GPS',
+    'gps.speed_kph': 'Velocidad GPS',
+    'gps.heading_deg': 'Rumbo GPS',
+    'engine.rpm_reported': 'RPM',
+    'engine.rotation_reported': 'Giro del motor',
+  }
+  const input = /^device\.input([1-5])_active$/u.exec(channel)
+  return fixed[channel] ?? (input ? `Entrada digital ${input[1]}` : channel)
+}
+
+export function perfilInicialFunciones(profiles, current, family, observed) {
+  const matches = (p, id, version) => p.profileId === id && p.profileVersion === version
+  if (current.profileId) return profiles.find(p => matches(p, current.profileId, current.profileVersion))
+  const detected = observed && profiles.find(p => matches(p, observed.profileId, observed.profileVersion))
+  if (detected) return detected
+  if (family === 'coban-gps103') return profiles.find(p => matches(p, 'coban-gps103.observed', 2))
+  return profiles.length === 1 ? profiles[0] : undefined
+}
+
+export function filasSugeridas(profile, prior = []) {
+  const priority = key => ({ 'ignition.acc': 0, 'door.open': 1, 'battery.level': 2 })[key] ?? 3
+  const functions = [...profile.functions].sort((a, b) => priority(a.semanticKey) - priority(b.semanticKey))
+  return functions.flatMap(fn => {
+    if (fn.direction !== 'observation' || fn.interpretationSupport !== 'implemented'
+      || fn.hardwareSupport === 'unsupported' || prior.some(r => r.mapping.semanticKey === fn.semanticKey)) return []
+    const native = fuentesFuncion(profile, fn).filter(c => c.source === 'native')
+    if (native.length !== 1 || prior.length >= 32) return []
+    return [nuevaFilaFuncion(profile, fn, prior)]
+  }).slice(0, Math.max(0, 32 - prior.length))
+}
+
 export function fuentesFuncion(profile, fn) {
   const native = profile.nativeChannels.filter(n => n.semanticKey === fn.semanticKey && n.definitionVersion === fn.definitionVersion)
     .map(n => ({ id: `native:${n.channel}`, source: 'native', channel: n.channel }))

@@ -53,3 +53,24 @@
   .catalogo-funciones input:not([type=checkbox]):not([type=radio]), .catalogo-funciones select, .catalogo-funciones textarea { font-size: 16px; }
   .cf-scroll td, .cf-scroll th { padding: 12px; }
 }
+
+.cf-mapper { display: grid; gap: 16px; }
+.cf-map-head, .cf-map-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.cf-map-head { justify-content: space-between; }
+.cf-map-head h2 { margin: 0 0 2px; }
+.cf-map-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.cf-map-list { display: grid; border: 1px solid var(--e-borde); border-radius: 16px; overflow: hidden; }
+.cf-map-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, .85fr) minmax(52px, .55fr); gap: 12px; padding: 12px 14px; align-items: center; font-size: 13px; }
+.cf-map-columns { color: var(--e-texto-2); background: var(--e-sup-baja); font-size: 12px; font-weight: 600; }
+.cf-map-entry { border-top: 1px solid var(--e-borde); }
+.cf-map-row small { display: block; color: var(--e-texto-3); margin-top: 2px; }
+.cf-map-row .cf-map-toggle { display: flex; align-items: center; }
+.cf-map-row select { min-height: 36px; padding: 6px 8px; }
+.cf-map-options > summary { cursor: pointer; color: var(--e-texto-2); font-size: 12px; }
+.cf-map-entry > .cf-map-options { padding: 0 14px 10px; }
+.cf-map-entry > .cf-map-options[open] .gp-btn2 { margin-top: 10px; }
+.cf-map-actions { margin-top: 12px; }
+.cf-map-actions > button { width: auto; }
+@media (max-width: 540px) {
+  .cf-map-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, .8fr) minmax(40px, .5fr); gap: 8px; padding-inline: 10px; overflow-wrap: anywhere; }
+}
