@@ -2233,6 +2233,7 @@ Object.assign(repoApi, {
     },
     vehiculo: {
       placas: (filas) => placasDeTransferencias(filas, api.vehiculo),
+      inventarioEntrega: (t) => api.inventarioDeEntrega(t.id),
       async dependencias(t) {
         const r = await api.preflightArchivoVehiculo(t.vehiculoId, t.origenId)
         if (r?.vehicleId !== t.vehiculoId || !r.blockers) throw Error('No se pudieron confirmar las dependencias.')

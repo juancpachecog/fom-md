@@ -604,6 +604,8 @@ Object.assign(api, {
     pedir(`${CONSOLA}/identity-transfers/${id}/${paso}`, { metodo: 'POST', cuerpo, idempotente: true }),
   transferenciasDeVehiculo: ({ status, tenantId, limit = 100 } = {}) =>
     pedir(`${CONSOLA}/vehicle-transfers${consulta({ status, tenantId, limit })}`),
+  inventarioDeEntrega: (id) =>
+    pedir(`${CONSOLA}/vehicle-transfers/${encodeURIComponent(id)}/handover-preview`),
   crearTransferenciaDeVehiculo: (cuerpo) =>
     pedir(`${CONSOLA}/vehicle-transfers`, { metodo: 'POST', cuerpo, idempotente: true }),
   decidirTransferenciaDeVehiculo: (id, paso, cuerpo) =>

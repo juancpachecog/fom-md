@@ -8,6 +8,7 @@ import { masNuevoPrimero } from '../datos/orden'
 import { esAdminFom } from '../roles'
 import { Icono } from '../Iconos'
 import { coincideConPlaca, conflictoDeDependencias, dependenciasDeTransferencia } from '../datos/transferenciasVehiculos'
+import ModalEntregaVehiculo from './ModalEntregaVehiculo'
 
 // ============================================================
 // TRANSFERENCIAS ENTRE ENTES (doble control)
@@ -58,6 +59,7 @@ export default function Transferencias() {
   const [creando, setCreando] = useState(false)
   const [seleccionId, setSeleccionId] = useState(null)
   const [cerrando, setCerrando] = useState(null) // { t, paso }
+  const [entrega, setEntrega] = useState(null)
 
   const lista = useDatos(
     () => (pestana === 'identidad' ? repo.transferencias.identidad.listar({ estado }) : repo.transferencias.vehiculo.listar({ estado })),
@@ -153,6 +155,10 @@ export default function Transferencias() {
                     {siguiente && (
                       <button type="button" className="pnl-btn primario" disabled={ocupado} onClick={() => {
                         setSeleccionId(t.id)
+                        if (pestana === 'vehiculo' && siguiente.clave === 'destination-acceptance' && esAdminFom(actor)) {
+                          setEntrega(t)
+                          return
+                        }
                         actuar(() => modulo().decidir(t, siguiente.clave), 'Paso registrado.')
                       }}>
                         {siguiente.texto}
@@ -199,6 +205,17 @@ export default function Transferencias() {
         guardar={(datos) => actuar(() => modulo().crear(datos), 'Transferencia abierta: falta que origen libere y destino acepte.')}
       />}
       <ModalCierre cierre={cerrando} alCerrar={() => setCerrando(null)} confirmar={(motivo) => actuar(() => modulo().decidir(cerrando.t, cerrando.paso, motivo), cerrando.paso === 'rejection' ? 'Transferencia rechazada.' : 'Transferencia cancelada.')} />
+      {entrega && <ModalEntregaVehiculo
+        transferencia={entrega}
+        origen={nombreEmpresa(entrega.origenId)}
+        destino={nombreEmpresa(entrega.destinoId)}
+        alCerrar={() => setEntrega(null)}
+        alCompletar={() => {
+          setEntrega(null)
+          setAviso('Transferencia completada.')
+          lista.recargar()
+        }}
+      />}
     </>
   )
 }
