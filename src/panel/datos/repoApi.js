@@ -30,6 +30,7 @@ import { buscarEquipoGps, empresaDeInstalacion, empresaPropia, equiposParaNuevaU
 import { empresaDeReinicio, mensajeReiniciarClave } from './reiniciarClave'
 import { crearUnidad, gpsDisponible } from './altaUnidad'
 import { placaMayuscula } from './placas'
+import { placasDeTransferencias } from './transferenciasVehiculos'
 import { cambiarCompanias, relacionesDeContratista } from './companiasEmpresa'
 import { LIMITE_EVENTOS, comoEventoManejo, diasServidor } from './eventosManejo'
 import { cloudinaryConfigurado, subirImagen } from './cloudinary'
@@ -49,7 +50,7 @@ function comoUnidad(v) {
   return {
     id: v.id,
     vehiculoId: v.id,
-    codigo: v.code?.toLowerCase(),
+    codigo: v.code,
     vin: v.vin ?? null,
     empresaId: null,
 
@@ -2231,6 +2232,12 @@ Object.assign(repoApi, {
       },
     },
     vehiculo: {
+      placas: (filas) => placasDeTransferencias(filas, api.vehiculo),
+      async dependencias(t) {
+        const r = await api.preflightArchivoVehiculo(t.vehiculoId, t.origenId)
+        if (r?.vehicleId !== t.vehiculoId || !r.blockers) throw Error('No se pudieron confirmar las dependencias.')
+        return r.blockers
+      },
       async listar({ estado = '' } = {}) {
         const r = await api.transferenciasDeVehiculo({ status: estado })
         return (r?.items ?? []).map(comoTransferencia)

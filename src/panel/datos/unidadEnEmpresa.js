@@ -1,3 +1,5 @@
+import { placaMayuscula } from './placas.js'
+
 // Reglas puras (sin red ni pantalla). La llamada al servidor vive en unidadEnEmpresaApi.js.
 // Crear una unidad EN una empresa desde la consola del administrador FOM, sin «entrar» a ella (T-215).
 //
@@ -48,7 +50,7 @@ export function cuerpoUnidad(datos) {
     code: numero.toLowerCase().replace(/\s+/gu, '-').slice(0, LIMITES_UNIDAD.codigo),
     alias: numero.slice(0, LIMITES_UNIDAD.alias),
     fleetNumber: numero.slice(0, LIMITES_UNIDAD.numero),
-    plate: t(datos.placa),
+    plate: placaMayuscula(t(datos.placa)),
     make: t(datos.marca),
     model: t(datos.modelo),
     modelYear: t(datos.anio) ? Number(t(datos.anio)) : undefined,

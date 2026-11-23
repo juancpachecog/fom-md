@@ -472,7 +472,9 @@ export const api = {
   },
 
   /** Ficha de un vehículo, con su última situación conocida. */
-  vehiculo: (vehiculoId) => pedir(`${CONSOLA}/vehicles/${vehiculoId}`),
+  vehiculo: (vehiculoId, enteId) => pedir(enteId
+    ? `${CONSOLA}/tenants/${encodeURIComponent(enteId)}/vehicles/${encodeURIComponent(vehiculoId)}`
+    : `${CONSOLA}/vehicles/${vehiculoId}`),
 
   /** Última posición válida del vehículo. */
   posicionDeVehiculo: (vehiculoId) =>
@@ -615,7 +617,9 @@ Object.assign(api, {
   auditoria: ({ entityType, action, limit = 200, offset = 0 } = {}) =>
     pedir(`${CONSOLA}/audit${consulta({ entityType, action, limit, offset })}`),
   /** Archivar una unidad: primero qué lo impide, luego el archivo con clave de idempotencia. */
-  preflightArchivoVehiculo: (vehicleId) => pedir(`${CONSOLA}/vehicles/${vehicleId}/archive-preflight`),
+  preflightArchivoVehiculo: (vehicleId, enteId) => pedir(enteId
+    ? `${CONSOLA}/tenants/${encodeURIComponent(enteId)}/vehicles/${encodeURIComponent(vehicleId)}/archive-preflight`
+    : `${CONSOLA}/vehicles/${vehicleId}/archive-preflight`),
   archivarVehiculo: (vehicleId, cuerpo) =>
     pedir(`${CONSOLA}/vehicles/${vehicleId}/archive`, { metodo: 'POST', cuerpo, idempotente: true }),
   /** Quién ejecuta la orden (aprobada → asignada, o reasignar). */

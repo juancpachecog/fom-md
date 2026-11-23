@@ -3,6 +3,7 @@ import repo from '../datos/repo'
 import { Campo, Modal } from '../comp/ui'
 import { useConfirmar } from '../comp/Confirmar'
 import { TIPOS_UNIDAD } from '../datos/unidadEnEmpresa'
+import { placaMayuscula } from '../datos/placas'
 
 const campos = [
   ['codigo', 'Código de la unidad', 50], ['vin', 'VIN / número de chasis (17 caracteres)', 17],
@@ -11,7 +12,9 @@ const campos = [
 ]
 const valorCampo = (v, k) => {
   const valor = k === 'numero' ? v.numeroFlota : k === 'alias' ? v.aliasRegistrado : v[k]
-  return valor === '—' ? '' : String(valor ?? '')
+  if (valor === '—') return ''
+  const texto = String(valor ?? '')
+  return k === 'placa' ? placaMayuscula(texto) : texto
 }
 
 export default function EditarVehiculo({ unidad, alCerrar, alGuardar }) {
@@ -31,7 +34,8 @@ export default function EditarVehiculo({ unidad, alCerrar, alGuardar }) {
       if (!Object.keys(parche).length) return
       await repo.vehiculos.set(unidad.id, parche)
       const nueva = await repo.vehiculos.obtener(unidad.id)
-      const coincide = nueva?.id === unidad.id && Object.keys(parche).every(k => valorCampo(nueva, k) === parche[k])
+      const coincide = nueva?.id === unidad.id && Object.keys(parche).every(k =>
+        k === 'codigo' ? valorCampo(nueva, k).toLowerCase() === parche[k] : valorCampo(nueva, k) === parche[k])
       if (!coincide) throw new Error('La lectura posterior no coincide. Recarga la ficha antes de repetir el cambio.')
       await alGuardar()
       alCerrar()
@@ -42,7 +46,10 @@ export default function EditarVehiculo({ unidad, alCerrar, alGuardar }) {
     <form onSubmit={guardar}>
       {campos.map(([k, titulo, max]) => <Campo key={k} etiqueta={titulo}>{k === 'tipo'
         ? <select className="pnl-select" value={valores[k]} disabled={ocupado} onChange={e => setValores(v => ({ ...v, [k]: e.target.value }))}>{!TIPOS_UNIDAD.some(t => t.v === valores[k]) && <option value={valores[k]}>{valores[k] || 'Sin tipo'}</option>}{TIPOS_UNIDAD.map(t => <option key={t.v} value={t.v}>{t.t}</option>)}</select>
-        : <input className="pnl-input" required={k === 'codigo'} pattern={k === 'vin' ? '[A-HJ-NPR-Za-hj-npr-z0-9]{17}' : undefined} maxLength={max} type={k === 'anio' ? 'number' : 'text'} min={k === 'anio' ? 1950 : undefined} max={k === 'anio' ? 2100 : undefined} value={valores[k]} disabled={ocupado} onChange={e => setValores(v => ({ ...v, [k]: e.target.value }))} />}</Campo>)}
+        : <input className="pnl-input" required={k === 'codigo'} pattern={k === 'vin' ? '[A-HJ-NPR-Za-hj-npr-z0-9]{17}' : undefined} maxLength={max} type={k === 'anio' ? 'number' : 'text'} min={k === 'anio' ? 1950 : undefined} max={k === 'anio' ? 2100 : undefined} value={valores[k]} disabled={ocupado} autoCapitalize={k === 'placa' ? 'characters' : undefined} onChange={e => {
+          const valor = k === 'placa' ? placaMayuscula(e.target.value) : e.target.value
+          setValores(v => ({ ...v, [k]: valor }))
+        }} />}</Campo>)}
       {error && <p role="alert">{error}</p>}
       <button type="button" className="pnl-btn" disabled={ocupado} onClick={alCerrar}>Cancelar</button>
       <button type="submit" className="pnl-btn primario" disabled={ocupado || campos.every(([k]) => valores[k].trim() === inicial[k].trim())}>{ocupado ? 'Comprobando…' : 'Guardar cambios'}</button>

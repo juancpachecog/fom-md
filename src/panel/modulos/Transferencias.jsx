@@ -7,6 +7,7 @@ import * as f from '../datos/formato'
 import { masNuevoPrimero } from '../datos/orden'
 import { esAdminFom } from '../roles'
 import { Icono } from '../Iconos'
+import { coincideConPlaca, conflictoDeDependencias, dependenciasDeTransferencia } from '../datos/transferenciasVehiculos'
 
 // ============================================================
 // TRANSFERENCIAS ENTRE ENTES (doble control)
@@ -40,6 +41,13 @@ const explicar = (mensaje) =>
     ? 'El servidor negó el permiso para esta operación. Solo la puede hacer el administrador FOM o un administrador o supervisor activo de la empresa de origen o de la de destino. Revisa el rol y la empresa de tu cuenta.'
     : mensaje
 
+function rotuloVehiculo(t, placa) {
+  if (!placa) return t.codigoDestino ? `Código en destino ${t.codigoDestino}` : ''
+  return coincideConPlaca(t.codigoDestino, placa) || !t.codigoDestino
+    ? placa
+    : `${placa} · código en destino ${t.codigoDestino}`
+}
+
 export default function Transferencias() {
   const sesion = useSesion()
   const actor = sesion?.perfil
@@ -67,7 +75,10 @@ export default function Transferencias() {
       lista.recargar()
       return true
     } catch (e) {
-      setAviso(explicar(e?.message) || 'No se pudo completar la acción.')
+      if (pestana === 'vehiculo' && conflictoDeDependencias(e)) {
+        setAviso('La transferencia sigue pendiente. Resuelve las dependencias activas en la empresa de origen y vuelve a intentar.')
+        dependencias.recargar()
+      } else setAviso(explicar(e?.message) || 'No se pudo completar la acción.')
       return false
     } finally {
       setOcupado(false)
@@ -76,6 +87,16 @@ export default function Transferencias() {
   // La más nueva arriba (y elegida por defecto).
   const filas = masNuevoPrimero(lista.datos, 'creadaEn')
   const seleccion = filas.find(t => t.id === seleccionId) ?? filas[0]
+  const placas = useDatos(() => pestana === 'vehiculo' && lista.datos?.length
+    ? repo.transferencias.vehiculo.placas(lista.datos)
+    : {}, [pestana, lista.datos])
+  const revisarDependencias = pestana === 'vehiculo' && seleccion?.vehiculoId && seleccion.estado === 'pending'
+  const dependencias = useDatos(async () => {
+    if (!revisarDependencias) return null
+    return { id: seleccion.id, items: dependenciasDeTransferencia(await repo.transferencias.vehiculo.dependencias(seleccion)) }
+  }, [revisarDependencias, seleccion?.id, seleccion?.version])
+  const bloqueos = revisarDependencias && !dependencias.error && dependencias.datos?.id === seleccion.id ? dependencias.datos.items : []
+  const rotuloSeleccion = seleccion ? rotuloVehiculo(seleccion, placas.datos?.[seleccion.id]) : ''
   const modulo = () => (pestana === 'identidad' ? repo.transferencias.identidad : repo.transferencias.vehiculo)
 
   return (
@@ -110,6 +131,7 @@ export default function Transferencias() {
               {filas.map((t) => {
                 const [esT, esC] = ESTADO[t.estado] ?? [t.estado, 'gris']
                 const siguiente = paso(t)
+                const rotulo = rotuloVehiculo(t, placas.datos?.[t.id])
                 return (
                   <div className={`pnl-fila pnl-transfer-card${seleccion?.id === t.id ? ' seleccionada' : ''}`} key={t.id}>
                     <Icono nombre={pestana === 'identidad' ? 'gente' : 'camion'} tam={18} />
@@ -117,7 +139,7 @@ export default function Transferencias() {
                       <b>
                         {nombreEmpresa(t.origenId)} → {nombreEmpresa(t.destinoId)}
                         {t.rolDestino ? ` · llega como ${t.rolDestino}` : ''}
-                        {t.codigoDestino ? ` · código ${t.codigoDestino}` : ''}
+                        {rotulo && ` · ${rotulo}`}
                       </b>
                       <span>
                         {t.motivo} · abierta {f.desde(t.creadaEn)}
@@ -129,7 +151,10 @@ export default function Transferencias() {
                     <Tag color={esC}>{esT}</Tag>
                     <button className="pnl-btn sutil" onClick={()=>setSeleccionId(t.id)} aria-pressed={seleccion?.id === t.id}>Ver detalle</button>
                     {siguiente && (
-                      <button type="button" className="pnl-btn primario" disabled={ocupado} onClick={() => actuar(() => modulo().decidir(t, siguiente.clave), 'Paso registrado.')}>
+                      <button type="button" className="pnl-btn primario" disabled={ocupado} onClick={() => {
+                        setSeleccionId(t.id)
+                        actuar(() => modulo().decidir(t, siguiente.clave), 'Paso registrado.')
+                      }}>
                         {siguiente.texto}
                       </button>
                     )}
@@ -146,11 +171,18 @@ export default function Transferencias() {
           ))}
         </Tarjeta><aside className="pnl-admin-detalle"><Tarjeta titulo="Detalle de la transferencia">
           {seleccion ? <><h3>{nombreEmpresa(seleccion.origenId)} <span aria-hidden="true">→</span> {nombreEmpresa(seleccion.destinoId)}</h3><Tag color={ESTADO[seleccion.estado]?.[1] ?? 'gris'}>{ESTADO[seleccion.estado]?.[0] ?? seleccion.estado}</Tag>
+            {rotuloSeleccion && <p><b>{rotuloSeleccion}</b></p>}
             <ol className="pnl-transfer-pasos">
               <li className="hecho"><i>1</i><div><b>Solicitud</b><span>{f.fechaHora(seleccion.creadaEn)}</span></div></li>
               <li className={seleccion.liberadaEn ? 'hecho' : ''}><i>2</i><div><b>Liberación en origen</b><span>{seleccion.liberadaEn ? f.fechaHora(seleccion.liberadaEn) : 'Pendiente'}</span></div></li>
               <li className={seleccion.aceptadaEn ? 'hecho' : ''}><i>3</i><div><b>Aceptación en destino</b><span>{seleccion.aceptadaEn ? f.fechaHora(seleccion.aceptadaEn) : 'Pendiente'}</span></div></li>
             </ol>
+            {bloqueos.length > 0 && <div className="pnl-audit-detalle">
+              <b>Dependencias que impiden completar</b>
+              <ul>{bloqueos.map(item => <li key={item.clave}>{item.texto}</li>)}</ul>
+              <p>Resuélvelas en {nombreEmpresa(seleccion.origenId)} antes de aceptar en destino.</p>
+              <button type="button" className="pnl-btn sutil" onClick={dependencias.recargar}>Actualizar dependencias</button>
+            </div>}
             <div className="pnl-audit-detalle"><b>Motivo</b><p>{seleccion.motivo}</p>{seleccion.rolDestino && <p>Rol en destino: {seleccion.rolDestino}</p>}</div>
             {seleccion.motivoCierre && <div className="pnl-audit-detalle"><b>Motivo del rechazo o cancelación</b><p>{seleccion.motivoCierre}</p></div>}
           </> : <Vacio icono="comparar" titulo="Sin transferencias" texto="Cuando exista una solicitud podrás consultar sus pasos aquí." />}

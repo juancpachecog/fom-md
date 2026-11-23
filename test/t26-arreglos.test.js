@@ -3,6 +3,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { build } from 'vite'
+import { coincideConPlaca, conflictoDeDependencias, dependenciasDeTransferencia } from '../src/panel/datos/transferenciasVehiculos.js'
 
 // ============================================================
 // T-26: tres arreglos pequeños del panel
@@ -34,6 +35,38 @@ test('transferencias: el 403 se explica sin hablar de una publicación pendiente
   const fuente = readFileSync(join(raiz, 'src/panel/modulos/Transferencias.jsx'), 'utf8')
   assert.doesNotMatch(fuente, /lo publique|falta que Juan|no se ha publicado/u)
   assert.match(fuente, /negó el permiso para esta operación/u)
+})
+
+test('transferencias consultan la placa y las dependencias con el ente autorizado de la unidad', async (t) => {
+  const repo = await repositorioConectado()
+  const original = globalThis.fetch
+  const llamadas = []
+  globalThis.fetch = async (url, options) => {
+    const ruta = String(url)
+    llamadas.push(ruta)
+    assert.equal(options.method, 'GET')
+    if (ruta.endsWith('/tenants/origen/vehicles/u1/archive-preflight')) {
+      return Response.json({ vehicleId: 'u1', blockers: { gpsInstallations: 1, driverAssignments: 1, workOrders: 5 } })
+    }
+    if (ruta.endsWith('/tenants/origen/vehicles/u1')) return Response.json({ vehicle: { id: 'u1', plate: 'xy321ab' } })
+    if (ruta.endsWith('/tenants/destino/vehicles/u2')) return Response.json({ vehicle: { id: 'distinto', plate: 'xy321ab' } })
+    return Response.json({ message: 'Not found' }, { status: 404 })
+  }
+  t.after(() => { globalThis.fetch = original })
+  const pendiente = { id: 't1', vehiculoId: 'u1', origenId: 'origen', destinoId: 'destino', estado: 'pending' }
+  const completada = { ...pendiente, id: 't3', vehiculoId: 'u2', estado: 'completed' }
+  const ajena = { ...pendiente, id: 't4', origenId: 'ajeno' }
+  const placas = await repo.transferencias.vehiculo.placas([pendiente, { ...pendiente, id: 't2' }, completada, ajena])
+  assert.deepEqual({ ...placas }, { t1: 'XY321AB', t2: 'XY321AB' })
+  assert.equal(llamadas.filter(r => r.endsWith('/tenants/origen/vehicles/u1')).length, 1)
+  const conteos = await repo.transferencias.vehiculo.dependencias(pendiente)
+  assert.deepEqual(dependenciasDeTransferencia(conteos).map(x => x.texto), [
+    '1 GPS instalado', '1 asignación de conductor vigente', '5 órdenes de trabajo abiertas',
+  ])
+  assert.equal(coincideConPlaca('xy321ab', placas.t1), true)
+  assert.equal(coincideConPlaca('flota-01', placas.t1), false)
+  assert.equal(conflictoDeDependencias({ estado: 409, message: 'Vehicle has active dependencies' }), true)
+  assert.equal(conflictoDeDependencias({ estado: 409, message: 'Vehicle transfer version changed' }), false)
 })
 
 test('inspecciones: sin conteos del servidor quedan en null, nunca en 0', async () => {
