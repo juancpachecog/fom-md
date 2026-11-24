@@ -3,7 +3,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { build } from 'vite'
-import { coincideConPlaca, conflictoDeDependencias, dependenciasDeTransferencia } from '../src/panel/datos/transferenciasVehiculos.js'
+import { coincideConPlaca, conflictoDeDependencias, dependenciasConfirmadas, dependenciasDeTransferencia, explicarAceptacion } from '../src/panel/datos/transferenciasVehiculos.js'
 
 // ============================================================
 // T-26: tres arreglos pequeños del panel
@@ -63,10 +63,37 @@ test('transferencias consultan la placa y las dependencias con el ente autorizad
   assert.deepEqual(dependenciasDeTransferencia(conteos).map(x => x.texto), [
     '1 GPS instalado', '1 asignación de conductor vigente', '5 órdenes de trabajo abiertas',
   ])
+  assert.equal(dependenciasConfirmadas(conteos), false)
+  assert.equal(dependenciasConfirmadas({ ...conteos, driverSessions: 0, emergencies: 0 }), true)
+  assert.equal(dependenciasConfirmadas({ ...conteos, driverSessions: -1, emergencies: 0 }), false)
   assert.equal(coincideConPlaca('xy321ab', placas.t1), true)
   assert.equal(coincideConPlaca('flota-01', placas.t1), false)
   assert.equal(conflictoDeDependencias({ estado: 409, message: 'Vehicle has active dependencies' }), true)
   assert.equal(conflictoDeDependencias({ estado: 409, message: 'Vehicle transfer version changed' }), false)
+})
+
+test('transferencias revisan la versión vigente y conservan la clave en un reintento', async (t) => {
+  const repo = await repositorioConectado()
+  const original = globalThis.fetch
+  const mutaciones = []
+  const actual = { id: 't1', version: 7, status: 'pending', originReleasedAt: '2026-11-24T10:00:00Z' }
+  globalThis.fetch = async (url, options) => {
+    if (String(url).endsWith('/vehicle-transfers/t1') && options.method === 'GET') return Response.json({ transfer: actual })
+    assert.ok(String(url).endsWith('/vehicle-transfers/t1/destination-acceptance'))
+    assert.equal(options.method, 'POST')
+    mutaciones.push([JSON.parse(options.body), options.headers['idempotency-key']])
+    return Response.json({ transfer: { ...actual, status: 'completed', version: 8 } })
+  }
+  t.after(() => { globalThis.fetch = original })
+  const detalle = await repo.transferencias.vehiculo.detalle('t1')
+  assert.equal(detalle.liberadaEn, actual.originReleasedAt)
+  const clave = '00000000-0000-4000-8000-000000000123'
+  for (const repeticion of [1, 2]) {
+    const respuesta = await repo.transferencias.vehiculo.decidir(detalle, 'destination-acceptance', undefined, clave)
+    assert.equal(respuesta.estado, 'completed')
+    assert.deepEqual(mutaciones[repeticion - 1], [{ expectedVersion: 7 }, clave])
+  }
+  assert.match(explicarAceptacion({ estado: 409, message: 'Transfer conflicts with current vehicle state' }), /estado o historial/u)
 })
 
 test('inspecciones: sin conteos del servidor quedan en null, nunca en 0', async () => {

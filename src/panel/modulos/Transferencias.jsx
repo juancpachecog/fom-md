@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { useSesion } from '../useSesion'
@@ -8,6 +9,7 @@ import { masNuevoPrimero } from '../datos/orden'
 import { esAdminFom } from '../roles'
 import { Icono } from '../Iconos'
 import { coincideConPlaca, conflictoDeDependencias, dependenciasDeTransferencia } from '../datos/transferenciasVehiculos'
+import RevisionTransferenciaVehiculo from './RevisionTransferenciaVehiculo'
 
 // ============================================================
 // TRANSFERENCIAS ENTRE ENTES (doble control)
@@ -51,13 +53,15 @@ function rotuloVehiculo(t, placa) {
 export default function Transferencias() {
   const sesion = useSesion()
   const actor = sesion?.perfil
-  const [pestana, setPestana] = useState('identidad')
+  const [parametros, setParametros] = useSearchParams()
+  const pestana = parametros.get('tipo') === 'vehiculo' ? 'vehiculo' : 'identidad'
   const [estado, setEstado] = useState('pending')
   const [aviso, setAviso] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const [creando, setCreando] = useState(false)
-  const [seleccionId, setSeleccionId] = useState(null)
+  const seleccionId = parametros.get('solicitud')
   const [cerrando, setCerrando] = useState(null) // { t, paso }
+  const [entrega, setEntrega] = useState(null)
 
   const lista = useDatos(
     () => (pestana === 'identidad' ? repo.transferencias.identidad.listar({ estado }) : repo.transferencias.vehiculo.listar({ estado })),
@@ -65,6 +69,19 @@ export default function Transferencias() {
   )
   const empresas = useDatos(() => repo.admin.empresas.listar({}), [])
   const nombreEmpresa = (id) => empresas.datos?.find((e) => e.id === id)?.nombre ?? id?.slice(0, 8) ?? '—'
+
+  function setPestana(tipo) {
+    setAviso('')
+    setParametros(tipo === 'vehiculo' ? { tipo } : {}, { replace: true })
+  }
+
+  function setSeleccionId(id) {
+    setParametros(previos => {
+      const siguientes = new URLSearchParams(previos)
+      siguientes.set('solicitud', id)
+      return siguientes
+    }, { replace: true })
+  }
 
   async function actuar(fn, exito) {
     setOcupado(true)
@@ -153,9 +170,14 @@ export default function Transferencias() {
                     {siguiente && (
                       <button type="button" className="pnl-btn primario" disabled={ocupado} onClick={() => {
                         setSeleccionId(t.id)
-                        actuar(() => modulo().decidir(t, siguiente.clave), 'Paso registrado.')
+                        if (t.vehiculoId && siguiente.clave === 'destination-acceptance') {
+                          setAviso('')
+                          setEntrega(t)
+                          return
+                        }
+                        actuar(() => modulo().decidir(t, siguiente.clave), t.vehiculoId ? 'Vehículo liberado. Falta la aceptación en destino.' : 'Paso registrado.')
                       }}>
-                        {siguiente.texto}
+                        {t.vehiculoId && siguiente.clave === 'destination-acceptance' ? 'Revisar entrega' : siguiente.texto}
                       </button>
                     )}
                     {t.estado === 'pending' && (
@@ -199,6 +221,16 @@ export default function Transferencias() {
         guardar={(datos) => actuar(() => modulo().crear(datos), 'Transferencia abierta: falta que origen libere y destino acepte.')}
       />}
       <ModalCierre cierre={cerrando} alCerrar={() => setCerrando(null)} confirmar={(motivo) => actuar(() => modulo().decidir(cerrando.t, cerrando.paso, motivo), cerrando.paso === 'rejection' ? 'Transferencia rechazada.' : 'Transferencia cancelada.')} />
+      {entrega && <RevisionTransferenciaVehiculo
+        key={entrega.id}
+        transferencia={entrega}
+        rotulo={rotuloVehiculo(entrega, placas.datos?.[entrega.id])}
+        origen={nombreEmpresa(entrega.origenId)}
+        destino={nombreEmpresa(entrega.destinoId)}
+        empresaOrigen={esAdminFom(actor) && empresas.datos?.find(e => e.id === entrega.origenId)}
+        alCerrar={() => { setEntrega(null); lista.recargar() }}
+        alCompletar={() => { setEntrega(null); setAviso('Transferencia completada.'); lista.recargar() }}
+      />}
     </>
   )
 }

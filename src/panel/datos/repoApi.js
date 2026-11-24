@@ -2233,6 +2233,11 @@ Object.assign(repoApi, {
     },
     vehiculo: {
       placas: (filas) => placasDeTransferencias(filas, api.vehiculo),
+      async detalle(id) {
+        const r = await api.transferenciaDeVehiculo(id)
+        if (r?.transfer?.id !== id) throw Error('No se pudo confirmar el estado de la solicitud.')
+        return comoTransferencia(r.transfer)
+      },
       async dependencias(t) {
         const r = await api.preflightArchivoVehiculo(t.vehiculoId, t.origenId)
         if (r?.vehicleId !== t.vehiculoId || !r.blockers) throw Error('No se pudieron confirmar las dependencias.')
@@ -2252,13 +2257,14 @@ Object.assign(repoApi, {
         })
         return { id: r?.transfer?.id ?? null }
       },
-      async decidir(t, paso, motivo_) {
+      async decidir(t, paso, motivo_, idempotencia) {
         const cierre = paso === 'rejection' || paso === 'cancellation'
-        await api.decidirTransferenciaDeVehiculo(t.id, paso, {
+        const r = await api.decidirTransferenciaDeVehiculo(t.id, paso, {
           expectedVersion: t.version,
           ...(cierre ? { reason: motivo(motivo_ || '', paso) } : {}),
-        })
-        return true
+        }, idempotencia)
+        if (r?.transfer?.id !== t.id) throw Error('No se pudo confirmar el resultado de la solicitud.')
+        return comoTransferencia(r.transfer)
       },
     },
   },
