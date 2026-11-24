@@ -255,13 +255,10 @@
 .pnl-plan-intervalo b { font-size: 18px; }
 .pnl-plan-intervalo p { color: var(--e-texto-2); font-size: 12px; margin-top: 6px; }
 .pnl-audit-detalle { margin-top: 20px; padding: 16px; border-radius: 12px; border: 1px solid var(--e-borde); background: var(--e-sup-baja); font-size: 13px; line-height: 1.6; color: var(--e-texto-2); overflow-wrap: anywhere; }
-.pnl-entrega-unidad { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 14px; }
-.pnl-entrega-unidad b { font-size: var(--e-t-md); }
-.pnl-entrega-unidad span { color: var(--e-texto-2); }
+.pnl-entrega-categorias { border: 0; padding: 0; margin: 16px 0; min-width: 0; }
+.pnl-entrega-categorias legend { font-weight: 700; }
 .pnl-entrega-opciones { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-block: 8px 12px; }
 .pnl-entrega-opciones .pnl-fila { gap: 8px; padding: 8px 10px; font-size: var(--e-t-sm); }
-.pnl-entrega-pendientes { margin: 6px 0 0; padding-inline-start: 18px; }
-.pnl-entrega-acciones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 @media (max-width: 520px) { .pnl-entrega-opciones { grid-template-columns: minmax(0, 1fr); } }
 .pnl-gps-visual { display: grid; place-items: center; height: 160px; margin-bottom: 20px; background: var(--e-sup-baja); border: 1px solid var(--e-borde); border-radius: 16px; color: var(--e-primario); }
 .fom-dark .pnl-transfer-card { flex-wrap: wrap; padding: 20px; gap: 12px; margin: 12px; border: 1px solid var(--e-borde); border-radius: 12px; background: var(--e-sup-baja); }
@@ -274,6 +271,11 @@
 .pnl-transfer-pasos .hecho i { color: var(--e-exito); background: var(--e-exito-sup); border-color: #286448; }
 .pnl-transfer-pasos b { display: block; font-size: 13px; }
 .pnl-transfer-pasos span { font-size: 12px; color: var(--e-texto-2); }
+.pnl-entrega-unidad { display: grid; gap: 4px; }
+.pnl-entrega-unidad span { color: var(--e-texto-2); }
+.pnl-entrega-pendientes { display: grid; gap: 4px; list-style: none; padding: 0; }
+.pnl-entrega-pendientes li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
+.pnl-entrega-acciones { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .fom-dark .pnl-select { background: var(--e-sup-baja); color: var(--e-texto); border: 1px solid var(--e-borde-fuerte); border-radius: 12px; min-height: 46px; padding: 10px 12px; width: 100%; font: inherit; }
 .fom-dark .pnl-mapa.oscuro .leaflet-tile-pane, .fom-site .pnl-mapa.oscuro .leaflet-tile-pane, .fom-password .pnl-mapa.oscuro .leaflet-tile-pane { filter: invert(1) grayscale(1) sepia(.3) hue-rotate(165deg) saturate(1.7) brightness(.78) contrast(.9); }
 .fom-dark .pnl-ficha-estado { text-transform: none; letter-spacing: 0; }

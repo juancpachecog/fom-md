@@ -1,20 +1,39 @@
 import { placaMayuscula } from './placas.js'
 
 const etiquetas = [
-  ['gpsInstallations', 'GPS instalado', 'GPS instalados'],
-  ['driverAssignments', 'asignación de conductor vigente', 'asignaciones de conductor vigentes'],
-  ['driverSessions', 'jornada abierta', 'jornadas abiertas'],
-  ['workOrders', 'orden de trabajo abierta', 'órdenes de trabajo abiertas'],
-  ['emergencies', 'emergencia pendiente', 'emergencias pendientes'],
+  ['gpsInstallations', 'GPS instalado', 'GPS instalados', 'Revisar telemetría', 'telemetria'],
+  ['driverAssignments', 'asignación de conductor vigente', 'asignaciones de conductor vigentes', 'Revisar conductores', 'usuarios'],
+  ['driverSessions', 'jornada abierta', 'jornadas abiertas', 'Revisar conductores', 'usuarios'],
+  ['workOrders', 'orden de trabajo abierta', 'órdenes de trabajo abiertas', 'Revisar órdenes', 'mantenimiento'],
+  ['emergencies', 'emergencia pendiente', 'emergencias pendientes', 'Revisar expediente', 'resumen'],
 ]
 
 export function dependenciasDeTransferencia(bloqueos) {
-  return etiquetas.flatMap(([clave, singular, plural]) => {
+  return etiquetas.flatMap(([clave, singular, plural, accion, vista]) => {
     const cantidad = bloqueos?.[clave]
     return Number.isSafeInteger(cantidad) && cantidad > 0
-      ? [{ clave, texto: `${cantidad} ${cantidad === 1 ? singular : plural}` }]
+      ? [{ clave, texto: `${cantidad} ${cantidad === 1 ? singular : plural}`, accion, vista }]
       : []
   })
+}
+
+export function dependenciasConfirmadas(bloqueos) {
+  return etiquetas.every(([clave]) => Number.isSafeInteger(bloqueos?.[clave]) && bloqueos[clave] >= 0)
+}
+
+export function explicarAceptacion(error) {
+  if (conflictoDeDependencias(error)) return 'El origen todavía tiene operaciones activas. Actualiza la revisión para ver los pendientes.'
+  if (error?.estado === 409) {
+    switch (error.message) {
+      case 'Transfer conflicts with current vehicle state':
+        return 'El servidor encontró un conflicto con el estado o historial del vehículo. La entrega sigue pendiente.'
+      case 'Destination vehicle code is already in use':
+        return 'El código del vehículo ya está en uso en la empresa de destino.'
+      default:
+        return 'La solicitud cambió o ya fue procesada. Actualiza la revisión antes de continuar.'
+    }
+  }
+  return error?.message || 'No se pudo confirmar la entrega.'
 }
 
 export function conflictoDeDependencias(error) {
