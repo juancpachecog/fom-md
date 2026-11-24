@@ -607,6 +607,9 @@ Object.assign(api, {
   transferenciaDeVehiculo: (id) => pedir(`${CONSOLA}/vehicle-transfers/${encodeURIComponent(id)}`),
   inventarioDeEntrega: (id) =>
     pedir(`${CONSOLA}/vehicle-transfers/${encodeURIComponent(id)}/handover-preview`),
+  planEntregaVehiculo: (id) => pedir(`${CONSOLA}/vehicle-transfers/${encodeURIComponent(id)}/handover-plan`),
+  guardarPlanEntregaVehiculo: (id, cuerpo, idempotencia) =>
+    pedir(`${CONSOLA}/vehicle-transfers/${encodeURIComponent(id)}/handover-plan`, { metodo: 'POST', cuerpo, idempotente: true, idempotencia }),
   crearTransferenciaDeVehiculo: (cuerpo) =>
     pedir(`${CONSOLA}/vehicle-transfers`, { metodo: 'POST', cuerpo, idempotente: true }),
   decidirTransferenciaDeVehiculo: (id, paso, cuerpo, idempotencia) =>

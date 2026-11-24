@@ -2234,6 +2234,12 @@ Object.assign(repoApi, {
     vehiculo: {
       placas: (filas) => placasDeTransferencias(filas, api.vehiculo),
       inventarioEntrega: (t) => api.inventarioDeEntrega(t.id),
+      async planEntrega(t) {
+        const respuesta = await api.planEntregaVehiculo(t.id)
+        if (!respuesta || !Object.hasOwn(respuesta, 'plan')) throw Error('No se pudo consultar la selección de entrega.')
+        return respuesta.plan
+      },
+      guardarPlanEntrega: (t, opciones, clave) => api.guardarPlanEntregaVehiculo(t.id, opciones, clave),
       async detalle(id) {
         const r = await api.transferenciaDeVehiculo(id)
         if (r?.transfer?.id !== id) throw Error('No se pudo confirmar el estado de la solicitud.')

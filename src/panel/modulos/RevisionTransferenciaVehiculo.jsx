@@ -1,32 +1,28 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cargando, Modal, Tag } from '../comp/ui'
+import { Cargando, Modal } from '../comp/ui'
 import { entrarEmpresa } from '../auth'
 import { claveIdempotente } from '../datos/api'
 import repo from '../datos/repo'
 import { dependenciasConfirmadas, dependenciasDeTransferencia, explicarAceptacion } from '../datos/transferenciasVehiculos'
 import { useDatos } from '../useDatos'
+import OpcionesEntregaVehiculo, { haySeleccionEntrega, ResumenSeleccionEntrega } from './OpcionesEntregaVehiculo'
 
-const categorias = [
-  ['documents', 'Documentos'],
-  ['inspections', 'Inspecciones'],
-  ['workOrders', 'Órdenes de trabajo'],
-  ['maintenancePlans', 'Planes de mantenimiento'],
-  ['expenses', 'Gastos del vehículo'],
-  ['hasPositionHistory', 'Recorridos'],
-]
+const sinSeleccion = { categories: [], gps: null, driver: null }
 
 export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, origen, destino, empresaOrigen, mostrarInventario, alCerrar, alCompletar }) {
   const navegar = useNavigate()
   const enCurso = useRef(false)
   const intento = useRef(null)
+  const intentoSeleccion = useRef(null)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
-  const [seleccion, setSeleccion] = useState([])
+  const [borrador, setBorrador] = useState(null)
   const vista = useDatos(async () => {
     const actual = await repo.transferencias.vehiculo.detalle(transferencia.id)
     if (actual.estado !== 'pending' || !actual.liberadaEn) return { revision, actual }
+    const plan = await repo.transferencias.vehiculo.planEntrega(actual)
     if (mostrarInventario) {
       const resumen = await repo.transferencias.vehiculo.inventarioEntrega(actual)
       if (resumen?.transferId !== actual.id || resumen.transferVersion !== actual.version || !resumen.originReleased) {
@@ -40,25 +36,70 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
         workOrders: inventario.openWorkOrders,
         emergencies: operations.unresolvedEmergencies,
       }
-      return { revision, actual, conteos, inventario, placa: resumen.plate }
+      return { revision, actual, conteos, inventario, operaciones: operations, plan, placa: resumen.plate }
     }
     try {
       const conteos = await repo.transferencias.vehiculo.dependencias(actual)
-      return { revision, actual, conteos }
+      return { revision, actual, conteos, plan }
     } catch (e) {
-      if (e.estado === 403 || e.estado === 404) return { revision, actual, sinAcceso: true }
+      if (e.estado === 403 || e.estado === 404) return { revision, actual, plan, sinAcceso: true }
       throw e
     }
   }, [transferencia.id, revision, mostrarInventario])
   const datos = vista.estado === 'ok' && vista.datos?.revision === revision ? vista.datos : null
   const actual = datos?.actual
   const pendientes = dependenciasDeTransferencia(datos?.conteos)
+  const operaciones = datos?.operaciones
+  const opciones = borrador?.opciones ?? datos?.plan ?? sinSeleccion
+  const revisionGuardada = datos?.plan?.revision ?? 0
   const tieneConteos = dependenciasConfirmadas(datos?.conteos)
   const siguePendiente = actual?.estado === 'pending' && actual.liberadaEn && !actual.aceptadaEn
-  const permiteAceptar = siguePendiente && !pendientes.length && !seleccion.length && (tieneConteos || datos?.sinAcceso)
+  const necesitaEntregaCoordinada = haySeleccionEntrega(datos?.plan)
+  const borradorVigente = borrador?.version === actual?.version && borrador?.revision === revisionGuardada
+  const gps = operaciones?.gpsInstallations ? opciones.gps : null
+  const driver = operaciones?.driverAssignments ? opciones.driver : null
+  const opcionesValidas = (!operaciones?.gpsInstallations || gps) && (!operaciones?.driverAssignments || driver)
+    && (gps !== 'continue' || operaciones.gpsInstallationsWithRecentQualifiedPosition === operaciones.gpsInstallations)
+    && (driver !== 'continue_principal' || operaciones.principalDriverEligible)
+    && opciones.categories.every(category => datos?.inventario?.[category])
+  const permiteGuardar = siguePendiente && borrador && borradorVigente && operaciones && opcionesValidas
+  const permiteAceptar = siguePendiente && !pendientes.length && !borrador && !necesitaEntregaCoordinada && (tieneConteos || datos?.sinAcceso)
 
   const actualizar = () => setRevision(valor => valor + 1)
   const cerrar = () => { if (!enCurso.current) alCerrar() }
+
+  function editarOpciones(cambios) {
+    setBorrador(previo => ({
+      version: previo?.version ?? actual.version,
+      revision: previo?.revision ?? revisionGuardada,
+      opciones: { ...(previo?.opciones ?? datos.plan ?? sinSeleccion), ...cambios },
+    }))
+  }
+
+  async function guardarOpciones() {
+    if (!permiteGuardar || enCurso.current) return
+    enCurso.current = true
+    setOcupado(true)
+    setError('')
+    const payload = {
+      expectedVersion: borrador.version, expectedPlanRevision: borrador.revision,
+      categories: [...opciones.categories].sort(), gps, driver,
+    }
+    const huella = JSON.stringify(payload)
+    if (intentoSeleccion.current?.huella !== huella) intentoSeleccion.current = { huella, clave: claveIdempotente() }
+    try {
+      const respuesta = await repo.transferencias.vehiculo.guardarPlanEntrega(actual, payload, intentoSeleccion.current.clave)
+      if (respuesta?.plan?.revision !== borrador.revision + 1) throw Error('La selección guardada requiere verificación.')
+      setBorrador(null)
+      intentoSeleccion.current = null
+    } catch (e) {
+      setError(e.estado >= 400 && e.estado < 500 ? e.message : 'La respuesta no confirmó la selección. Se está consultando el registro guardado.')
+    } finally {
+      actualizar()
+      enCurso.current = false
+      setOcupado(false)
+    }
+  }
 
   async function abrirExpediente(vistaOrigen) {
     if (!empresaOrigen || enCurso.current) return
@@ -111,35 +152,20 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
       {actual?.estado === 'pending' && !actual.liberadaEn && <p role="status">Falta que {origen} libere el vehículo.</p>}
       {siguePendiente && <>
         <p>Vehículo liberado en {origen}. Falta la aceptación de {destino}.</p>
-        {datos.inventario && <fieldset className="pnl-entrega-categorias">
-          <legend>Información para entregar</legend>
-          <div className="pnl-filas pnl-entrega-opciones">
-            {categorias.map(([clave, nombre]) => {
-              const cantidad = datos.inventario[clave]
-              const marcada = seleccion.includes(clave)
-              return <label className="pnl-fila" key={clave}>
-                <input type="checkbox" checked={marcada} disabled={ocupado || (!cantidad && !marcada)} onChange={e => {
-                  const activa = e.target.checked
-                  setSeleccion(previa => activa ? [...previa, clave] : previa.filter(item => item !== clave))
-                }} />
-                <span className="pnl-fila-txt">{nombre}</span>
-                <Tag color="gris">{typeof cantidad === 'boolean' ? cantidad ? 'Disponible' : 'Sin registros' : cantidad}</Tag>
-              </label>
-            })}
-          </div>
-          <p role="status">{seleccion.length
-            ? 'La entrega de las categorías seleccionadas aún está pendiente de habilitación.'
-            : `Con la selección vacía, los registros históricos quedan en ${origen} y el vehículo llega a ${destino} sin conductor.`}</p>
-        </fieldset>}
+        <ResumenSeleccionEntrega plan={datos.plan} />
+        {datos.inventario && <OpcionesEntregaVehiculo inventario={datos.inventario} operaciones={operaciones}
+          opciones={opciones} onChange={editarOpciones} ocupado={ocupado} />}
+        {borrador && !borradorVigente && <p role="status">La selección guardada cambió. Descarta los cambios locales para revisar la versión actual.</p>}
+        {necesitaEntregaCoordinada && <p role="status">Selección registrada. La aceptación con estos vínculos y registros está pendiente de habilitación.</p>}
         {pendientes.length > 0 && <div className="pnl-audit-detalle">
           <b>Pendientes en {origen}</b>
           <ul className="pnl-entrega-pendientes">
             {pendientes.map(({ clave, texto, accion, vista }) => <li key={clave}>
               <span>{texto}</span>
-              {empresaOrigen && <button type="button" className="pnl-btn sutil" disabled={ocupado} onClick={() => abrirExpediente(vista)}>{accion}</button>}
+              {empresaOrigen && (!operaciones || !['gpsInstallations', 'driverAssignments'].includes(clave)) && <button type="button" className="pnl-btn sutil" disabled={ocupado} onClick={() => abrirExpediente(vista)}>{accion}</button>}
             </li>)}
           </ul>
-          <p>Revisa cada operación en origen y vuelve a esta solicitud para actualizar su estado.</p>
+          {operaciones && <p>La selección de GPS y conductor se registra aquí. Las órdenes, jornadas y emergencias abiertas siguen sus propios requisitos de entrega.</p>}
         </div>}
         {tieneConteos && !pendientes.length && <p role="status">La consulta del origen no encontró operaciones activas. El servidor realizará la validación final al aceptar.</p>}
         {datos.sinAcceso && <p role="status">La revisión no pudo consultar el expediente del origen. El servidor comprobará los requisitos al aceptar.</p>}
@@ -149,8 +175,10 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
       {error && actual?.estado !== 'completed' && <p className="pnl-campo-error" role="alert">{error}</p>}
       <div className="pnl-entrega-acciones">
         <button className="pnl-btn sutil" type="button" disabled={ocupado} onClick={actual?.estado === 'completed' ? alCompletar : cerrar}>Volver</button>
+        {borrador && <button className="pnl-btn sutil" type="button" disabled={ocupado} onClick={() => { setBorrador(null); setError('') }}>Descartar edición</button>}
         {(!actual || siguePendiente) && <button className="pnl-btn sutil" type="button" disabled={ocupado || vista.estado === 'cargando'} onClick={() => { setError(''); actualizar() }}>Actualizar revisión</button>}
-        {siguePendiente && <button className="pnl-btn primario" type="submit" disabled={!permiteAceptar || ocupado}>{ocupado ? 'Comprobando…' : 'Aceptar en destino'}</button>}
+        {siguePendiente && borrador && <button className="pnl-btn primario" type="button" disabled={!permiteGuardar || ocupado} onClick={guardarOpciones}>Guardar selección</button>}
+        {siguePendiente && !borrador && <button className="pnl-btn primario" type="submit" disabled={!permiteAceptar || ocupado}>{ocupado ? 'Comprobando…' : 'Aceptar en destino'}</button>}
       </div>
     </form>
   </Modal>
