@@ -3,7 +3,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { build } from 'vite'
-import { coincideConPlaca, conflictoDeDependencias, dependenciasConfirmadas, dependenciasDeTransferencia, explicarAceptacion } from '../src/panel/datos/transferenciasVehiculos.js'
+import { coincideConPlaca, conflictoDeDependencias, dependenciasConfirmadas, dependenciasDeTransferencia, explicarAceptacion, sugerirContinuidadEntrega } from '../src/panel/datos/transferenciasVehiculos.js'
 
 // ============================================================
 // T-26: tres arreglos pequeños del panel
@@ -94,6 +94,21 @@ test('transferencias revisan la versión vigente y conservan la clave en un rein
     assert.deepEqual(mutaciones[repeticion - 1], [{ expectedVersion: 7 }, clave])
   }
   assert.match(explicarAceptacion({ estado: 409, message: 'Transfer conflicts with current vehicle state' }), /estado o historial/u)
+})
+
+test('transferencias proponen la continuidad de cada operación sin elegir desvinculaciones', () => {
+  const inventario = { openWorkOrders: 5, openOrdersLinkedToMaintenance: 0 }
+  const operaciones = { gpsInstallations: 1, gpsInstallationsWithRecentQualifiedPosition: 1, driverAssignments: 1, principalDriverEligible: true }
+  assert.deepEqual(sugerirContinuidadEntrega(inventario, operaciones), {
+    categories: [], gps: 'continue', driver: 'continue_principal', orders: 'continue',
+  })
+  assert.deepEqual(sugerirContinuidadEntrega(inventario, {
+    ...operaciones, gpsInstallationsWithRecentQualifiedPosition: 0, principalDriverEligible: false,
+  }), { categories: [], gps: null, driver: null, orders: 'continue' })
+  assert.equal(sugerirContinuidadEntrega({ ...inventario, openOrdersLinkedToMaintenance: 1 }, operaciones).orders, null)
+  assert.deepEqual(sugerirContinuidadEntrega(undefined, undefined), {
+    categories: [], gps: null, driver: null, orders: null,
+  })
 })
 
 test('inspecciones: sin conteos del servidor quedan en null, nunca en 0', async () => {

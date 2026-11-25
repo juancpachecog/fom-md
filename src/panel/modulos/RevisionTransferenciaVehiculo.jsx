@@ -4,11 +4,9 @@ import { Cargando, Modal } from '../comp/ui'
 import { entrarEmpresa } from '../auth'
 import { claveIdempotente } from '../datos/api'
 import repo from '../datos/repo'
-import { dependenciasConfirmadas, dependenciasDeTransferencia, explicarAceptacion } from '../datos/transferenciasVehiculos'
+import { dependenciasConfirmadas, dependenciasDeTransferencia, explicarAceptacion, sugerirContinuidadEntrega } from '../datos/transferenciasVehiculos'
 import { useDatos } from '../useDatos'
 import OpcionesEntregaVehiculo, { ResumenSeleccionEntrega } from './OpcionesEntregaVehiculo'
-
-const sinSeleccion = { categories: [], gps: null, driver: null, orders: null }
 
 export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, origen, destino, empresaOrigen, mostrarInventario, alCerrar, alCompletar }) {
   const navegar = useNavigate()
@@ -51,14 +49,18 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
   const actual = datos?.actual
   const pendientes = dependenciasDeTransferencia(datos?.conteos)
   const operaciones = datos?.operaciones
-  const opciones = borrador?.opciones ?? datos?.plan ?? sinSeleccion
-  const revisionGuardada = datos?.plan?.revision ?? 0
+  const plan = datos?.plan
+  const opcionesIniciales = plan ?? sugerirContinuidadEntrega(datos?.inventario, operaciones)
+  const opciones = borrador?.opciones ?? opcionesIniciales
+  const revisionVigente = { version: actual?.version, revision: plan?.revision ?? 0, snapshot: datos?.operationalSnapshot }
+  const hayPreseleccion = !plan && Boolean(opcionesIniciales.gps || opcionesIniciales.driver || opcionesIniciales.orders)
+  const seleccionPorGuardar = borrador ?? (hayPreseleccion ? revisionVigente : null)
   const tieneConteos = dependenciasConfirmadas(datos?.conteos)
   const siguePendiente = actual?.estado === 'pending' && actual.liberadaEn && !actual.aceptadaEn
   const bloqueosOperativos = pendientes.filter(item => ['driverSessions', 'emergencies'].includes(item.clave))
   const bloqueosMantenimiento = datos?.inventario?.openOrdersLinkedToMaintenance > 0
-  const borradorVigente = borrador?.version === actual?.version && borrador?.revision === revisionGuardada
-    && borrador?.snapshot === datos?.operationalSnapshot
+  const borradorVigente = !borrador || (borrador.version === revisionVigente.version && borrador.revision === revisionVigente.revision
+    && borrador.snapshot === revisionVigente.snapshot)
   const gps = operaciones?.gpsInstallations ? opciones.gps : null
   const driver = operaciones?.driverAssignments ? opciones.driver : null
   const orders = datos?.inventario?.openWorkOrders ? opciones.orders : null
@@ -67,8 +69,7 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
     && (gps !== 'continue' || operaciones.gpsInstallationsWithRecentQualifiedPosition === operaciones.gpsInstallations)
     && (driver !== 'continue_principal' || operaciones.principalDriverEligible)
     && !opciones.categories.length
-  const permiteGuardar = siguePendiente && borrador && borradorVigente && operaciones && opcionesValidas
-  const plan = datos?.plan
+  const permiteGuardar = siguePendiente && seleccionPorGuardar && borradorVigente && operaciones && opcionesValidas
   const coincideConPlan = plan && (!operaciones || (opcionesValidas && gps === plan.gps && driver === plan.driver && orders === plan.orders))
   const puedeAplicarPlan = coincideConPlan && plan.transferVersion === actual?.version && plan.operationalReviewCurrent
     && !plan.categories.length && !bloqueosOperativos.length && !bloqueosMantenimiento
@@ -81,10 +82,8 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
 
   function editarOpciones(cambios) {
     setBorrador(previo => ({
-      version: previo?.version ?? actual.version,
-      revision: previo?.revision ?? revisionGuardada,
-      snapshot: previo?.snapshot ?? datos.operationalSnapshot,
-      opciones: { ...(previo?.opciones ?? datos.plan ?? sinSeleccion), ...cambios },
+      ...(previo ?? revisionVigente),
+      opciones: { ...(previo?.opciones ?? opcionesIniciales), ...cambios },
     }))
   }
 
@@ -93,16 +92,17 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
     enCurso.current = true
     setOcupado(true)
     setError('')
+    const { version, revision: revisionSeleccion, snapshot } = seleccionPorGuardar
     const payload = {
-      expectedVersion: borrador.version, expectedPlanRevision: borrador.revision,
-      expectedOperationalSnapshot: borrador.snapshot,
+      expectedVersion: version, expectedPlanRevision: revisionSeleccion,
+      expectedOperationalSnapshot: snapshot,
       categories: [...opciones.categories].sort(), gps, driver, orders,
     }
     const huella = JSON.stringify(payload)
     if (intentoSeleccion.current?.huella !== huella) intentoSeleccion.current = { huella, clave: claveIdempotente() }
     try {
       const respuesta = await repo.transferencias.vehiculo.guardarPlanEntrega(actual, payload, intentoSeleccion.current.clave)
-      if (respuesta?.plan?.revision !== borrador.revision + 1) throw Error('La selección guardada requiere verificación.')
+      if (respuesta?.plan?.revision !== revisionSeleccion + 1) throw Error('La selección guardada requiere verificación.')
       setBorrador(null)
       intentoSeleccion.current = null
     } catch (e) {
@@ -192,7 +192,7 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
         <button className="pnl-btn sutil" type="button" disabled={ocupado} onClick={actual?.estado === 'completed' ? alCompletar : cerrar}>Volver</button>
         {borrador && <button className="pnl-btn sutil" type="button" disabled={ocupado} onClick={() => { setBorrador(null); setError('') }}>Descartar edición</button>}
         {(!actual || siguePendiente) && <button className="pnl-btn sutil" type="button" disabled={ocupado || vista.estado === 'cargando'} onClick={() => { setError(''); actualizar() }}>Actualizar revisión</button>}
-        {siguePendiente && borrador && <button className="pnl-btn primario" type="button" disabled={!permiteGuardar || ocupado} onClick={guardarOpciones}>Guardar selección</button>}
+        {siguePendiente && seleccionPorGuardar && <button className="pnl-btn primario" type="button" disabled={!permiteGuardar || ocupado} onClick={guardarOpciones}>Guardar selección</button>}
         {siguePendiente && operaciones && plan && !plan.operationalReviewCurrent && !borrador && <button className="pnl-btn sutil" type="button" disabled={ocupado} onClick={() => editarOpciones({})}>Revisar selección</button>}
         {permiteAceptar && <button className="pnl-btn primario" type="submit" disabled={ocupado}>{ocupado ? 'Comprobando…' : 'Aceptar en destino'}</button>}
       </div>
