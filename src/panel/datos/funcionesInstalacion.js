@@ -1,4 +1,5 @@
 import { pedir } from './api'
+import { numero } from './formato.js'
 
 const BASE = '/api/v1/console'
 const consultar = (url, options = {}) => pedir(url, { ...options, empresaContexto: null })
@@ -126,4 +127,39 @@ export function valorFuncion(observation, semanticKey) {
   }
   if (observation.valueKind === 'numeric') return observation.numericValue === null ? 'Sin dato' : String(observation.numericValue)
   return observation.enumValue ?? 'Sin dato'
+}
+
+const simbolosUnidad = {
+  percent: '%', degree: '°', celsius: ' °C', fahrenheit: ' °F', volt: ' V',
+  kilometer: ' km', meter: ' m', kph: ' km/h', rpm: ' rpm',
+}
+
+const calidadLectura = {
+  invalid: 'Lectura inválida', uncertain: 'Lectura incierta',
+  out_of_range: 'Fuera de rango', contradictory: 'Lectura contradictoria',
+}
+
+export function filasFuncionesGps(instalacionId, snapshot) {
+  if (!instalacionId || snapshot?.assignmentId !== instalacionId || snapshot.isCurrent !== true || !Array.isArray(snapshot.items)) return []
+  const funciones = snapshot.items.filter(item => item.selected === true && item.direction === 'observation'
+    && item.installationVersion === snapshot.installationVersion)
+  return funciones.map(item => {
+    const nombre = item.semanticKey === 'door.open' ? 'Puerta' : nombreFuncion(item.semanticKey)
+    const etiqueta = nombre === item.semanticKey ? nombre.replace(/[._-]+/gu, ' ').replace(/^./u, letra => letra.toUpperCase()) : nombre
+    const distinguirInstancia = item.instance > 1 || funciones.some(otra => otra !== item && otra.semanticKey === item.semanticKey)
+    const observacion = item.lastObservation?.historicalOnly ? null : item.lastObservation
+    const instante = observacion && (item.freshnessBasis === 'observed_at' ? observacion.observedAt : observacion.receivedAt)
+    let valor = 'Sin lectura'
+    if (observacion) {
+      if (observacion.quality !== 'valid') valor = calidadLectura[observacion.quality] ?? 'Lectura sin validar'
+      else if (observacion.valueKind === 'numeric') valor = Number.isFinite(observacion.numericValue)
+        ? `${numero(observacion.numericValue)}${simbolosUnidad[item.unit] ?? ''}` : 'Sin lectura'
+      else valor = valorFuncion(observacion, item.semanticKey)
+    }
+    return {
+      id: item.functionId, etiqueta: distinguirInstancia ? `${etiqueta} ${item.instance}` : etiqueta,
+      valor, instante: Number.isFinite(Date.parse(instante)) ? instante : null,
+      vigencia: item.freshness === 'stale' ? 'Lectura anterior' : item.freshness === 'unknown' ? 'Vigencia sin confirmar' : null,
+    }
+  })
 }
