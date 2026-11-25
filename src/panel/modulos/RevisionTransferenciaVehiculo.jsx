@@ -4,7 +4,7 @@ import { Cargando, Modal } from '../comp/ui'
 import { entrarEmpresa } from '../auth'
 import { claveIdempotente } from '../datos/api'
 import repo from '../datos/repo'
-import { dependenciasConfirmadas, dependenciasDeTransferencia, explicarAceptacion, sugerirContinuidadEntrega } from '../datos/transferenciasVehiculos'
+import { bloqueosGpsDeEntrega, dependenciasConfirmadas, dependenciasDeTransferencia, explicarAceptacion, sugerirContinuidadEntrega } from '../datos/transferenciasVehiculos'
 import { useDatos } from '../useDatos'
 import OpcionesEntregaVehiculo, { ResumenSeleccionEntrega } from './OpcionesEntregaVehiculo'
 
@@ -57,7 +57,9 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
   const seleccionPorGuardar = borrador ?? (hayPreseleccion ? revisionVigente : null)
   const tieneConteos = dependenciasConfirmadas(datos?.conteos)
   const siguePendiente = actual?.estado === 'pending' && actual.liberadaEn && !actual.aceptadaEn
-  const bloqueosOperativos = pendientes.filter(item => ['driverSessions', 'emergencies'].includes(item.clave))
+  const bloqueosGps = bloqueosGpsDeEntrega(operaciones?.gpsBlockers ?? plan?.gpsBlockers)
+  const bloqueosOperativos = [...pendientes.filter(item => ['driverSessions', 'emergencies'].includes(item.clave)), ...bloqueosGps]
+  const bloqueosEnRevision = operaciones || plan ? bloqueosOperativos : pendientes
   const bloqueosMantenimiento = datos?.inventario?.openOrdersLinkedToMaintenance > 0
   const borradorVigente = !borrador || (borrador.version === revisionVigente.version && borrador.revision === revisionVigente.revision
     && borrador.snapshot === revisionVigente.snapshot)
@@ -171,10 +173,10 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
         {borrador && !borradorVigente && <p role="status">La selección guardada cambió. Descarta los cambios locales para revisar la versión actual.</p>}
         {plan && !plan.operationalReviewCurrent && <p role="status">Cambiaron los vínculos o las órdenes. Revisa y vuelve a guardar la selección.</p>}
         {puedeAplicarPlan && <p role="status">La selección está lista. Al aceptar se aplicarán juntas las opciones guardadas.</p>}
-        {(!operaciones ? pendientes.length > 0 : bloqueosOperativos.length > 0 || bloqueosMantenimiento) && <div className="pnl-audit-detalle">
+        {(bloqueosEnRevision.length > 0 || bloqueosMantenimiento) && <div className="pnl-audit-detalle">
           <p role="status"><b>Aceptación bloqueada.</b> Hay operaciones activas en {origen}.</p>
           <ul className="pnl-entrega-pendientes">
-            {(operaciones ? bloqueosOperativos : pendientes).map(({ clave, texto, accion, vista }) => <li key={clave}>
+            {bloqueosEnRevision.map(({ clave, texto, accion, vista }) => <li key={clave}>
               <span>{texto}</span>
               {empresaOrigen && (!operaciones || !['gpsInstallations', 'driverAssignments'].includes(clave)) && <button type="button" className="pnl-btn sutil" disabled={ocupado} onClick={() => abrirExpediente(vista)}>{accion}</button>}
             </li>)}
@@ -182,9 +184,9 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
           {bloqueosMantenimiento && <p>Revisa las órdenes abiertas vinculadas a un plan de mantenimiento.</p>}
           <p>Actualiza la revisión para volver a consultar estos pendientes.</p>
         </div>}
-        {tieneConteos && !pendientes.length && <p role="status">La consulta del origen no encontró operaciones activas. El servidor realizará la validación final al aceptar.</p>}
-        {datos.sinAcceso && <p role="status">La revisión no pudo consultar el expediente del origen. El servidor comprobará los requisitos al aceptar.</p>}
-        {!tieneConteos && !datos.sinAcceso && !pendientes.length && <p role="status">La consulta de pendientes quedó incompleta. Actualiza la revisión.</p>}
+        {tieneConteos && !pendientes.length && !bloqueosGps.length && <p role="status">La consulta del origen no encontró operaciones activas. El servidor realizará la validación final al aceptar.</p>}
+        {datos.sinAcceso && !bloqueosGps.length && <p role="status">La revisión no pudo consultar el expediente del origen. El servidor comprobará los requisitos al aceptar.</p>}
+        {!tieneConteos && !datos.sinAcceso && !pendientes.length && !bloqueosGps.length && <p role="status">La consulta de pendientes quedó incompleta. Actualiza la revisión.</p>}
         <p>La aceptación cambia la custodia. Los registros anteriores conservan su empresa de origen.</p>
       </>}
       {error && actual?.estado !== 'completed' && <p className="pnl-campo-error" role="alert">{error}</p>}
