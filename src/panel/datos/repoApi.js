@@ -2264,11 +2264,12 @@ Object.assign(repoApi, {
         })
         return { id: r?.transfer?.id ?? null }
       },
-      async decidir(t, paso, motivo_, idempotencia) {
+      async decidir(t, paso, motivo_, idempotencia, planRevision) {
         const cierre = paso === 'rejection' || paso === 'cancellation'
         const r = await api.decidirTransferenciaDeVehiculo(t.id, paso, {
           expectedVersion: t.version,
           ...(cierre ? { reason: motivo(motivo_ || '', paso) } : {}),
+          ...(paso === 'destination-acceptance' && planRevision != null ? { expectedPlanRevision: planRevision } : {}),
         }, idempotencia)
         if (r?.transfer?.id !== t.id) throw Error('No se pudo confirmar el resultado de la solicitud.')
         return comoTransferencia(r.transfer)
