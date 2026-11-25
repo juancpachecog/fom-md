@@ -621,7 +621,7 @@ export default function ExpedienteVehiculo() {
                     <p className="fum-nota">{textoRecorridoHoy(vivo.hoy, vivo.unidad)}</p>
                   </Tarjeta>
                 ) : (
-                  <div className="pnl-expediente-hero"><Tarjeta titulo="Vehículo"><FichaUnidad unidad={v} conEnlace={false} /></Tarjeta><Tarjeta titulo="Recorrido del día" sinCuerpo><Mapa vehiculos={[v]} seleccionado={pinSeleccionado} alSeleccionar={setPinSeleccionado} recorrido={v.recorrido} alto="470px" ficha={false} /></Tarjeta></div>
+                  <div className="pnl-expediente-hero"><Tarjeta titulo="Vehículo"><FichaUnidad unidad={v} conEnlace={false} instalacionGpsId={v.id === id ? v.gps?.instalacionId : null} /></Tarjeta><Tarjeta titulo="Recorrido del día" sinCuerpo><Mapa vehiculos={[v]} seleccionado={pinSeleccionado} alSeleccionar={setPinSeleccionado} recorrido={v.recorrido} alto="470px" ficha={false} /></Tarjeta></div>
                 )}
                 <div className="eu-resumen-grid">
                   <ResumenDocumentos documentos={v.documentos} verTodo={() => irAParte('documentos')} />

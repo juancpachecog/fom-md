@@ -50,6 +50,7 @@ const firmaAnalisis = (a) => `${firmaPuntos(a.puntos)}|${a.viajes.length}|${a.pa
 
 export default function CentroControl() {
   const contexto = useSesion()
+  const empresaDetalle = contexto?.perfil?.empresaGestion?.id ?? contexto?.perfil?.empresaId
   const [q, setQ] = useState('')
   const [estadoMarcha, setEstadoMarcha] = useState('')
   const [areaId, setAreaId] = useState('')
@@ -78,10 +79,8 @@ export default function CentroControl() {
     metrica: seleccionado && repo.vehiculos.kmHoy ? await repo.vehiculos.kmHoy(seleccionado) : null,
   }), [seleccionado], 60000)
   const kmHoy = lecturaKmSeleccionado(kmDia, seleccionado)
-  // La ficha solo necesita de más el IMEI del equipo, que la flota no trae: se saca del inventario
-  // de equipos GPS (un solo pedido) al elegir la unidad. Antes se pedía el expediente entero (~8
-  // pedidos, todas las páginas de ODT). Lo vivo (posición, velocidad, señal) ya llega con la
-  // flota, y el trazo reciente con `cola`.
+  // La flota trae lo vivo. Sólo al elegir una unidad se consulta su montaje GPS
+  // desde el inventario y se usa para leer las funciones de esa instalación.
   const detalle = useDatos(
     () => (seleccionado
       ? repo.admin.gps.listar().then(async (equipos) => {
@@ -89,10 +88,11 @@ export default function CentroControl() {
           const e = candidatos.length === 1 ? candidatos[0] : null
           const ubicacionGps = e?.protocolo === 'meitrack-t399'
             ? await repo.admin.gps.telemetria(e.id, { limite: 1 }).then(r => r.ubicacion).catch(() => ({ state: 'unavailable' })) : null
-          return { id: seleccionado, ubicacionGps, gps: e ? { modelo: e.modelo ?? 'Equipo GPS', imei: e.imei, linea: e.linea, verificado: e.verificado, conectado: e.conectado } : null }
+          return { id: seleccionado, empresa: empresaDetalle, ubicacionGps, instalacionGpsId: e?.instalacionId ?? null,
+            gps: e ? { modelo: e.modelo ?? 'Equipo GPS', imei: e.imei, linea: e.linea, verificado: e.verificado, conectado: e.conectado } : null }
         })
       : Promise.resolve(null)),
-    [seleccionado], 30000
+    [seleccionado, empresaDetalle], 30000
   )
 
   // Sin pedir el recorrido: los últimos minutos de camino de la unidad elegida, para saber de
@@ -197,7 +197,8 @@ export default function CentroControl() {
   const incompleta = flota.estado === 'ok' && Boolean(datosFlota?.incompleta)
 
   const unidadLista = lista.find(v => v.id === seleccionado)
-  const unidadDetalle = detalle.datos?.id === seleccionado ? detalle.datos : null
+  const unidadDetalle = detalle.estado === 'ok' && detalle.datos?.id === seleccionado
+    && detalle.datos.empresa === empresaDetalle ? detalle.datos : null
   // La lista va encima: sus datos son de hace menos de 15 s; los del expediente, de cuando se eligió.
   const unidad = unidadLista ? { ...unidadDetalle, ...unidadLista, ubicacionGps: unidadDetalle?.ubicacionGps ?? unidadLista.ubicacionGps } : null
   const sinPunto = lista.filter(v => !Number.isFinite(v.lat) || !Number.isFinite(v.lng)).length
@@ -281,7 +282,7 @@ export default function CentroControl() {
         <ListaUnidades vehiculos={lista} seleccionado={seleccionado} alSeleccionar={elegirUnidad} />
       </aside>}
       {seleccionado && <aside className={`control-panel control-unit${enModo ? ' con-ruta' : ''}`} aria-label="Detalle de la unidad">
-        <FichaUnidad unidad={unidad} kmHoy={kmHoy} alCerrar={() => setSeleccionado(null)} alVerRecorrido={alternarRecorrido} viendoRecorrido={viendoRecorrido}
+        <FichaUnidad unidad={unidad} kmHoy={kmHoy} instalacionGpsId={unidadDetalle?.instalacionGpsId} alCerrar={() => setSeleccionado(null)} alVerRecorrido={alternarRecorrido} viendoRecorrido={viendoRecorrido}
           alVerManejo={alternarManejo} viendoManejo={viendoManejo} />
         {viendoManejo && <BloqueManejoBrusco m={manejo} />}
         {!enModo && colaPuntos.length > 1 && <p className="control-detail-note ruta-cola-nota" role="status">{colaInfo?.ampliada ? 'Línea punteada: su último trayecto (ahora está detenida).' : `Línea punteada: los últimos ${COLA_MIN} min de camino.`} Pulsa «Ver recorrido» para el día completo.</p>}

@@ -3,7 +3,15 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { build } from 'vite'
-import { coincideConPlaca, conflictoDeDependencias, dependenciasConfirmadas, dependenciasDeTransferencia, explicarAceptacion, sugerirContinuidadEntrega } from '../src/panel/datos/transferenciasVehiculos.js'
+import { bloqueosGpsDeEntrega, coincideConPlaca, conflictoDeDependencias, dependenciasConfirmadas, dependenciasDeTransferencia, explicarAceptacion, sugerirContinuidadEntrega } from '../src/panel/datos/transferenciasVehiculos.js'
+
+test('la revisión distingue las pruebas GPS vigentes de los comandos pendientes', () => {
+  assert.deepEqual(bloqueosGpsDeEntrega(undefined), [])
+  assert.deepEqual(bloqueosGpsDeEntrega({ tests: 0, commands: 0 }), [])
+  assert.deepEqual(bloqueosGpsDeEntrega({ tests: 1, commands: 2 }).map(({ texto }) => texto), [
+    '1 prueba de GPS vigente', '2 comandos de GPS pendientes',
+  ])
+})
 
 // ============================================================
 // T-26: tres arreglos pequeños del panel

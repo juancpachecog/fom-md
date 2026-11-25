@@ -4,11 +4,13 @@ import { Icono } from '../Iconos'
 import { estadoUnidad } from '../datos/estadoUnidad'
 import { conSenalAlDia, textoSinSenal, textoUltimoReporte, useMinuto } from '../datos/sinSenal'
 import FotoUnidad from './FotoUnidad'
+import FuncionesGpsUnidad from './FuncionesGpsUnidad'
 import { KmHoy } from './KmHoy'
 import { PastillaConductor } from './ManejoConductor'
 import { useSesion } from '../useSesion'
 import { esGestor } from '../roles'
 import { locationStatus } from '../meitrack/location-status.js'
+import { CONECTADO } from '../datos/repo'
 import '../../styles/fleet-map.css'
 export { estadoUnidad } from '../datos/estadoUnidad'
 
@@ -38,8 +40,10 @@ function datosDe(v) {
   return filas.filter(([, valor]) => valor != null && valor !== '')
 }
 
-export default function FichaUnidad({ unidad, kmHoy, variante = 'panel', conCabecera = true, alCerrar, conEnlace = true, alVerRecorrido, viendoRecorrido = false, alVerManejo, viendoManejo = false, children }) {
-  const puedeEditar = esGestor(useSesion()?.perfil)
+export default function FichaUnidad({ unidad, kmHoy, instalacionGpsId, variante = 'panel', conCabecera = true, alCerrar, conEnlace = true, alVerRecorrido, viendoRecorrido = false, alVerManejo, viendoManejo = false, children }) {
+  const perfil = useSesion()?.perfil
+  const puedeEditar = esGestor(perfil)
+  const empresa = perfil?.empresaGestion?.id ?? perfil?.empresaId
   // Con la ficha abierta, «hace 12 min» avanza solo cada minuto y la unidad pasa sola a
   // «Sin señal» a los 5 min sin reportar, sin esperar otra lectura del servidor.
   const ahora = useMinuto()
@@ -71,6 +75,8 @@ export default function FichaUnidad({ unidad, kmHoy, variante = 'panel', conCabe
     {ubicacionGps && !ubicacionGps.available && <div role="status" className="fleet-status-nota"><strong>{ubicacionGps.title}</strong><p>{ubicacionGps.detail}</p></div>}
     <div className="fleet-plate-dia"><h3 className="fleet-plate">{v.placa || 'Sin placa'}</h3>{kmHoy && <KmHoy lectura={kmHoy}/>}</div>
     {descripcion && <p className="fleet-description">{descripcion}</p>}
+    {CONECTADO && puedeEditar && empresa && instalacionGpsId && <FuncionesGpsUnidad
+      key={`${perfil.id}:${empresa}:${v.id}:${instalacionGpsId}`} instalacionId={instalacionGpsId} />}
     <FotoUnidad key={v.id} unidad={v} puedeEditar={puedeEditar} />
     <div className="fleet-speed"><Icono nombre="velocidad" tam={25} /><strong>{v.velocidadKmh == null ? 'Sin velocidad GPS' : f.numero(v.velocidadKmh)}{v.velocidadKmh != null && <small> km/h</small>}</strong></div>
     <dl className="fleet-facts">{filas.map(([icono, etiqueta, valor]) => <div key={etiqueta}><Icono nombre={icono} tam={19} /><div><dt>{etiqueta}</dt><dd>{valor}</dd></div></div>)}</dl>

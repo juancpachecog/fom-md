@@ -8,13 +8,26 @@ const etiquetas = [
   ['emergencies', 'emergencia pendiente', 'emergencias pendientes', 'Revisar expediente', 'resumen'],
 ]
 
-export function dependenciasDeTransferencia(bloqueos) {
-  return etiquetas.flatMap(([clave, singular, plural, accion, vista]) => {
+const etiquetasGps = [
+  ['tests', 'prueba de GPS vigente', 'pruebas de GPS vigentes', 'Revisar telemetría', 'telemetria'],
+  ['commands', 'comando de GPS pendiente', 'comandos de GPS pendientes', 'Revisar telemetría', 'telemetria'],
+]
+
+function mostrarDependencias(bloqueos, nombres) {
+  return nombres.flatMap(([clave, singular, plural, accion, vista]) => {
     const cantidad = bloqueos?.[clave]
     return Number.isSafeInteger(cantidad) && cantidad > 0
       ? [{ clave, texto: `${cantidad} ${cantidad === 1 ? singular : plural}`, accion, vista }]
       : []
   })
+}
+
+export function dependenciasDeTransferencia(bloqueos) {
+  return mostrarDependencias(bloqueos, etiquetas)
+}
+
+export function bloqueosGpsDeEntrega(bloqueos) {
+  return mostrarDependencias(bloqueos, etiquetasGps)
 }
 
 export function dependenciasConfirmadas(bloqueos) {
