@@ -30,6 +30,7 @@ import { buscarEquipoGps, empresaDeInstalacion, empresaPropia, equiposParaNuevaU
 import { empresaDeReinicio, mensajeReiniciarClave } from './reiniciarClave'
 import { crearUnidad, gpsDisponible } from './altaUnidad'
 import { placaMayuscula } from './placas'
+import { placasDeTransferencias } from './transferenciasVehiculos'
 import { cambiarCompanias, relacionesDeContratista } from './companiasEmpresa'
 import { LIMITE_EVENTOS, comoEventoManejo, diasServidor } from './eventosManejo'
 import { cloudinaryConfigurado, subirImagen } from './cloudinary'
@@ -49,7 +50,7 @@ function comoUnidad(v) {
   return {
     id: v.id,
     vehiculoId: v.id,
-    codigo: v.code?.toLowerCase(),
+    codigo: v.code,
     vin: v.vin ?? null,
     empresaId: null,
 
@@ -2231,6 +2232,17 @@ Object.assign(repoApi, {
       },
     },
     vehiculo: {
+      placas: (filas) => placasDeTransferencias(filas, api.vehiculo),
+      async detalle(id) {
+        const r = await api.transferenciaDeVehiculo(id)
+        if (r?.transfer?.id !== id) throw Error('No se pudo confirmar el estado de la solicitud.')
+        return comoTransferencia(r.transfer)
+      },
+      async dependencias(t) {
+        const r = await api.preflightArchivoVehiculo(t.vehiculoId, t.origenId)
+        if (r?.vehicleId !== t.vehiculoId || !r.blockers) throw Error('No se pudieron confirmar las dependencias.')
+        return r.blockers
+      },
       async listar({ estado = '' } = {}) {
         const r = await api.transferenciasDeVehiculo({ status: estado })
         return (r?.items ?? []).map(comoTransferencia)
@@ -2245,13 +2257,14 @@ Object.assign(repoApi, {
         })
         return { id: r?.transfer?.id ?? null }
       },
-      async decidir(t, paso, motivo_) {
+      async decidir(t, paso, motivo_, idempotencia) {
         const cierre = paso === 'rejection' || paso === 'cancellation'
-        await api.decidirTransferenciaDeVehiculo(t.id, paso, {
+        const r = await api.decidirTransferenciaDeVehiculo(t.id, paso, {
           expectedVersion: t.version,
           ...(cierre ? { reason: motivo(motivo_ || '', paso) } : {}),
-        })
-        return true
+        }, idempotencia)
+        if (r?.transfer?.id !== t.id) throw Error('No se pudo confirmar el resultado de la solicitud.')
+        return comoTransferencia(r.transfer)
       },
     },
   },
