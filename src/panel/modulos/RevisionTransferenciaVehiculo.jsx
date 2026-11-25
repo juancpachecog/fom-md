@@ -87,14 +87,14 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
       {siguePendiente && <>
         <p>Vehículo liberado en {origen}. Falta la aceptación de {destino}.</p>
         {pendientes.length > 0 && <div className="pnl-audit-detalle">
-          <b>Pendientes en {origen}</b>
+          <p role="status"><b>Aceptación bloqueada.</b> Hay operaciones activas en {origen}.</p>
           <ul className="pnl-entrega-pendientes">
             {pendientes.map(({ clave, texto, accion, vista }) => <li key={clave}>
               <span>{texto}</span>
               {empresaOrigen && <button type="button" className="pnl-btn sutil" disabled={ocupado} onClick={() => abrirExpediente(vista)}>{accion}</button>}
             </li>)}
           </ul>
-          <p>Revisa cada operación en origen y vuelve a esta solicitud para actualizar su estado.</p>
+          <p>Actualiza la revisión para volver a consultar estos pendientes.</p>
         </div>}
         {tieneConteos && !pendientes.length && <p role="status">La consulta del origen no encontró operaciones activas. El servidor realizará la validación final al aceptar.</p>}
         {datos.sinAcceso && <p role="status">La revisión no pudo consultar el expediente del origen. El servidor comprobará los requisitos al aceptar.</p>}
@@ -105,7 +105,7 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
       <div className="pnl-entrega-acciones">
         <button className="pnl-btn sutil" type="button" disabled={ocupado} onClick={actual?.estado === 'completed' ? alCompletar : cerrar}>Volver</button>
         {(!actual || siguePendiente) && <button className="pnl-btn sutil" type="button" disabled={ocupado || vista.estado === 'cargando'} onClick={() => { setError(''); actualizar() }}>Actualizar revisión</button>}
-        {siguePendiente && <button className="pnl-btn primario" type="submit" disabled={!permiteAceptar || ocupado}>{ocupado ? 'Comprobando…' : 'Aceptar en destino'}</button>}
+        {permiteAceptar && <button className="pnl-btn primario" type="submit" disabled={ocupado}>{ocupado ? 'Comprobando…' : 'Aceptar en destino'}</button>}
       </div>
     </form>
   </Modal>
