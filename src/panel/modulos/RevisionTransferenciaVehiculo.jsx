@@ -158,14 +158,16 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
         {borrador && !borradorVigente && <p role="status">La selección guardada cambió. Descarta los cambios locales para revisar la versión actual.</p>}
         {necesitaEntregaCoordinada && <p role="status">Selección registrada. La aceptación con estos vínculos y registros está pendiente de habilitación.</p>}
         {pendientes.length > 0 && <div className="pnl-audit-detalle">
-          <b>Pendientes en {origen}</b>
+          <p role="status"><b>Aceptación bloqueada.</b> Hay operaciones activas en {origen}.</p>
           <ul className="pnl-entrega-pendientes">
             {pendientes.map(({ clave, texto, accion, vista }) => <li key={clave}>
               <span>{texto}</span>
               {empresaOrigen && (!operaciones || !['gpsInstallations', 'driverAssignments'].includes(clave)) && <button type="button" className="pnl-btn sutil" disabled={ocupado} onClick={() => abrirExpediente(vista)}>{accion}</button>}
             </li>)}
           </ul>
-          {operaciones && <p>La selección de GPS y conductor se registra aquí. Las órdenes, jornadas y emergencias abiertas siguen sus propios requisitos de entrega.</p>}
+          <p>{operaciones
+            ? 'La selección de GPS y conductor se registra aquí. Las órdenes, jornadas y emergencias abiertas siguen sus propios requisitos de entrega.'
+            : 'Actualiza la revisión para volver a consultar estos pendientes.'}</p>
         </div>}
         {tieneConteos && !pendientes.length && <p role="status">La consulta del origen no encontró operaciones activas. El servidor realizará la validación final al aceptar.</p>}
         {datos.sinAcceso && <p role="status">La revisión no pudo consultar el expediente del origen. El servidor comprobará los requisitos al aceptar.</p>}
@@ -178,7 +180,7 @@ export default function RevisionTransferenciaVehiculo({ transferencia, rotulo, o
         {borrador && <button className="pnl-btn sutil" type="button" disabled={ocupado} onClick={() => { setBorrador(null); setError('') }}>Descartar edición</button>}
         {(!actual || siguePendiente) && <button className="pnl-btn sutil" type="button" disabled={ocupado || vista.estado === 'cargando'} onClick={() => { setError(''); actualizar() }}>Actualizar revisión</button>}
         {siguePendiente && borrador && <button className="pnl-btn primario" type="button" disabled={!permiteGuardar || ocupado} onClick={guardarOpciones}>Guardar selección</button>}
-        {siguePendiente && !borrador && <button className="pnl-btn primario" type="submit" disabled={!permiteAceptar || ocupado}>{ocupado ? 'Comprobando…' : 'Aceptar en destino'}</button>}
+        {permiteAceptar && <button className="pnl-btn primario" type="submit" disabled={ocupado}>{ocupado ? 'Comprobando…' : 'Aceptar en destino'}</button>}
       </div>
     </form>
   </Modal>
