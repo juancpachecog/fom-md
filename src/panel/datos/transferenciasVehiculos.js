@@ -21,6 +21,16 @@ export function dependenciasConfirmadas(bloqueos) {
   return etiquetas.every(([clave]) => Number.isSafeInteger(bloqueos?.[clave]) && bloqueos[clave] >= 0)
 }
 
+export function sugerirContinuidadEntrega(inventario, operaciones) {
+  return {
+    categories: [],
+    gps: operaciones?.gpsInstallations > 0
+      && operaciones.gpsInstallationsWithRecentQualifiedPosition === operaciones.gpsInstallations ? 'continue' : null,
+    driver: operaciones?.driverAssignments > 0 && operaciones.principalDriverEligible ? 'continue_principal' : null,
+    orders: inventario?.openWorkOrders > 0 && inventario.openOrdersLinkedToMaintenance === 0 ? 'continue' : null,
+  }
+}
+
 export function explicarAceptacion(error) {
   if (conflictoDeDependencias(error)) return 'El origen todavía tiene operaciones activas. Actualiza la revisión para ver los pendientes.'
   if (error?.estado === 409) {

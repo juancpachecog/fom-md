@@ -228,6 +228,7 @@ export default function Transferencias() {
         origen={nombreEmpresa(entrega.origenId)}
         destino={nombreEmpresa(entrega.destinoId)}
         empresaOrigen={esAdminFom(actor) && empresas.datos?.find(e => e.id === entrega.origenId)}
+        mostrarInventario={esAdminFom(actor)}
         alCerrar={() => { setEntrega(null); lista.recargar() }}
         alCompletar={() => { setEntrega(null); setAviso('Transferencia completada.'); lista.recargar() }}
       />}
