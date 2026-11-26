@@ -311,6 +311,7 @@ function MapaEmpresa({ perfil, empresaDetalle, admin, abrirSelector, selectorAbi
 }
 
 const esSinSenal = (v) => estadoUnidad(v).clave === 'sin_senal'
+const clasePunto = { verde: 'on', ambar: 'idle', gris: 'off' }
 
 function ListaUnidades({ vehiculos, seleccionado, alSeleccionar }) {
   // Cada minuto se rehace el «hace …» y el orden de las calladas, sin pedir nada al servidor.
@@ -320,7 +321,6 @@ function ListaUnidades({ vehiculos, seleccionado, alSeleccionar }) {
     <div className="pnl-filas">
       {filas.map((v) => {
         const estado = estadoUnidad(v)
-        const viva = estado.color === 'verde'
         const abierta = seleccionado === v.id
         const alternar = () => alSeleccionar(abierta ? null : v.id)
         return (
@@ -338,7 +338,7 @@ function ListaUnidades({ vehiculos, seleccionado, alSeleccionar }) {
               }
             }}
           >
-            <i className={`pnl-punto ${viva ? 'on' : 'off'}`} />
+            <i className={`pnl-punto ${clasePunto[estado.color]}`} role="img" aria-label={estado.texto} />
             <div className="pnl-fila-txt">
               <b>{v.alias}</b>
               <span>
