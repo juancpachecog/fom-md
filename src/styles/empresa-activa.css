@@ -7,6 +7,11 @@
 .pnl .control-titulo-empresa { display:flex; align-items:center; gap:12px; min-width:0; }
 .pnl .control-titulo-empresa h1 { flex-shrink:0; }
 .pnl .control-titulo-empresa .pnl-empresa-activa { max-width:22vw; }
+.pnl .pnl-empresa-cambiar { grid-template-columns:minmax(0,1fr) auto; column-gap:9px; min-height:44px; color:var(--e-texto-2); cursor:pointer; }
+.pnl .pnl-empresa-cambiar small, .pnl .pnl-empresa-cambiar b { grid-column:1; }
+.pnl .pnl-empresa-cambiar::after { content:""; grid-column:2; grid-row:1 / span 2; align-self:center; width:6px; height:6px; border:solid currentColor; border-width:0 1.5px 1.5px 0; transform:rotate(45deg); }
+.pnl .pnl-empresa-cambiar:hover, .pnl .pnl-empresa-cambiar[aria-expanded="true"] { border-color:var(--e-primario); background:var(--e-sup); }
+.pnl .pnl-empresa-cambiar:focus-visible { outline:2px solid var(--e-foco,var(--e-primario)); outline-offset:2px; }
 .pnl .mv-empresa-activa { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--app-texto-2,#b7c7d9); font-size:11px; }
 @media(max-width:1100px) and (min-width:768px) {
   .pnl .control-titulo-empresa { gap:7px; }
@@ -14,4 +19,11 @@
   .pnl .control-titulo-empresa .pnl-empresa-activa { max-width:18vw; padding:4px 7px; }
   .pnl .control-titulo-empresa .pnl-empresa-activa b { font-size:11px; }
 }
-@media(max-width:767px) { .pnl .control-titulo-empresa .pnl-empresa-activa { display:none; } }
+@media(max-width:767px) {
+  .pnl .control-titulo-empresa { gap:7px; }
+  .pnl .control-titulo-empresa .pnl-empresa-activa:not(.pnl-empresa-cambiar) { display:none; }
+  .pnl .control-titulo-empresa .pnl-empresa-cambiar { max-width:32vw; min-width:76px; padding:4px 7px; column-gap:5px; }
+  .pnl .control-titulo-empresa .pnl-empresa-cambiar small, .pnl .control-titulo-empresa .pnl-empresa-cambiar b { font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pnl .control-search-heading > div:first-child { min-width:0; }
+  .pnl .control-titulo-empresa:has(.pnl-empresa-cambiar) h1 { flex-shrink:1; }
+}

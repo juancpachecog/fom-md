@@ -33,6 +33,27 @@ test('puerta, ACC y giro muestran estados distintos sin convertir ausencia o con
  assert.equal(api.nombreFuncion('engine.rpm'),'Régimen del motor (RPM)')
 })
 
+test('el Coban de inventario antiguo ofrece ACC y puerta del perfil sin asignar entradas ni pisar mapeos', () => {
+ const family = api.familiaFunciones('coban gps103')
+ const coban = { profileId: 'coban-gps103.observed', profileVersion: 2, resources: profile.resources,
+  nativeChannels: [
+   { channel: 'device.acc_reported', semanticKey: 'ignition.acc', definitionVersion: 1 },
+   { channel: 'device.door_open_reported', semanticKey: 'door.open', definitionVersion: 1 },
+  ],
+  functions: ['door.open', 'ignition.acc', 'input.digital.active', 'engine.running']
+   .map(semanticKey => ({ ...fn, semanticKey, interpretationSupport: semanticKey === 'engine.running' ? 'not_implemented' : 'implemented' })),
+ }
+ const extended = { profileId: 'coban.ascii.extended19', profileVersion: 1 }
+ assert.equal(api.perfilInicialFunciones([extended, coban], {}, family, { ...coban, profileVersion: 1 }), coban)
+ assert.equal(api.perfilInicialFunciones([extended, coban], {}, family, extended), extended)
+ assert.equal(api.perfilInicialFunciones([extended, coban], coban, family, extended), coban)
+ const rows = api.filasSugeridas(coban)
+ assert.deepEqual(rows.map(r => [r.mapping.semanticKey, r.mapping.source]), [
+  ['ignition.acc', 'native'], ['door.open', 'native'],
+ ])
+ assert.deepEqual(api.filasSugeridas(coban, [{ ...rows[0], selected: false }]), rows.slice(1))
+})
+
 test('configurar no certifica: PUT explícito, llave estable y lectura independiente de versión',async()=>{
  const old=globalThis.fetch,calls=[]
  const body={expectedVersion:0,profileId:'synthetic',profileVersion:1,functions:[]}

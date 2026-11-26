@@ -12,6 +12,7 @@
 // ============================================================
 import { aRutaPorEnte, SIN_RUTA_POR_ENTE } from './rutaPorEnte'
 import { placasEnRespuesta } from './placas'
+import { avisarComunicacion } from './eventosComunicacion'
 
 const BASE = (import.meta.env?.VITE_FOM_API || '').replace(/\/+$/, '')
 
@@ -150,14 +151,22 @@ async function pedirUnaVez(rutaPedida, { metodo = 'GET', cuerpo, señal, idempot
   } catch (error) {
     clearTimeout(tope)
     if (control.signal.reason === 'tope') {
+      if (!/\/auth\//u.test(ruta)) avisarComunicacion({ tipo: 'red' })
       throw new Error('El servidor tardó demasiado en responder. Revisa la conexión e inténtalo de nuevo.')
     }
     if (error.name === 'AbortError') throw error
+    if (!/\/auth\//u.test(ruta)) avisarComunicacion({ tipo: 'red' })
     throw new Error(traducir(0))
   }
 
-  clearTimeout(tope)
-  const texto = await respuesta.text()
+  let texto
+  try { texto = await respuesta.text() }
+  catch (error) {
+    if (error.name === 'AbortError' && control.signal.reason !== 'tope') throw error
+    if (!/\/auth\//u.test(ruta)) avisarComunicacion({ tipo: 'red' })
+    throw new Error(control.signal.reason === 'tope'
+      ? 'El servidor tardó demasiado en responder. Revisa la conexión e inténtalo de nuevo.' : traducir(0))
+  } finally { clearTimeout(tope) }
   let datos = null
   if (texto) {
     try {
@@ -168,6 +177,8 @@ async function pedirUnaVez(rutaPedida, { metodo = 'GET', cuerpo, señal, idempot
   }
 
   if (!respuesta.ok) {
+    if (!/\/auth\//u.test(ruta) && (respuesta.status === 401 || respuesta.status >= 500))
+      avisarComunicacion({ tipo: respuesta.status === 401 ? 'sesion' : 'servidor', estado: respuesta.status })
     // El estado viaja pegado al error: un 401 en el LOGIN significa «clave
     // incorrecta», y el mismo 401 en cualquier otra ruta significa «sesion
     // caida». Sin el numero, quien llama no puede distinguirlos y termina
@@ -206,7 +217,7 @@ export const api = {
   // acceso de la app móvil.
   entrar: (email, password) =>
     pedir(`${CONSOLA}/auth/login`, { metodo: 'POST', cuerpo: { email, password } }),
-  sesion: () => pedir(`${CONSOLA}/auth/session`),
+  sesion: (opciones = {}) => pedir(`${CONSOLA}/auth/session`, opciones),
   salir: () => pedir(`${CONSOLA}/auth/logout`, { metodo: 'POST' }),
   cambiarClaveInicial: (currentPassword, newPassword) =>
     pedir(`${CONSOLA}/auth/password`, {
@@ -461,7 +472,9 @@ export const api = {
   },
 
   /** Ficha de un vehículo, con su última situación conocida. */
-  vehiculo: (vehiculoId) => pedir(`${CONSOLA}/vehicles/${vehiculoId}`),
+  vehiculo: (vehiculoId, enteId) => pedir(enteId
+    ? `${CONSOLA}/tenants/${encodeURIComponent(enteId)}/vehicles/${encodeURIComponent(vehiculoId)}`
+    : `${CONSOLA}/vehicles/${vehiculoId}`),
 
   /** Última posición válida del vehículo. */
   posicionDeVehiculo: (vehiculoId) =>
@@ -591,10 +604,16 @@ Object.assign(api, {
     pedir(`${CONSOLA}/identity-transfers/${id}/${paso}`, { metodo: 'POST', cuerpo, idempotente: true }),
   transferenciasDeVehiculo: ({ status, tenantId, limit = 100 } = {}) =>
     pedir(`${CONSOLA}/vehicle-transfers${consulta({ status, tenantId, limit })}`),
+  transferenciaDeVehiculo: (id) => pedir(`${CONSOLA}/vehicle-transfers/${encodeURIComponent(id)}`),
+  inventarioDeEntrega: (id) =>
+    pedir(`${CONSOLA}/vehicle-transfers/${encodeURIComponent(id)}/handover-preview`),
+  planEntregaVehiculo: (id) => pedir(`${CONSOLA}/vehicle-transfers/${encodeURIComponent(id)}/handover-plan`),
+  guardarPlanEntregaVehiculo: (id, cuerpo, idempotencia) =>
+    pedir(`${CONSOLA}/vehicle-transfers/${encodeURIComponent(id)}/handover-plan`, { metodo: 'POST', cuerpo, idempotente: true, idempotencia }),
   crearTransferenciaDeVehiculo: (cuerpo) =>
     pedir(`${CONSOLA}/vehicle-transfers`, { metodo: 'POST', cuerpo, idempotente: true }),
-  decidirTransferenciaDeVehiculo: (id, paso, cuerpo) =>
-    pedir(`${CONSOLA}/vehicle-transfers/${id}/${paso}`, { metodo: 'POST', cuerpo, idempotente: true }),
+  decidirTransferenciaDeVehiculo: (id, paso, cuerpo, idempotencia) =>
+    pedir(`${CONSOLA}/vehicle-transfers/${id}/${paso}`, { metodo: 'POST', cuerpo, idempotente: true, idempotencia }),
 
   // --- Lecturas de toda la plataforma (solo administrador FOM) -------------
   personasDePlataforma: ({ q, limit = 50, offset = 0 } = {}) =>
@@ -604,7 +623,9 @@ Object.assign(api, {
   auditoria: ({ entityType, action, limit = 200, offset = 0 } = {}) =>
     pedir(`${CONSOLA}/audit${consulta({ entityType, action, limit, offset })}`),
   /** Archivar una unidad: primero qué lo impide, luego el archivo con clave de idempotencia. */
-  preflightArchivoVehiculo: (vehicleId) => pedir(`${CONSOLA}/vehicles/${vehicleId}/archive-preflight`),
+  preflightArchivoVehiculo: (vehicleId, enteId) => pedir(enteId
+    ? `${CONSOLA}/tenants/${encodeURIComponent(enteId)}/vehicles/${encodeURIComponent(vehicleId)}/archive-preflight`
+    : `${CONSOLA}/vehicles/${vehicleId}/archive-preflight`),
   archivarVehiculo: (vehicleId, cuerpo) =>
     pedir(`${CONSOLA}/vehicles/${vehicleId}/archive`, { metodo: 'POST', cuerpo, idempotente: true }),
   /** Quién ejecuta la orden (aprobada → asignada, o reasignar). */

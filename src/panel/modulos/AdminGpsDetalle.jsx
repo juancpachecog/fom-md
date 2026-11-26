@@ -20,6 +20,7 @@ import { locationStatus } from '../meitrack/location-status.js'
 import FuncionesDetectadas from '../comp/FuncionesDetectadas'
 import {RevisionTramaRegistrada} from '../comp/RevisionTramaGps'
 import FuncionesInstalacion from './FuncionesInstalacion'
+import { familiaFunciones } from '../datos/funcionesInstalacion'
 import ComandosInstalacion from './ComandosInstalacion'
 import { useConfirmar } from '../comp/Confirmar'
 
@@ -44,7 +45,6 @@ export default function AdminGpsDetalle() {
   const [params, setParams] = useSearchParams()
   const pestana = pestanaEquipo(params.toString())
   const setPestana = value => setParams(previous => { const next = new URLSearchParams(previous); next.set('vista', value); return next }, { replace: true })
-  const [funcionesRevision,setFuncionesRevision] = useState(0)
   const [desmontando, setDesmontando] = useState(false)
   const [archivando, setArchivando] = useState(false)
   const sesion = useSesion()
@@ -110,8 +110,13 @@ export default function AdminGpsDetalle() {
         )}
         {pestana === 'historial' && <Historial g={g} posiciones={posiciones} />}
         {pestana === 'funciones' && <>
-          {g.protocolo === 'coban-gps103' && <section className="gp-card gp-col"><FuncionesDetectadas id={g.id} editar={sesion?.perfil?.rol === 'admin_fom'} assignmentId={g.instalacionId} alAplicar={() => setFuncionesRevision(n => n+1)} /></section>}
-          {g.instalacionId ? <FuncionesInstalacion key={`${g.instalacionId}-${funcionesRevision}`} assignmentId={g.instalacionId} protocolFamily={g.protocolo}/> : <p className="gp-hint">Puedes guardar la selección ahora y aplicarla después de instalar el GPS en un vehículo.</p>}
+          {g.instalacionId ? <FuncionesInstalacion key={g.instalacionId} assignmentId={g.instalacionId}
+            protocolFamily={familiaFunciones(g.protocolo)} deviceId={g.protocolo === 'coban-gps103' ? g.id : undefined}
+            preferencias={g.protocolo === 'coban-gps103' && sesion?.perfil?.rol === 'admin_fom'
+              ? <FuncionesDetectadas id={g.id} assignmentId={g.instalacionId} alAplicar={() => setAviso('Funciones guardadas.')} /> : null}/>
+            : familiaFunciones(g.protocolo) === 'coban-gps103' && <section className="gp-card gp-col">
+                <FuncionesDetectadas id={g.id} editar={sesion?.perfil?.rol === 'admin_fom'} detectar={g.protocolo === 'coban-gps103'}/>
+              </section>}
         </>}
         {pestana === 'comandos' && (g.instalacionId ? <ComandosInstalacion key={g.instalacionId} assignmentId={g.instalacionId}/> : <p>Instala el equipo en un vehículo para consultar sus comandos.</p>)}
       </div>

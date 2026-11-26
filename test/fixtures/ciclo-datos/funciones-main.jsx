@@ -3,9 +3,12 @@ import {createRoot} from 'react-dom/client'
 import {BrowserRouter} from 'react-router-dom'
 import FuncionesInstalacion from '../../../src/panel/modulos/FuncionesInstalacion.jsx'
 const assignment='11111111-1111-4111-8111-111111111111'
-const profile={profileId:'synthetic',profileVersion:1,manufacturer:'SINTÉTICO',model:'Ensayo',protocolFamily:'synthetic',
- nativeChannels:[{channel:'device.acc_reported',semanticKey:'ignition.acc',definitionVersion:1}],resources:[],
- functions:[{semanticKey:'ignition.acc',definitionVersion:1,valueKind:'boolean',unit:'none',maxInstances:1,direction:'observation',hardwareSupport:'unknown',interpretationSupport:'implemented',requirements:[]}]}
+import '../../../src/panel/modulos/admin-gps.css'
+const profile={profileId:'coban-gps103.observed',profileVersion:2,manufacturer:'Coban',model:'Ensayo GPS-403',protocolFamily:'coban-gps103',
+ nativeChannels:[{channel:'device.acc_reported',semanticKey:'ignition.acc',definitionVersion:1},
+  {channel:'device.door_open_reported',semanticKey:'door.open',definitionVersion:1}],resources:[],
+ functions:['ignition.acc','door.open'].map(semanticKey=>({semanticKey,definitionVersion:1,valueKind:'boolean',unit:'none',maxInstances:1,
+  direction:'observation',hardwareSupport:'unknown',interpretationSupport:'implemented',requirements:[]}))}
 let state={assignmentId:assignment,isCurrent:true,installationVersion:0,profileId:null,profileVersion:null,items:[]}
 const entry='22222222-2222-4222-8222-222222222222'
 const variable={id:entry,key:'contacto_prueba',category:'variable',name:'Contacto de prueba',status:'active',version:1,definitionVersion:1,
@@ -34,18 +37,19 @@ globalThis.fetch=async(url,options={})=>{
   aliases=[item];aliasHistory.unshift({...body,version:item.version,effectiveFrom:item.effectiveFrom});return response({assignmentId:assignment,entryId:entry,instance:body.instance,version:item.version,replayed:false})
  }
  if(u.pathname.endsWith('/gps-capability-catalog'))return response({items:[profile],page:{limit:50,offset:0,count:1,total:1}})
- if(u.pathname.endsWith('/versions/1'))return response(profile)
+ if(u.pathname.endsWith('/versions/2'))return response(profile)
  if(u.pathname.endsWith('/observations'))return response({items:[],page:{limit:50,offset:0,count:0,total:0}})
  if(u.pathname.endsWith('/functions')){
   if(method==='GET')return response(state)
   const body=JSON.parse(options.body)
   if(body.expectedVersion!==state.installationVersion)return response({message:'Version conflict'},409)
   state={...state,installationVersion:state.installationVersion+1,profileId:body.profileId,profileVersion:body.profileVersion,
-   items:body.functions.map((f,i)=>({...profile.functions[0],...f,functionId:`${state.installationVersion+1}-${i+1}`,instance:f.mapping.instance,
-    enabled:false,verification:'pending',freshness:'unknown',lastObservation:{quality:'valid',valueKind:'boolean',booleanValue:false,receivedAt:new Date().toISOString()}}))}
+   items:body.functions.map((f,i)=>({...profile.functions.find(fn=>fn.semanticKey===f.mapping.semanticKey),...f,
+    functionId:`${state.installationVersion+1}-${i+1}`,instance:f.mapping.instance,
+    enabled:false,verification:'pending',freshness:'missing',lastObservation:null}))}
   return response({assignmentId:assignment,version:state.installationVersion,effectiveFrom:new Date().toISOString()})
  }
  throw Error('Unrecognized synthetic request')
 }
 document.body.style.fontFamily='system-ui';document.body.style.padding='20px'
-createRoot(document.getElementById('root')).render(<BrowserRouter><p>ENSAYO SINTÉTICO · sin hardware ni base productiva</p><FuncionesInstalacion assignmentId={assignment} protocolFamily="synthetic"/></BrowserRouter>)
+createRoot(document.getElementById('root')).render(<BrowserRouter><p>ENSAYO SINTÉTICO · sin hardware ni base productiva</p><FuncionesInstalacion assignmentId={assignment} protocolFamily="coban gps103"/></BrowserRouter>)

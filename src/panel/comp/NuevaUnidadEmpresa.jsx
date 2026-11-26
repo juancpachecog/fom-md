@@ -6,6 +6,7 @@ import { Icono } from '../Iconos'
 import { empresaDeInstalacion } from '../datos/instalarGps'
 import { TIPOS_UNIDAD, UNIDAD_VACIA, LIMITES_UNIDAD, validarUnidad } from '../datos/unidadEnEmpresa'
 import { crearUnidadEnEmpresa } from '../datos/unidadEnEmpresaApi'
+import { placaMayuscula } from '../datos/placas'
 import './nueva-unidad-empresa.css'
 
 // ============================================================
@@ -83,7 +84,11 @@ export default function NuevaUnidadEmpresa({
   const campo = (clave) => ({
     value: datos[clave],
     disabled: Boolean(creada) || guardando,
-    onChange: (e) => { setDatos((d) => ({ ...d, [clave]: e.target.value })); setErrores((x) => ({ ...x, [clave]: undefined })) },
+    onChange: (e) => {
+      const valor = clave === 'placa' ? placaMayuscula(e.target.value) : e.target.value
+      setDatos((d) => ({ ...d, [clave]: valor }))
+      setErrores((x) => ({ ...x, [clave]: undefined }))
+    },
   })
   const empresa = empresas.find((e) => e.id === empresaId)
   const gpsElegido = equipoFijo?.id || gpsId || ''
@@ -169,7 +174,7 @@ export default function NuevaUnidadEmpresa({
             <input className="pnl-input" placeholder="Unidad 27" maxLength={LIMITES_UNIDAD.numero} autoComplete="off" {...campo('numero')} />
           </Campo>
           <Campo etiqueta="Placa" error={errores.placa}>
-            <input className="pnl-input" placeholder="A12BC3D" maxLength={LIMITES_UNIDAD.placa} autoComplete="off" {...campo('placa')} />
+            <input className="pnl-input" placeholder="A12BC3D" maxLength={LIMITES_UNIDAD.placa} autoComplete="off" autoCapitalize="characters" {...campo('placa')} />
           </Campo>
           <Campo etiqueta="Marca" error={errores.marca}>
             <input className="pnl-input" placeholder="Toyota" maxLength={LIMITES_UNIDAD.marca} autoComplete="off" {...campo('marca')} />

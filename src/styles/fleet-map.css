@@ -19,6 +19,15 @@
 .fleet-status-nota { display:block; margin:6px 0 0; font-size:11px; color:var(--fleet-muted); font-variant-numeric:tabular-nums; }
 .fleet-plate { margin:14px 0 0; font-size:32px; font-weight:700; line-height:1.1; letter-spacing:-.025em; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
 .fleet-description { margin:6px 0 0; font-size:13px; color:var(--fleet-muted); }
+.fleet-gps { margin:14px 0 0; }
+.fleet-gps h4 { margin:0 0 7px; font-size:13px; font-weight:600; }
+.fleet-gps dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; margin:0; }
+.fleet-gps dl > div { min-width:0; padding:7px 9px; border:1px solid var(--fleet-line); border-radius:9px; }
+.fleet-gps dt,.fleet-gps small,.fleet-gps-aviso { color:var(--fleet-muted); font-size:11px; }
+.fleet-gps dd { margin:2px 0 0; font-size:13px; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.fleet-gps dt { overflow-wrap:anywhere; }
+.fleet-gps small { display:block; margin-top:2px; }
+.fleet-gps-aviso { margin:10px 0 0; }
 .fleet-vehicle-image { margin:12px 0 14px; border-bottom:1px solid var(--fleet-line); background:radial-gradient(ellipse at 50% 65%,#243c4d 0%,#0c192600 70%); }
 .fleet-vehicle-image img { display:block; width:100%; height:144px; object-fit:contain; }
 .fleet-vehicle-image figcaption { text-align:right; color:var(--fleet-muted); font-size:10px; padding:0 0 10px; }

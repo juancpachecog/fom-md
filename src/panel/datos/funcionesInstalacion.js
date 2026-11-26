@@ -1,4 +1,5 @@
 import { pedir } from './api'
+import { numero } from './formato.js'
 
 const BASE = '/api/v1/console'
 const consultar = (url, options = {}) => pedir(url, { ...options, empresaContexto: null })
@@ -54,6 +55,46 @@ export const nombreFuncion = key => ({ 'battery.level':'Batería', 'fuel.level':
   'ignition.acc': 'Contacto (ACC)', 'door.open': 'Puerta abierta', 'input.digital.active': 'Entrada digital activa',
   'input.voltage': 'Voltaje de entrada', 'engine.rpm': 'Régimen del motor (RPM)', 'engine.running': 'Giro del motor detectado' })[key] || key
 
+export const familiaFunciones = value => String(value ?? '').trim().toLowerCase().replace(/^coban[ -]gps103$/u, 'coban-gps103')
+
+export function nombreFuente(channel) {
+  const fixed = {
+    'device.acc_reported': 'ACC ON / OFF',
+    'device.door_open_reported': 'Puerta abierta / cerrada',
+    'device.battery_percent_reported': 'Carga de batería',
+    'device.fuel_percent_reported': 'Nivel de combustible',
+    'device.humidity_percent_reported': 'Humedad',
+    'device.altitude_m_reported': 'Altitud GPS',
+    'gps.speed_kph': 'Velocidad GPS',
+    'gps.heading_deg': 'Rumbo GPS',
+    'engine.rpm_reported': 'RPM',
+    'engine.rotation_reported': 'Giro del motor',
+  }
+  const input = /^device\.input([1-5])_active$/u.exec(channel)
+  return fixed[channel] ?? (input ? `Entrada digital ${input[1]}` : channel)
+}
+
+export function perfilInicialFunciones(profiles, current, family, observed) {
+  const matches = (p, id, version) => p.profileId === id && p.profileVersion === version
+  if (current.profileId) return profiles.find(p => matches(p, current.profileId, current.profileVersion))
+  const detected = observed && profiles.find(p => matches(p, observed.profileId, observed.profileVersion))
+  if (detected) return detected
+  if (family === 'coban-gps103') return profiles.find(p => matches(p, 'coban-gps103.observed', 2))
+  return profiles.length === 1 ? profiles[0] : undefined
+}
+
+export function filasSugeridas(profile, prior = []) {
+  const priority = key => ({ 'ignition.acc': 0, 'door.open': 1, 'battery.level': 2 })[key] ?? 3
+  const functions = [...profile.functions].sort((a, b) => priority(a.semanticKey) - priority(b.semanticKey))
+  return functions.flatMap(fn => {
+    if (fn.direction !== 'observation' || fn.interpretationSupport !== 'implemented'
+      || fn.hardwareSupport === 'unsupported' || prior.some(r => r.mapping.semanticKey === fn.semanticKey)) return []
+    const native = fuentesFuncion(profile, fn).filter(c => c.source === 'native')
+    if (native.length !== 1 || prior.length >= 32) return []
+    return [nuevaFilaFuncion(profile, fn, prior)]
+  }).slice(0, Math.max(0, 32 - prior.length))
+}
+
 export function fuentesFuncion(profile, fn) {
   const native = profile.nativeChannels.filter(n => n.semanticKey === fn.semanticKey && n.definitionVersion === fn.definitionVersion)
     .map(n => ({ id: `native:${n.channel}`, source: 'native', channel: n.channel }))
@@ -86,4 +127,39 @@ export function valorFuncion(observation, semanticKey) {
   }
   if (observation.valueKind === 'numeric') return observation.numericValue === null ? 'Sin dato' : String(observation.numericValue)
   return observation.enumValue ?? 'Sin dato'
+}
+
+const simbolosUnidad = {
+  percent: '%', degree: '°', celsius: ' °C', fahrenheit: ' °F', volt: ' V',
+  kilometer: ' km', meter: ' m', kph: ' km/h', rpm: ' rpm',
+}
+
+const calidadLectura = {
+  invalid: 'Lectura inválida', uncertain: 'Lectura incierta',
+  out_of_range: 'Fuera de rango', contradictory: 'Lectura contradictoria',
+}
+
+export function filasFuncionesGps(instalacionId, snapshot) {
+  if (!instalacionId || snapshot?.assignmentId !== instalacionId || snapshot.isCurrent !== true || !Array.isArray(snapshot.items)) return []
+  const funciones = snapshot.items.filter(item => item.selected === true && item.direction === 'observation'
+    && item.installationVersion === snapshot.installationVersion)
+  return funciones.map(item => {
+    const nombre = item.semanticKey === 'door.open' ? 'Puerta' : nombreFuncion(item.semanticKey)
+    const etiqueta = nombre === item.semanticKey ? nombre.replace(/[._-]+/gu, ' ').replace(/^./u, letra => letra.toUpperCase()) : nombre
+    const distinguirInstancia = item.instance > 1 || funciones.some(otra => otra !== item && otra.semanticKey === item.semanticKey)
+    const observacion = item.lastObservation?.historicalOnly ? null : item.lastObservation
+    const instante = observacion && (item.freshnessBasis === 'observed_at' ? observacion.observedAt : observacion.receivedAt)
+    let valor = 'Sin lectura'
+    if (observacion) {
+      if (observacion.quality !== 'valid') valor = calidadLectura[observacion.quality] ?? 'Lectura sin validar'
+      else if (observacion.valueKind === 'numeric') valor = Number.isFinite(observacion.numericValue)
+        ? `${numero(observacion.numericValue)}${simbolosUnidad[item.unit] ?? ''}` : 'Sin lectura'
+      else valor = valorFuncion(observacion, item.semanticKey)
+    }
+    return {
+      id: item.functionId, etiqueta: distinguirInstancia ? `${etiqueta} ${item.instance}` : etiqueta,
+      valor, instante: Number.isFinite(Date.parse(instante)) ? instante : null,
+      vigencia: item.freshness === 'stale' ? 'Lectura anterior' : item.freshness === 'unknown' ? 'Vigencia sin confirmar' : null,
+    }
+  })
 }

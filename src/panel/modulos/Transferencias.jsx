@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import repo from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { useSesion } from '../useSesion'
@@ -7,6 +8,8 @@ import * as f from '../datos/formato'
 import { masNuevoPrimero } from '../datos/orden'
 import { esAdminFom } from '../roles'
 import { Icono } from '../Iconos'
+import { coincideConPlaca, conflictoDeDependencias, dependenciasDeTransferencia } from '../datos/transferenciasVehiculos'
+import RevisionTransferenciaVehiculo from './RevisionTransferenciaVehiculo'
 
 // ============================================================
 // TRANSFERENCIAS ENTRE ENTES (doble control)
@@ -40,16 +43,25 @@ const explicar = (mensaje) =>
     ? 'El servidor negó el permiso para esta operación. Solo la puede hacer el administrador FOM o un administrador o supervisor activo de la empresa de origen o de la de destino. Revisa el rol y la empresa de tu cuenta.'
     : mensaje
 
+function rotuloVehiculo(t, placa) {
+  if (!placa) return t.codigoDestino ? `Código en destino ${t.codigoDestino}` : ''
+  return coincideConPlaca(t.codigoDestino, placa) || !t.codigoDestino
+    ? placa
+    : `${placa} · código en destino ${t.codigoDestino}`
+}
+
 export default function Transferencias() {
   const sesion = useSesion()
   const actor = sesion?.perfil
-  const [pestana, setPestana] = useState('identidad')
+  const [parametros, setParametros] = useSearchParams()
+  const pestana = parametros.get('tipo') === 'vehiculo' ? 'vehiculo' : 'identidad'
   const [estado, setEstado] = useState('pending')
   const [aviso, setAviso] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const [creando, setCreando] = useState(false)
-  const [seleccionId, setSeleccionId] = useState(null)
+  const seleccionId = parametros.get('solicitud')
   const [cerrando, setCerrando] = useState(null) // { t, paso }
+  const [entrega, setEntrega] = useState(null)
 
   const lista = useDatos(
     () => (pestana === 'identidad' ? repo.transferencias.identidad.listar({ estado }) : repo.transferencias.vehiculo.listar({ estado })),
@@ -57,6 +69,19 @@ export default function Transferencias() {
   )
   const empresas = useDatos(() => repo.admin.empresas.listar({}), [])
   const nombreEmpresa = (id) => empresas.datos?.find((e) => e.id === id)?.nombre ?? id?.slice(0, 8) ?? '—'
+
+  function setPestana(tipo) {
+    setAviso('')
+    setParametros(tipo === 'vehiculo' ? { tipo } : {}, { replace: true })
+  }
+
+  function setSeleccionId(id) {
+    setParametros(previos => {
+      const siguientes = new URLSearchParams(previos)
+      siguientes.set('solicitud', id)
+      return siguientes
+    }, { replace: true })
+  }
 
   async function actuar(fn, exito) {
     setOcupado(true)
@@ -67,7 +92,10 @@ export default function Transferencias() {
       lista.recargar()
       return true
     } catch (e) {
-      setAviso(explicar(e?.message) || 'No se pudo completar la acción.')
+      if (pestana === 'vehiculo' && conflictoDeDependencias(e)) {
+        setAviso('La transferencia sigue pendiente. Resuelve las dependencias activas en la empresa de origen y vuelve a intentar.')
+        dependencias.recargar()
+      } else setAviso(explicar(e?.message) || 'No se pudo completar la acción.')
       return false
     } finally {
       setOcupado(false)
@@ -76,6 +104,16 @@ export default function Transferencias() {
   // La más nueva arriba (y elegida por defecto).
   const filas = masNuevoPrimero(lista.datos, 'creadaEn')
   const seleccion = filas.find(t => t.id === seleccionId) ?? filas[0]
+  const placas = useDatos(() => pestana === 'vehiculo' && lista.datos?.length
+    ? repo.transferencias.vehiculo.placas(lista.datos)
+    : {}, [pestana, lista.datos])
+  const revisarDependencias = pestana === 'vehiculo' && seleccion?.vehiculoId && seleccion.estado === 'pending'
+  const dependencias = useDatos(async () => {
+    if (!revisarDependencias) return null
+    return { id: seleccion.id, items: dependenciasDeTransferencia(await repo.transferencias.vehiculo.dependencias(seleccion)) }
+  }, [revisarDependencias, seleccion?.id, seleccion?.version])
+  const bloqueos = revisarDependencias && !dependencias.error && dependencias.datos?.id === seleccion.id ? dependencias.datos.items : []
+  const rotuloSeleccion = seleccion ? rotuloVehiculo(seleccion, placas.datos?.[seleccion.id]) : ''
   const modulo = () => (pestana === 'identidad' ? repo.transferencias.identidad : repo.transferencias.vehiculo)
 
   return (
@@ -110,6 +148,7 @@ export default function Transferencias() {
               {filas.map((t) => {
                 const [esT, esC] = ESTADO[t.estado] ?? [t.estado, 'gris']
                 const siguiente = paso(t)
+                const rotulo = rotuloVehiculo(t, placas.datos?.[t.id])
                 return (
                   <div className={`pnl-fila pnl-transfer-card${seleccion?.id === t.id ? ' seleccionada' : ''}`} key={t.id}>
                     <Icono nombre={pestana === 'identidad' ? 'gente' : 'camion'} tam={18} />
@@ -117,7 +156,7 @@ export default function Transferencias() {
                       <b>
                         {nombreEmpresa(t.origenId)} → {nombreEmpresa(t.destinoId)}
                         {t.rolDestino ? ` · llega como ${t.rolDestino}` : ''}
-                        {t.codigoDestino ? ` · código ${t.codigoDestino}` : ''}
+                        {rotulo && ` · ${rotulo}`}
                       </b>
                       <span>
                         {t.motivo} · abierta {f.desde(t.creadaEn)}
@@ -129,8 +168,16 @@ export default function Transferencias() {
                     <Tag color={esC}>{esT}</Tag>
                     <button className="pnl-btn sutil" onClick={()=>setSeleccionId(t.id)} aria-pressed={seleccion?.id === t.id}>Ver detalle</button>
                     {siguiente && (
-                      <button type="button" className="pnl-btn primario" disabled={ocupado} onClick={() => actuar(() => modulo().decidir(t, siguiente.clave), 'Paso registrado.')}>
-                        {siguiente.texto}
+                      <button type="button" className="pnl-btn primario" disabled={ocupado} onClick={() => {
+                        setSeleccionId(t.id)
+                        if (t.vehiculoId && siguiente.clave === 'destination-acceptance') {
+                          setAviso('')
+                          setEntrega(t)
+                          return
+                        }
+                        actuar(() => modulo().decidir(t, siguiente.clave), t.vehiculoId ? 'Vehículo liberado. Falta la aceptación en destino.' : 'Paso registrado.')
+                      }}>
+                        {t.vehiculoId && siguiente.clave === 'destination-acceptance' ? 'Revisar entrega' : siguiente.texto}
                       </button>
                     )}
                     {t.estado === 'pending' && (
@@ -146,11 +193,18 @@ export default function Transferencias() {
           ))}
         </Tarjeta><aside className="pnl-admin-detalle"><Tarjeta titulo="Detalle de la transferencia">
           {seleccion ? <><h3>{nombreEmpresa(seleccion.origenId)} <span aria-hidden="true">→</span> {nombreEmpresa(seleccion.destinoId)}</h3><Tag color={ESTADO[seleccion.estado]?.[1] ?? 'gris'}>{ESTADO[seleccion.estado]?.[0] ?? seleccion.estado}</Tag>
+            {rotuloSeleccion && <p><b>{rotuloSeleccion}</b></p>}
             <ol className="pnl-transfer-pasos">
               <li className="hecho"><i>1</i><div><b>Solicitud</b><span>{f.fechaHora(seleccion.creadaEn)}</span></div></li>
               <li className={seleccion.liberadaEn ? 'hecho' : ''}><i>2</i><div><b>Liberación en origen</b><span>{seleccion.liberadaEn ? f.fechaHora(seleccion.liberadaEn) : 'Pendiente'}</span></div></li>
               <li className={seleccion.aceptadaEn ? 'hecho' : ''}><i>3</i><div><b>Aceptación en destino</b><span>{seleccion.aceptadaEn ? f.fechaHora(seleccion.aceptadaEn) : 'Pendiente'}</span></div></li>
             </ol>
+            {bloqueos.length > 0 && <div className="pnl-audit-detalle">
+              <b>Dependencias que impiden completar</b>
+              <ul>{bloqueos.map(item => <li key={item.clave}>{item.texto}</li>)}</ul>
+              <p>Resuélvelas en {nombreEmpresa(seleccion.origenId)} antes de aceptar en destino.</p>
+              <button type="button" className="pnl-btn sutil" onClick={dependencias.recargar}>Actualizar dependencias</button>
+            </div>}
             <div className="pnl-audit-detalle"><b>Motivo</b><p>{seleccion.motivo}</p>{seleccion.rolDestino && <p>Rol en destino: {seleccion.rolDestino}</p>}</div>
             {seleccion.motivoCierre && <div className="pnl-audit-detalle"><b>Motivo del rechazo o cancelación</b><p>{seleccion.motivoCierre}</p></div>}
           </> : <Vacio icono="comparar" titulo="Sin transferencias" texto="Cuando exista una solicitud podrás consultar sus pasos aquí." />}
@@ -167,6 +221,17 @@ export default function Transferencias() {
         guardar={(datos) => actuar(() => modulo().crear(datos), 'Transferencia abierta: falta que origen libere y destino acepte.')}
       />}
       <ModalCierre cierre={cerrando} alCerrar={() => setCerrando(null)} confirmar={(motivo) => actuar(() => modulo().decidir(cerrando.t, cerrando.paso, motivo), cerrando.paso === 'rejection' ? 'Transferencia rechazada.' : 'Transferencia cancelada.')} />
+      {entrega && <RevisionTransferenciaVehiculo
+        key={entrega.id}
+        transferencia={entrega}
+        rotulo={rotuloVehiculo(entrega, placas.datos?.[entrega.id])}
+        origen={nombreEmpresa(entrega.origenId)}
+        destino={nombreEmpresa(entrega.destinoId)}
+        empresaOrigen={esAdminFom(actor) && empresas.datos?.find(e => e.id === entrega.origenId)}
+        mostrarInventario={esAdminFom(actor)}
+        alCerrar={() => { setEntrega(null); lista.recargar() }}
+        alCompletar={() => { setEntrega(null); setAviso('Transferencia completada.'); lista.recargar() }}
+      />}
     </>
   )
 }

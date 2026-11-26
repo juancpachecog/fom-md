@@ -34,7 +34,7 @@ test('validar: respeta los topes del servidor y el rango del año', () => {
 })
 
 test('cuerpo: código sin espacios y en minúsculas, y el año solo si se escribió', () => {
-  const c = cuerpoUnidad({ ...buena, numero: '  Unidad 27 ' })
+  const c = cuerpoUnidad({ ...buena, numero: '  Unidad 27 ', placa: ' a12bC3d ' })
   assert.equal(c.code, 'unidad-27')
   assert.equal(c.alias, 'Unidad 27')
   assert.equal(c.fleetNumber, 'Unidad 27')

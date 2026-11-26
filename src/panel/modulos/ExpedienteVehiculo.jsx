@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import repo, { CONECTADO } from '../datos/repo'
 import { useDatos } from '../useDatos'
 import { useSesion } from '../useSesion'
-import { esGestor } from '../roles'
+import { esAdminFom, esGestor } from '../roles'
 import {
   Cabecera, Cargando, Vacio, ErrorCarga, Tag, Tarjeta, Kpi, Barra, Modal, Campo,
   Volver, Pestanas, Datos,
@@ -552,7 +552,9 @@ export default function ExpedienteVehiculo() {
       </Cabecera>
 
       <div className="pnl-cuerpo">
-        <Volver a="/panel/flota">Vehículos</Volver>
+        {parametros.get('transferencia') && esAdminFom(sesion?.perfil)
+          ? <Volver a={`/panel/admin/transferencias?tipo=vehiculo&solicitud=${encodeURIComponent(parametros.get('transferencia'))}`}>Volver a la transferencia</Volver>
+          : <Volver a="/panel/flota">Vehículos</Volver>}
 
         {cargando && <Cargando filas={6} />}
         {estado === 'error' && <ErrorCarga onReintentar={recargar} error={error} />}
@@ -619,7 +621,7 @@ export default function ExpedienteVehiculo() {
                     <p className="fum-nota">{textoRecorridoHoy(vivo.hoy, vivo.unidad)}</p>
                   </Tarjeta>
                 ) : (
-                  <div className="pnl-expediente-hero"><Tarjeta titulo="Vehículo"><FichaUnidad unidad={v} conEnlace={false} /></Tarjeta><Tarjeta titulo="Recorrido del día" sinCuerpo><Mapa vehiculos={[v]} seleccionado={pinSeleccionado} alSeleccionar={setPinSeleccionado} recorrido={v.recorrido} alto="470px" ficha={false} /></Tarjeta></div>
+                  <div className="pnl-expediente-hero"><Tarjeta titulo="Vehículo"><FichaUnidad unidad={v} conEnlace={false} instalacionGpsId={v.id === id ? v.gps?.instalacionId : null} /></Tarjeta><Tarjeta titulo="Recorrido del día" sinCuerpo><Mapa vehiculos={[v]} seleccionado={pinSeleccionado} alSeleccionar={setPinSeleccionado} recorrido={v.recorrido} alto="470px" ficha={false} /></Tarjeta></div>
                 )}
                 <div className="eu-resumen-grid">
                   <ResumenDocumentos documentos={v.documentos} verTodo={() => irAParte('documentos')} />

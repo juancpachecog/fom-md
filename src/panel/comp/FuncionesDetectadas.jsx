@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { pedir } from '../datos/api'
 import { apiAutodeteccion, nombreSenal, valorSenal, propuestaDesdePerfil } from '../datos/gpsAutodeteccion'
-import { leerPerfilFunciones } from '../datos/funcionesInstalacion'
+import { leerPerfilFunciones, nombreFuente } from '../datos/funcionesInstalacion'
 import { haceCuanto } from '../datos/gps'
 import { useConfirmar } from './Confirmar'
 import './funciones-detectadas.css'
@@ -9,15 +9,16 @@ const api = apiAutodeteccion(pedir)
 const fecha = value => value ? new Date(value).toLocaleString('es-VE') : 'Sin lectura'
 const variantes = { 'coban.ascii.extended19.v1':'Coban · ASCII extendido', 'coban.ascii.position13.v3':'Coban · Posición básica', 'coban.ascii.state20.v4':'Coban · Posición y entradas', 'coban.ascii.heartbeat':'Conexión periódica', 'coban.ascii.login':'Inicio de conexión', 'coban.ascii.status2023.prefix':'Estado del equipo', 'coban.ascii.unrecognized':'Variante pendiente de interpretar' }
 
-export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar = true, assignmentId, alAplicar }) {
+export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar = true, assignmentId, alAplicar, detectar = true }) {
   const [snapshot, setSnapshot] = useState(null), [profile, setProfile] = useState(null), [saved, setSaved] = useState(null)
   const [loadError,setLoadError] = useState('')
-  const [error, setError] = useState(''), [mensaje, setMensaje] = useState(''), [busy, setBusy] = useState(false), [pagina, setPagina] = useState(0)
+  const [error, setError] = useState(''), [mensaje, setMensaje] = useState(''), [busy, setBusy] = useState(false)
   const [local, setLocal] = useState(null), [profiles,setProfiles] = useState([])
   const { confirmar, dialogo } = useConfirmar()
   const pending = useRef(null), lock = useRef(false), current = draft ?? local
   const cambiar = value => { pending.current = null; alCambiar ? alCambiar(value) : setLocal(value) }
   useEffect(() => {
+    if (!detectar) return undefined
     let alive = true, loading = false
     const load = async () => {
       if (loading) return; loading = true
@@ -26,7 +27,7 @@ export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar
     }
     load(); const timer = setInterval(load, 15000)
     return () => { alive = false; clearInterval(timer) }
-  }, [id, imei])
+  }, [id, imei, detectar])
   useEffect(() => { if (!id || !editar) return; let alive = true
     api.leer(id).then(data => { if (alive) { setSaved(data); if (data.revision) setLocal({profileId:data.profileId,profileVersion:data.profileVersion,choices:data.choices}) } }).catch(e => { if (alive) setError(e.message) })
     return () => { alive = false }
@@ -36,10 +37,13 @@ export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar
     return()=>{alive=false}
   },[editar])
   const elegirPerfil = async event => {const selected=profiles.find(p=>p.profileId+'@'+p.profileVersion===event.target.value);if(!selected)return
-    try{const p=await leerPerfilFunciones(selected.profileId,selected.profileVersion);setProfile(p);cambiar(propuestaDesdePerfil(p));setPagina(0)}catch(e){setError(e.message)}
+    try{const p=await leerPerfilFunciones(selected.profileId,selected.profileVersion);setProfile(p);cambiar(propuestaDesdePerfil(p));}catch(e){setError(e.message)}
   }
-  const desiredId = current?.profileId || saved?.profileId || snapshot?.profileSuggestion?.profileId
-  const desiredVersion = current?.profileVersion || saved?.profileVersion || snapshot?.profileSuggestion?.profileVersion
+  const observed = snapshot?.profileSuggestion
+  const suggested = profiles.find(p => p.profileId === observed?.profileId && p.profileVersion === observed?.profileVersion)
+    || profiles.find(p => p.profileId === 'coban-gps103.observed' && p.profileVersion === 2)
+  const desiredId = current?.profileId || saved?.profileId || suggested?.profileId
+  const desiredVersion = current?.profileVersion || saved?.profileVersion || suggested?.profileVersion
   useEffect(() => { setProfile(null); if (!desiredId || !desiredVersion) return; let alive = true
     leerPerfilFunciones(desiredId, desiredVersion).then(data => { if (alive) setProfile(data) }).catch(e => { if (alive) setError(e.message) })
     return () => { alive = false }
@@ -48,7 +52,7 @@ export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar
   const choices = selection?.choices ?? []
   const savedSelection = profile && saved ? propuestaDesdePerfil(profile,saved) : null
   const cambiosSinGuardar = !!savedSelection && (saved.profileId !== selection.profileId || saved.profileVersion !== selection.profileVersion || JSON.stringify(selection) !== JSON.stringify(savedSelection))
-  const signals = snapshot?.signals ?? [], paginas = Math.max(1, Math.ceil(choices.length / 4)), actual = Math.min(pagina, paginas - 1)
+  const signals = snapshot?.signals ?? []
   const save = async () => {
     if (lock.current || !selection || !saved) return
     if (!await confirmar({ titulo:'Guardar funciones del GPS', texto:'Se guardará tu selección para este equipo. Las comprobaciones de cableado y sensores se realizan en la instalación.', accion:'Guardar selección' })) return
@@ -74,7 +78,7 @@ export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar
   return <section className="gp-auto" aria-label="Funciones detectadas del GPS">
     {error && <p className="gp-error" role="alert">{error}</p>}
     {loadError && <p className="gp-error" role="alert">{loadError} {snapshot && 'Las lecturas anteriores no confirman el estado actual.'}</p>}
-    {!snapshot && !loadError && <p className="gp-hint" role="status">Analizando las tramas recibidas…</p>}
+    {detectar && !snapshot && !loadError && <p className="gp-hint" role="status">Analizando las tramas recibidas…</p>}
     {snapshot && <>
       <div className="gp-auto-status"><span><i className={snapshot.communicationFresh && !loadError ? 'live' : ''} />Comunicación <b>{haceCuanto(snapshot.lastCommunicationAt)}</b></span><span><i className={snapshot.positionFresh && !loadError ? 'live' : ''} />Posición recibida <b>{haceCuanto(snapshot.lastPositionAt)}</b></span></div>
       <p className="gp-hint">{snapshot.variants.filter(v => /extended19|position13|state20|unrecognized/.test(v.id)).map(v => variantes[v.id] || 'Variante pendiente').join(' · ') || 'Aún sin tramas de posición reconocidas'} · Firmware sin identificar</p>
@@ -83,13 +87,14 @@ export default function FuncionesDetectadas({ id, imei, draft, alCambiar, editar
     </>}
     {editar && profiles.length > 1 && <label className="gp-auto-profile"><span>Tipo de lectura</span><select value={desiredId ? desiredId+'@'+desiredVersion : ''} onChange={elegirPerfil} disabled={busy}><option value="">Revisar perfil…</option>{profiles.map(p=><option key={p.profileId+'@'+p.profileVersion} value={p.profileId+'@'+p.profileVersion}>{p.profileId==='coban.ascii.extended19'?'ASCII extendido':p.profileVersion===2?'Posición y entradas':'Posición básica'}</option>)}</select></label>}
     {selection && <>
-      <div className="gp-auto-heading"><b>Funciones del dispositivo</b>{editar && <button type="button" className="gp-btn2 chico" disabled={busy || !!loadError} onClick={() => cambiar({...selection,choices:choices.map(c => ({...c,selected:signals.some(s => s.key === c.semanticKey && s.quality === 'valid' && s.freshness === 'fresh' && s.interpretation === 'implemented')}))})}>Seleccionar observadas</button>}</div>
-      <div className="gp-auto-functions">{choices.slice(actual*4,(actual+1)*4).map((choice,index) => {const signal = signals.find(s => s.key === choice.semanticKey);return <label className="gp-auto-function" key={choice.semanticKey}>
-        {editar && <input type="checkbox" checked={choice.selected} disabled={busy} onChange={e => cambiar({...selection,choices:choices.map((c,i) => i === actual*4+index ? {...c,selected:e.target.checked} : c)})} />}
-        <span><b>{nombreSenal(choice.semanticKey)}</b><small>{signal ? signal.quality === 'contradictory' ? 'Lectura contradictoria' : loadError || signal.freshness === 'stale' ? 'Observada · lectura anterior' : 'Observada' : 'Compatible · sin muestra'} · Comprobación pendiente</small></span><span className="gp-auto-value" title={signal ? fecha(signal.receivedAt) : undefined}>{signal ? valorSenal(signal) : 'Sin lectura'}{signal && <small>{haceCuanto(signal.receivedAt)}</small>}</span>
+      <div className="gp-auto-heading"><b>Señales y variables</b>{editar && <button type="button" className="gp-btn2 chico" disabled={busy || !!loadError || !choices.some(c => signals.some(s => s.key === c.semanticKey && s.quality === 'valid' && s.freshness === 'fresh' && s.interpretation === 'implemented'))} onClick={() => cambiar({...selection,choices:choices.map(c => ({...c,selected:c.selected || signals.some(s => s.key === c.semanticKey && s.quality === 'valid' && s.freshness === 'fresh' && s.interpretation === 'implemented')}))})}>Seleccionar observadas</button>}</div>
+      <div className="gp-auto-functions">{choices.map((choice,index) => {
+        const signal = signals.find(s => s.key === choice.semanticKey)
+        const source = profile?.nativeChannels.find(c => c.semanticKey === choice.semanticKey && c.definitionVersion === choice.definitionVersion)
+        return <label className="gp-auto-function" key={choice.semanticKey}>
+        {editar && <input type="checkbox" checked={choice.selected} disabled={busy} onChange={e => cambiar({...selection,choices:choices.map((c,i) => i === index ? {...c,selected:e.target.checked} : c)})} />}
+        <span><b>{source ? nombreFuente(source.channel) : nombreSenal(choice.semanticKey)}</b><small>En FOM · {nombreSenal(choice.semanticKey)}</small></span><span className="gp-auto-value" title={signal ? fecha(signal.receivedAt) : undefined}>{signal ? valorSenal(signal) : 'Sin lectura'}{signal && <small>{haceCuanto(signal.receivedAt)}</small>}</span>
       </label>})}</div>
-      {paginas > 1 && <div className="gp-discovery-pagination"><button type="button" className="gp-btn2 chico" disabled={!actual} onClick={() => setPagina(actual-1)}>Anterior</button><span>{actual+1} / {paginas}</span><button type="button" className="gp-btn2 chico" disabled={actual+1>=paginas} onClick={() => setPagina(actual+1)}>Siguiente</button></div>}
-      <p className="gp-hint">{choices.filter(c => c.selected).length} seleccionadas · ACC no confirma que el motor esté girando. Los valores describen lo que reportó el equipo.</p>
     </>}
     {(signals.some(s => s.interpretation === 'unit_pending') || snapshot?.settings) && <details className="gp-auto-more"><summary>Más lecturas y estado</summary>
       {signals.filter(s => s.interpretation === 'unit_pending').map(s => <p className="gp-hint" key={s.key}>{nombreSenal(s.key)}: {valorSenal(s)}</p>)}

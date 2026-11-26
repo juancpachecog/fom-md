@@ -5,6 +5,7 @@ import { cerrarSesion, esAdminFom, resolverSesion, salirEmpresa, sesionActual } 
 import { areaDe, esGestor } from './roles'
 import { reorganizarMenu } from './hardware-navegacion'
 import HardwareTelemetria from './modulos/HardwareTelemetria'
+import SesionFinalizada from './SesionFinalizada'
 import { useSesion } from './useSesion'
 import { useApariencia } from './useApariencia'
 import { estaLeida } from './modulos/alertas-presentacion'
@@ -45,6 +46,7 @@ const CARGADORES = {
   Documentos: () => import('./modulos/Documentos'),
   Reportes: () => import('./modulos/Reportes'),
   AdminEmpresas: () => import('./modulos/AdminEmpresas'),
+  SeleccionEmpresa: () => import('./modulos/SeleccionEmpresa'),
   AdminCicloDatos: () => import('./modulos/AdminCicloDatos'),
   AdminPagos: () => import('./modulos/AdminPagos'),
   CatalogoFunciones: () => import('./modulos/CatalogoFunciones'),
@@ -94,6 +96,7 @@ const Transferencias = lazy(CARGADORES.Transferencias)
 const Plataforma = lazy(CARGADORES.Plataforma)
 const AdminVehiculos = lazy(CARGADORES.AdminVehiculos)
 const AdminCicloDatos = lazy(CARGADORES.AdminCicloDatos)
+const SeleccionEmpresa = lazy(CARGADORES.SeleccionEmpresa)
 
 /**
  * Qué módulo(s) pide cada ruta. Sirve para empezar a bajar la pantalla antes de
@@ -122,6 +125,7 @@ function modulosDeRuta(pathname, area) {
     case 'configuracion': return ['Configuracion']
     case 'funciones': return ['CatalogoFunciones']
     case 'admin': return MODULOS_ADMIN[sub] ? [MODULOS_ADMIN[sub]] : []
+    case 'seleccionar-empresa': return ['SeleccionEmpresa']
     default: return []
   }
 }
@@ -284,12 +288,13 @@ const RUTAS_POR_AREA = {
 
 /** Pantallas del conductor que no están en el menú del teléfono: su nombre en la cápsula, como el ScreenHeader de la app. */
 const TITULOS_PROPIOS = {
+  '/panel/seleccionar-empresa': 'Seleccionar empresa',
   '/panel/sos': 'Emergencia',
   '/panel/otra-unidad': 'Usar otra unidad (PIN)',
 }
 
 function inicioDe(area) {
-  if (area === 'admin') return '/panel/admin/plataforma'
+  if (area === 'admin') return '/panel/seleccionar-empresa'
   if (area === 'gerencial') return '/panel/personal'
   if (area === 'personal') return '/panel/mapa'
   return '/panel'
@@ -298,7 +303,7 @@ function inicioDe(area) {
 /** El menú de esta persona: el mismo para el lateral y para el teléfono. */
 function menuDe(perfil) {
   const menu = esAdminFom(perfil) && perfil.empresaGestion
-    ? [...MENU, MENU_ADMIN]
+    ? [MENU_ADMIN, ...MENU]
     : MENU_POR_AREA[areaDe(perfil)] ?? MENU_POR_AREA.conductor
   return reorganizarMenu(menu, perfil)
 }
@@ -452,7 +457,9 @@ export default function Consola() {
     )
   }
   if (!sesion) return <Navigate to="/entrar" replace />
-  if (sesion.errorConexion) return <div className="pnl-cargando-sesion" role="alert"><p>{sesion.errorConexion}</p><button className="pnl-btn" onClick={resolverSesion}>Reintentar conexión</button></div>
+  if (sesion.finalizada) return <SesionFinalizada estado={sesion.finalizada} />
+  if (sesion.comprobandoConexion) return <SesionFinalizada comprobando />
+  if (sesion.errorConexion) return <SesionFinalizada estado={{ motivo: 'conexion', pendiente: true }} />
   if (sesion.debeCambiarClave) return <Navigate to="/cambiar-clave-inicial" replace />
 
   const { perfil } = sesion
@@ -462,8 +469,8 @@ export default function Consola() {
   // `pathname` viene del router, no del `window`: asi la guarda vuelve a
   // evaluarse en cada navegacion y no solo al cargar la pagina.
   const primerTramo = pathname.replace(/^\/panel\/?/u, '').split('/')[0]
-  if (area === 'admin' && !perfil.empresaGestion && !['admin', 'mi-perfil', 'configuracion', 'alertas'].includes(primerTramo)) {
-    return <Navigate to="/panel/admin/plataforma" replace />
+  if (area === 'admin' && !perfil.empresaGestion && !['admin', 'seleccionar-empresa', 'mi-perfil', 'configuracion'].includes(primerTramo)) {
+    return <Navigate to="/panel/seleccionar-empresa" replace />
   }
   if (!['mi-perfil', 'configuracion'].includes(primerTramo) && permitidas && !permitidas.includes(primerTramo)) {
     return <Navigate to={inicioDe(area)} replace />
@@ -566,6 +573,7 @@ export default function Consola() {
           {esAdminFom(perfil) && (
             <>
               <Route path="admin/empresas" element={<AdminEmpresas />} />
+              <Route path="seleccionar-empresa" element={<SeleccionEmpresa />} />
               <Route path="admin/ciclo-datos" element={<AdminCicloDatos />} />
               <Route path="admin/plataforma" element={<Plataforma />} />
               <Route path="admin/vehiculos" element={<AdminVehiculos />} />
