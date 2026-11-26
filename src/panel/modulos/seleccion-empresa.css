@@ -3,6 +3,7 @@
 .seleccion-empresa-opcion { display: flex; align-items: center; gap: 16px; padding: 20px; width: 100%; text-align: left; border: 1px solid var(--e-borde); border-radius: 16px; background: var(--e-sup); color: var(--e-texto); cursor: pointer; }
 .seleccion-empresa-opcion:hover, .seleccion-empresa-opcion:focus-visible { border-color: var(--e-primario); background: var(--e-sup-baja); }
 .seleccion-empresa-opcion:disabled { opacity: .65; cursor: wait; }
+.seleccion-empresa-opcion[aria-current="true"] { opacity: 1; cursor: default; }
 .seleccion-empresa-opcion > span:not(.pnl-tag) { display: grid; gap: 5px; flex: 1; min-width: 0; }
 .seleccion-empresa-opcion strong { font-size: 18px; overflow-wrap: anywhere; }
 .seleccion-empresa-opcion small { color: var(--e-texto-2); }
