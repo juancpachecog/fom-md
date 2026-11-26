@@ -84,3 +84,23 @@
 .emp-simbolo .logo-fom { width: 62%; height: auto; }
 .emp-gestion label.pnl-btn { cursor: pointer; }
 .emp-gestion label.pnl-btn.deshabilitado { opacity: 0.5; pointer-events: none; }
+
+.emp-eliminacion { display: grid; gap: 12px; }
+.emp-eliminacion > p { margin: 0; line-height: 1.6; }
+.emp-eliminacion-nombre { color: var(--e-texto); font-size: 19px; font-weight: 650; overflow-wrap: anywhere; }
+.emp-eliminacion-resumen { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0; gap: 10px; }
+.emp-eliminacion-resumen > div { padding: 12px; background: var(--e-sup-baja); border: 1px solid var(--e-borde); border-radius: 12px; }
+.emp-eliminacion-resumen dt { color: var(--e-texto-2); font-size: 12px; }
+.emp-eliminacion-resumen dd { margin: 5px 0 0; font-size: 21px; font-weight: 650; }
+@media (min-width: 560px) { .emp-eliminacion-resumen { grid-template-columns: repeat(4,minmax(0,1fr)); } }
+.emp-eliminacion-aviso { font-size: 12px; color: var(--e-texto-2); line-height: 1.6; }
+.emp-eliminacion .emp-form-acciones { margin-top: 18px; flex-wrap: wrap; }
+.emp-eliminaciones { margin: 0 0 18px; padding: 16px 20px; border: 1px solid var(--e-borde); border-radius: 14px; background: var(--e-sup-baja); }
+.emp-eliminaciones > summary { cursor: pointer; font-weight: 600; }
+.emp-eliminaciones > summary > span { margin-left: 12px; color: var(--e-texto-2); font-size: 12px; font-weight: 400; }
+.emp-eliminaciones ul { list-style: none; margin: 12px 0 0; padding: 0; }
+.emp-eliminaciones li { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 14px 0; border-top: 1px solid var(--e-borde); }
+.emp-eliminaciones li > div { display: grid; gap: 5px; min-width: 0; flex: 1 1 180px; }
+.emp-eliminaciones li strong { overflow-wrap: anywhere; }
+.emp-eliminaciones li > div > span { font-size: 12px; color: var(--e-texto-2); }
+.emp-eliminaciones-paginas { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 10px; font-size: 12px; }
