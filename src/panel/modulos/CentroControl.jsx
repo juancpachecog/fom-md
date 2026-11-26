@@ -19,6 +19,7 @@ import { leerEnlaceEvento } from '../datos/eventosManejo'
 import { BloqueManejoBrusco, useManejoBrusco } from '../comp/ManejoBrusco'
 import * as f from '../datos/formato'
 import { Icono } from '../Iconos'
+import SeleccionEmpresa from './SeleccionEmpresa'
 import '../../styles/control-map.css'
 
 const ESTADOS = [
@@ -49,8 +50,18 @@ const firmaPuntos = (p) => `${p.length}|${p[0]?.hora}|${p.at(-1)?.hora}|${p.at(-
 const firmaAnalisis = (a) => `${firmaPuntos(a.puntos)}|${a.viajes.length}|${a.paradas.length}`
 
 export default function CentroControl() {
-  const contexto = useSesion()
-  const empresaDetalle = contexto?.perfil?.empresaGestion?.id ?? contexto?.perfil?.empresaId
+  const perfil = useSesion()?.perfil
+  const empresaDetalle = perfil?.empresaGestion?.id ?? perfil?.empresaId
+  const admin = esAdminFom(perfil)
+  const [selectorAbierto, setSelectorAbierto] = useState(false)
+  return <>
+    <MapaEmpresa key={empresaDetalle} perfil={perfil} empresaDetalle={empresaDetalle} admin={admin}
+      abrirSelector={admin ? () => setSelectorAbierto(true) : undefined} selectorAbierto={selectorAbierto} />
+    {admin && selectorAbierto && <SeleccionEmpresa empresaId={empresaDetalle} alCerrar={() => setSelectorAbierto(false)} />}
+  </>
+}
+
+function MapaEmpresa({ perfil, empresaDetalle, admin, abrirSelector, selectorAbierto }) {
   const [q, setQ] = useState('')
   const [estadoMarcha, setEstadoMarcha] = useState('')
   const [areaId, setAreaId] = useState('')
@@ -250,7 +261,7 @@ export default function CentroControl() {
           alto="100%" ficha={false} leyenda={false} espacioFicha herramientas />
       </div>
       <div className="control-search">
-        <div className="control-search-heading"><div><div className="control-titulo-empresa"><h1>Centro de control</h1><EmpresaActiva perfil={contexto?.perfil} admin={esAdminFom(contexto?.perfil)} /></div><p>{bajada}{sinPunto > 0 && <> · <button type="button" className="control-sin-posicion" onClick={() => { setListaAbierta(true); setSeleccionado(null) }}>{sinPunto} sin posición · Ver unidades</button></>}</p>{incompleta && <p role="status">Lista incompleta: la flota es más grande de lo que se pudo leer.</p>}</div>
+        <div className="control-search-heading"><div><div className="control-titulo-empresa"><h1>Centro de control</h1><EmpresaActiva perfil={perfil} admin={admin} alPulsar={abrirSelector} abierto={selectorAbierto} /></div><p>{bajada}{sinPunto > 0 && <> · <button type="button" className="control-sin-posicion" onClick={() => { setListaAbierta(true); setSeleccionado(null) }}>{sinPunto} sin posición · Ver unidades</button></>}</p>{incompleta && <p role="status">Lista incompleta: la flota es más grande de lo que se pudo leer.</p>}</div>
           <div className="control-acciones">
             <button className="pnl-btn" type="button" aria-label="Unidades" aria-expanded={listaAbierta} aria-controls="control-unidades" onClick={() => { setListaAbierta(v => !v); setSeleccionado(null) }}><Icono nombre="camion" tam={18} />Unidades</button>
           </div>

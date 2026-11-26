@@ -217,7 +217,6 @@ const MENU = [
 const MENU_ADMIN = {
   grupo: 'Administración FOM',
   items: [
-    { a: '/panel/seleccionar-empresa', icono: 'empresa', texto: 'Seleccionar empresa' },
     { a: '/panel/admin/empresas', icono: 'empresa', texto: 'Empresas' },
     { a: '/panel/admin/ciclo-datos', icono: 'auditoria', texto: 'Retirada y limpieza' },
     { a: '/panel/admin/plataforma', icono: 'buscar', texto: 'Usuarios generales' },
@@ -289,6 +288,7 @@ const RUTAS_POR_AREA = {
 
 /** Pantallas del conductor que no están en el menú del teléfono: su nombre en la cápsula, como el ScreenHeader de la app. */
 const TITULOS_PROPIOS = {
+  '/panel/seleccionar-empresa': 'Seleccionar empresa',
   '/panel/sos': 'Emergencia',
   '/panel/otra-unidad': 'Usar otra unidad (PIN)',
 }
